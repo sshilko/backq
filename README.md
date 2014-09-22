@@ -16,14 +16,14 @@ MIT
 
 Provided
 
-1. Adapter for Beanstalkd
+* Adapter for Beanstalkd
 
 ```
 //by default connects to 127.0.0.1:11300
 $adapter = new \BackQ\Adapter\Beanstalk;
 ```
 
-2. Worker that dispatches messages
+* Worker that dispatches messages
 
 ```
 $log = 'somepath/log.txt';
@@ -42,7 +42,7 @@ $worker->toggleDebug(true);
 $worker->run();
 ```
 
-3. Publisher that pushes new messages into Beanstalkd queue
+* Publisher that pushes new messages into Beanstalkd queue
 
 ```
 //array of [ApnsPHP_Message_Custom or ApnsPHP_Message]
