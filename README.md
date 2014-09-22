@@ -13,13 +13,15 @@ Background notifications processing with workers &amp; publisher
 Provided
 
 1. Adapter for Beanstalkd
-`
+
+- `
 //by default connects to 127.0.0.1:11300
 $adapter = new \BackQ\Adapter\Beanstalk;
 `
 
 2. Worker that dispatches messages
-`
+
+- `
 $log = 'somepath/log.txt';
 $ca  = 'somepath/entrust_2048_ca.cer';
 $pem = 'somepath/apnscertificate.pem';
@@ -34,11 +36,11 @@ $worker->setEnvironment($env);
 $worker->toggleDebug(true);
 
 $worker->run();
-
 `
 
 3. Publisher that pushes new messages into Beanstalkd queue
-`
+
+- `
 //array of [ApnsPHP_Message_Custom or ApnsPHP_Message]
 $messages  = array();
 $publisher = \BackQ\Publisher\Apnsd::getInstance(new \BackQ\Adapter\Beanstalk);
