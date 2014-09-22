@@ -7,6 +7,7 @@ Background notifications processing with workers &amp; publisher
 
 * [ApnsPHP](https://github.com/duccio/ApnsPHP/)
 * davidpersson/beanstalk [library](https://github.com/davidpersson/beanstalk) for Beanstalkd 
+* PHP 5.5 ([generators](http://php.net/manual/en/language.generators.overview.php) & coroutines)
 
 #### Licence
 MIT
