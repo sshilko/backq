@@ -1,0 +1,19 @@
+{
+"name": "sshilko/backq",
+"description": "Background push notifications processing with workers & publisher",
+"keywords": ["queue", "worker", "apns", "push", "apple", "ios"],
+"homepage": "https://github.com/sshilko/backq",
+"license": "MIT",
+"authors": [
+{
+"name": "Sergey Shilko",
+"email": "contact@sshilko.com"
+}
+],
+"require": {
+"php": ">=5.5.0"
+},
+"autoload": {
+"psr-4": { "Backq\\": "/" }
+}
+}
