@@ -37,7 +37,7 @@ $worker->setLogger(new \BackQ\Logger($log));
 $worker->setRootCertificationAuthority($ca);
 $worker->setCertificate($pem);
 $worker->setEnvironment($env);
-$worker->toggleDebug(true);
+//$worker->toggleDebug(true);
 
 $worker->run();
 ```
