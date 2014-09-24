@@ -51,9 +51,9 @@ $publisher = \BackQ\Publisher\Apnsd::getInstance(new \BackQ\Adapter\Beanstalk);
 
 //try connecting to Beanstalkd and ensure there are workers waiting for a job
 if ($publisher->start() && $publisher->hasWorkers()) {
+    //wait 3 seconds for worker response on job status, see Beanstalkd protocol for details
+    $ttr = 3;
     for ($i=0; $i < count($messages); $i++) {
-        //allow maximum 3 seconds for worker to give a response on job status, see Beanstalkd protocol for details
-        $ttr = 3;
         $result = $publisher->publish($messages[$i], array(\BackQ\Adapter\Beanstalk::PARAM_JOBTTR => $ttr));
         if ($result > 0) {
             //successfull
