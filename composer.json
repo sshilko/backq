@@ -1,7 +1,12 @@
 {
     "name": "sshilko/backq",
     "description": "Background push notifications processing with workers & publisher",
-    "keywords": ["queue", "worker", "apns", "push", "apple", "ios"],
+    "version": "1.0.0",
+    "type": "library",
+    "support": {
+        "issues": "https://github.com/sshilko/backq/issues",
+    },
+    "keywords": ["queue", "worker", "apns", "push", "ios", "apple"],
     "homepage": "https://github.com/sshilko/backq",
     "license": "MIT",
     "authors": [
@@ -13,9 +18,11 @@
         }
     ],
     "require": {
-        "php": ">=5.5.0"
-    },
+        "php": ">=5.5.0",
+        "davidpersson/beanstalk": "dev-master",
+        "duccio/apns-php": "dev-master"
+    },    
     "autoload": {
-        "psr-0": { "Backq\\": "src/" }
+        "psr-4": { "Backq\\": "src/" }
     }
 }
