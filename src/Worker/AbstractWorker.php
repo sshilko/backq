@@ -24,7 +24,8 @@ abstract class AbstractWorker
 
     abstract public function run();
 
-    public function __construct(\BackQ\Adapter\AbstractAdapter $adapter) {
+    public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
+    {
         $this->_adapter = $adapter;
     }
 
@@ -33,7 +34,8 @@ abstract class AbstractWorker
      *
      * @return bool
      */
-    protected function start() {
+    protected function start()
+    {
         if (true === $this->_adapter->connect()) {
             if ($this->_adapter->bindRead($this->getQueueName())) {
                 $this->_bind = true;
@@ -44,9 +46,10 @@ abstract class AbstractWorker
     }
 
     /**
-     * Process data, 
+     * Process data,
      */
-    protected function work() {
+    protected function work()
+    {
         if (!$this->_bind) {
             return;
         }
@@ -63,7 +66,7 @@ abstract class AbstractWorker
             $result = (yield $job[0] => $job[1]);
             yield;
 
-            $ack = FALSE;
+            $ack = false;
             if ($response === FALSE) {
                 $ack = $this->_adapter->afterWorkFailed($job[0]);
             } else {
@@ -76,7 +79,8 @@ abstract class AbstractWorker
         }
     }
 
-    protected function finish() {
+    protected function finish()
+    {
         if ($this->_bind) {
             $this->_adapter->disconnect();
             return true;
@@ -84,14 +88,16 @@ abstract class AbstractWorker
         return false;
     }
 
-    public function toggleDebug($flag) {
+    public function toggleDebug($flag)
+    {
         $this->_doDebug = $flag;
     }
 
     /**
      * Process debug logging if needed
      */
-    protected function _debug($log) {
+    protected function _debug($log)
+    {
         if ($this->_doDebug) {
             echo "\n" . $log;
         }

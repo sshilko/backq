@@ -12,7 +12,8 @@ namespace BackQ\Publisher;
 
 class Apnsd extends AbstractPublisher
 {
-    public function getQueueName() {
+    public function getQueueName()
+    {
         return 'apnsd';
     }
 }

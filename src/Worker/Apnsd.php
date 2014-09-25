@@ -24,7 +24,7 @@ final class Apnsd extends AbstractWorker
      *
      * A status code of 10 indicates that the APNs server closed the connection (for example, to perform maintenance).
      * The notification identifier in the error response indicates the last notification that was successfully sent.
-     * Any notifications you sent after it have been discarded and must be resent. 
+     * Any notifications you sent after it have been discarded and must be resent.
      * When you receive this status code, stop using this connection and open a new connection.
      *
      * @see https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/CommunicatingWIthAPS.html
@@ -36,39 +36,45 @@ final class Apnsd extends AbstractWorker
     /**
      * Queue this worker is read from
      */
-    public function getQueueName() {
+    public function getQueueName()
+    {
         return 'apnsd';
     }
 
     /**
      * Declare Logger
      */
-    public function setLogger(\ApnsPHP_Log_Interface $log) {
-        $this->_logger = $log;        
+    public function setLogger(\ApnsPHP_Log_Interface $log)
+    {
+        $this->_logger = $log;
     }
 
     /**
      * Declare CA Authority certificate
      */
-    public function setRootCertificationAuthority($caCert) {
+    public function setRootCertificationAuthority($caCert)
+    {
         $this->_caCert = $caCert;
     }
 
     /**
      * Declare working environment
      */
-    public function setEnvironment($environment = \ApnsPHP_Abstract::ENVIRONMENT_SANDBOX) {
+    public function setEnvironment($environment = \ApnsPHP_Abstract::ENVIRONMENT_SANDBOX)
+    {
         $this->_environment = $environment;
     }
 
     /**
      * Declare path to SSL certificate
      */
-    public function setCertificate($pem) {
+    public function setCertificate($pem)
+    {
         $this->_pem = $pem;
     }
 
-    public function run() {
+    public function run()
+    {
         $version   = filemtime(__FILE__);
         $connected = $this->start();
         $this->_debug('started');
@@ -180,7 +186,7 @@ final class Apnsd extends AbstractWorker
                                         }
                                     } else {
                                         @error_log('apnsd worker error generic: ' . @json_encode($e));
-                                        $processed = false;                                        
+                                        $processed = false;
                                     }
                                 }
                             } else {

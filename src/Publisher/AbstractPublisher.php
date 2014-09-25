@@ -17,7 +17,8 @@ abstract class AbstractPublisher
 
     protected static $_instances = null;
 
-    protected function __construct(\BackQ\Adapter\AbstractAdapter $adapter) {
+    protected function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
+    {
         $this->_adapter = $adapter;
     }
 
@@ -26,7 +27,8 @@ abstract class AbstractPublisher
      */
     abstract public function getQueueName();
 
-    public static function getInstance(\BackQ\Adapter\AbstractAdapter $adapter) {
+    public static function getInstance(\BackQ\Adapter\AbstractAdapter $adapter)
+    {
         $cname = get_class($adapter);
 
         if (null === self::$_instances || (is_array(self::$_instances) && !isset(self::$_instances[$cname]))) {
@@ -41,7 +43,8 @@ abstract class AbstractPublisher
      *
      * @return bool
      */
-    public function start() {
+    public function start()
+    {
         if (true === $this->_bind) {
             return true;
         }
@@ -57,7 +60,8 @@ abstract class AbstractPublisher
     /**
      * Check if connection is alive and ready to do the job
      */
-    public function ready() {
+    public function ready()
+    {
         if ($this->_bind) {
             return $this->_adapter->ping();
         }
@@ -68,7 +72,8 @@ abstract class AbstractPublisher
      *
      * @return null|int
      */
-    public function hasWorkers() {
+    public function hasWorkers()
+    {
         return $this->_adapter->hasWorkers($this->getQueueName());
     }
 
@@ -77,17 +82,19 @@ abstract class AbstractPublisher
      *
      * @param mixed $serializable job payload
      * @param array $params adapter specific params
-     * 
+     *
      * @return integer|bool
      */
-    public function publish($serializable, $params = array()) {
+    public function publish($serializable, $params = array())
+    {
         if (!$this->_bind) {
             return false;
         }
         return $this->_adapter->putTask(serialize($serializable));
     }
 
-    public function finish() {
+    public function finish()
+    {
         if ($this->_bind) {
             $this->_adapter->disconnect();
             $this->_bind = false;
