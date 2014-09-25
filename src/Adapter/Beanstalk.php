@@ -10,7 +10,8 @@
 **/
 namespace BackQ\Adapter;
 
-use Exception, RuntimeException;
+use Exception;
+use RuntimeException;
 
 /**
  * Beanstalk protocol adapter

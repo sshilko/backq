@@ -9,6 +9,7 @@
 *
 **/
 namespace BackQ\Worker;
+
 use Exception;
 
 abstract class AbstractWorker
