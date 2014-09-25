@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "type": "library",
     "support": {
-        "issues": "https://github.com/sshilko/backq/issues",
+        "issues": "https://github.com/sshilko/backq/issues"
     },
     "keywords": ["queue", "worker", "apns", "push", "ios", "apple"],
     "homepage": "https://github.com/sshilko/backq",
@@ -19,7 +19,7 @@
     ],
     "require": {
         "php": ">=5.5.0",
-        "davidpersson/beanstalk": "dev-master",
+        "davidpersson/beanstalk": "dev-next",
         "duccio/apns-php": "dev-master"
     },    
     "autoload": {
