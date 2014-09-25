@@ -1,7 +1,6 @@
 {
     "name": "sshilko/backq",
     "description": "Background push notifications processing with workers & publisher",
-    "version": "1.0.0",
     "type": "library",
     "support": {
         "issues": "https://github.com/sshilko/backq/issues"
