@@ -12,14 +12,14 @@ namespace BackQ\Publisher;
 
 abstract class AbstractPublisher
 {
-    private $_adapter;
-    private $_bind;
+    private $adapter;
+    private $bind;
 
-    protected static $_instances = null;
+    protected static $instances = null;
 
     protected function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
-        $this->_adapter = $adapter;
+        $this->adapter = $adapter;
     }
 
     /**
@@ -31,11 +31,11 @@ abstract class AbstractPublisher
     {
         $cname = get_class($adapter);
 
-        if (null === self::$_instances || (is_array(self::$_instances) && !isset(self::$_instances[$cname]))) {
+        if (null === self::$instances || (is_array(self::$instances) && !isset(self::$instances[$cname]))) {
             $class = get_called_class();
-            self::$_instances[$cname] = new $class($adapter);
+            self::$instances[$cname] = new $class($adapter);
         }
-        return self::$_instances[$cname];
+        return self::$instances[$cname];
     }
 
     /**
@@ -45,12 +45,12 @@ abstract class AbstractPublisher
      */
     public function start()
     {
-        if (true === $this->_bind) {
+        if (true === $this->bind) {
             return true;
         }
-        if (true === $this->_adapter->connect()) {
-            if ($this->_adapter->bindWrite($this->getQueueName())) {
-                $this->_bind = true;
+        if (true === $this->adapter->connect()) {
+            if ($this->adapter->bindWrite($this->getQueueName())) {
+                $this->bind = true;
                 return true;
             }
         }
@@ -62,8 +62,8 @@ abstract class AbstractPublisher
      */
     public function ready()
     {
-        if ($this->_bind) {
-            return $this->_adapter->ping();
+        if ($this->bind) {
+            return $this->adapter->ping();
         }
     }
 
@@ -74,7 +74,7 @@ abstract class AbstractPublisher
      */
     public function hasWorkers()
     {
-        return $this->_adapter->hasWorkers($this->getQueueName());
+        return $this->adapter->hasWorkers($this->getQueueName());
     }
 
     /**
@@ -87,17 +87,17 @@ abstract class AbstractPublisher
      */
     public function publish($serializable, $params = array())
     {
-        if (!$this->_bind) {
+        if (!$this->bind) {
             return false;
         }
-        return $this->_adapter->putTask(serialize($serializable));
+        return $this->adapter->putTask(serialize($serializable));
     }
 
     public function finish()
     {
-        if ($this->_bind) {
-            $this->_adapter->disconnect();
-            $this->_bind = false;
+        if ($this->bind) {
+            $this->adapter->disconnect();
+            $this->bind = false;
             return true;
         }
         return false;

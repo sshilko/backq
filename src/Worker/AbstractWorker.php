@@ -13,9 +13,9 @@ use Exception;
 
 abstract class AbstractWorker
 {
-    private $_adapter;
-    private $_bind;
-    private $_doDebug;
+    private $adapter;
+    private $bind;
+    private $doDebug;
 
     /**
      * Specify worker queue to pick job from
@@ -26,7 +26,7 @@ abstract class AbstractWorker
 
     public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
-        $this->_adapter = $adapter;
+        $this->adapter = $adapter;
     }
 
     /**
@@ -36,9 +36,9 @@ abstract class AbstractWorker
      */
     protected function start()
     {
-        if (true === $this->_adapter->connect()) {
-            if ($this->_adapter->bindRead($this->getQueueName())) {
-                $this->_bind = true;
+        if (true === $this->adapter->connect()) {
+            if ($this->adapter->bindRead($this->getQueueName())) {
+                $this->bind = true;
                 return true;
             }
         }
@@ -50,12 +50,12 @@ abstract class AbstractWorker
      */
     protected function work()
     {
-        if (!$this->_bind) {
+        if (!$this->bind) {
             return;
         }
 
         while (true) {
-            $job = $this->_adapter->pickTask();
+            $job = $this->adapter->pickTask();
             if (!is_array($job)) {
                 throw new Exception('Worker failed to fetch new job');
             }
@@ -68,9 +68,9 @@ abstract class AbstractWorker
 
             $ack = false;
             if ($response === FALSE) {
-                $ack = $this->_adapter->afterWorkFailed($job[0]);
+                $ack = $this->adapter->afterWorkFailed($job[0]);
             } else {
-                $ack = $this->_adapter->afterWorkSuccess($job[0]);
+                $ack = $this->adapter->afterWorkSuccess($job[0]);
             }
 
             if (!$ack) {
@@ -81,8 +81,8 @@ abstract class AbstractWorker
 
     protected function finish()
     {
-        if ($this->_bind) {
-            $this->_adapter->disconnect();
+        if ($this->bind) {
+            $this->adapter->disconnect();
             return true;
         }
         return false;
@@ -90,15 +90,15 @@ abstract class AbstractWorker
 
     public function toggleDebug($flag)
     {
-        $this->_doDebug = $flag;
+        $this->doDebug = $flag;
     }
 
     /**
      * Process debug logging if needed
      */
-    protected function _debug($log)
+    protected function debug($log)
     {
-        if ($this->_doDebug) {
+        if ($this->doDebug) {
             echo "\n" . $log;
         }
     }

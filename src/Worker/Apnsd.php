@@ -12,10 +12,10 @@ namespace BackQ\Worker;
 
 final class Apnsd extends AbstractWorker
 {
-    private $_logger;
-    private $_pem;
-    private $_caCert;
-    private $_environment;
+    private $logger;
+    private $pem;
+    private $caCert;
+    private $environment;
 
     public $quitIfModified = true;
 
@@ -46,7 +46,7 @@ final class Apnsd extends AbstractWorker
      */
     public function setLogger(\ApnsPHP_Log_Interface $log)
     {
-        $this->_logger = $log;
+        $this->logger = $log;
     }
 
     /**
@@ -54,7 +54,7 @@ final class Apnsd extends AbstractWorker
      */
     public function setRootCertificationAuthority($caCert)
     {
-        $this->_caCert = $caCert;
+        $this->caCert = $caCert;
     }
 
     /**
@@ -62,7 +62,7 @@ final class Apnsd extends AbstractWorker
      */
     public function setEnvironment($environment = \ApnsPHP_Abstract::ENVIRONMENT_SANDBOX)
     {
-        $this->_environment = $environment;
+        $this->environment = $environment;
     }
 
     /**
@@ -70,24 +70,24 @@ final class Apnsd extends AbstractWorker
      */
     public function setCertificate($pem)
     {
-        $this->_pem = $pem;
+        $this->pem = $pem;
     }
 
     public function run()
     {
         $version   = filemtime(__FILE__);
         $connected = $this->start();
-        $this->_debug('started');
+        $this->debug('started');
         if ($connected) {
             try {
-                $push = new \ApnsPHP_Push($this->_environment, $this->_pem);
-                if ($this->_logger) {
-                    $push->setLogger($this->_logger);
+                $push = new \ApnsPHP_Push($this->environment, $this->pem);
+                if ($this->logger) {
+                    $push->setLogger($this->logger);
                 }
-                $push->setRootCertificationAuthority($this->_caCert);
+                $push->setRootCertificationAuthority($this->caCert);
                 $push->connect();
 
-                $this->_debug('ios connected');
+                $this->debug('ios connected');
 
                 /**
                  * Dont retry, will restart worker in case things go south
@@ -99,9 +99,9 @@ final class Apnsd extends AbstractWorker
                 $push->setConnectTimeout(20);
 
                 $work = $this->work();
-                $this->_debug('after init work generator');
-                foreach($work as $taskId => $payload) {
-                    $this->_debug('got some work');
+                $this->debug('after init work generator');
+                foreach ($work as $taskId => $payload) {
+                    $this->debug('got some work');
 
                     if ($quitIfModified) {
                         /**
@@ -112,7 +112,7 @@ final class Apnsd extends AbstractWorker
                             /**
                              * Return the work, worker version changed, quitting
                              */
-                            $this->_debug('worker code changed, returning job');
+                            $this->debug('worker code changed, returning job');
                             $work->send(false);
                             break;
                         }
@@ -136,14 +136,14 @@ final class Apnsd extends AbstractWorker
                              * We send 1 message per push, thats easier handling errors (see below error handling section, especially error code 10 from apple)
                              */
                             $push->add($message);
-                            $this->_debug('job added to apns queue');
+                            $this->debug('job added to apns queue');
                             $push->send();
-                            $this->_debug('job queue pushed to apple');
+                            $this->debug('job queue pushed to apple');
                         } catch (\ApnsPHP_Message_Exception $longpayload) {
-                            $this->_debug('bad job payload');
+                            $this->debug('bad job payload');
                             @error_log($longpayload->getMessage());
                         } catch (\ApnsPHP_Push_Exception $networkIssue) {
-                            $this->_debug('bad connection network');
+                            $this->debug('bad connection network');
                             @error_log($networkIssue->getMessage());
                             $processed = $networkIssue->getMessage();
                         } finally {
@@ -170,8 +170,11 @@ final class Apnsd extends AbstractWorker
                                                      * Critical errors requiring action
                                                      */
                                                     case \ApnsPHP_Push::STATUS_CODE_INTERNAL_ERROR:
+                                                    // no break
                                                     case self::CODE_APNS_PROCERRN:
+                                                    // no break
                                                     case self::CODE_APNS_SHUTDOWN:
+                                                    // no break
                                                     case self::CODE_APNS_UNKNOWN:
                                                         @error_log('apnsd worker error data: ' . @json_encode($err));
                                                         $processed = $err['statusCode'] . ' ' . $err['statusMessage'];

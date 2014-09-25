@@ -25,8 +25,8 @@ final class Beanstalk extends AbstractAdapter
     const PARAM_READYWAIT = 'readywait';
     const PARAM_JOBTTR    = 'jobttr';
 
-    private $_client;
-    private $_connected;
+    private $client;
+    private $connected;
 
     /**
      * Simple log
@@ -46,9 +46,9 @@ final class Beanstalk extends AbstractAdapter
         try {
             $bconfig = array('host' => $host, 'port' => $port, 'timeout' => $timeout, 'persistent' => $persistent);
             $bconfig['logger'] = $this;
-            $this->_client = new \Beanstalk\Client($bconfig);
-            if ($this->_client->connect()) {
-                $this->_connected = true;
+            $this->client = new \Beanstalk\Client($bconfig);
+            if ($this->client->connect()) {
+                $this->connected = true;
                 return true;
             }
         } catch (Exception $e) {
@@ -64,9 +64,9 @@ final class Beanstalk extends AbstractAdapter
      */
     public function hasWorkers($queue)
     {
-        if ($this->_connected) {
+        if ($this->connected) {
             try {
-                $result = $this->_client->stats($queue);
+                $result = $this->client->stats($queue);
                 if ($result && is_array($result) && isset($result['current-workers'])) {
                     return $result['current-workers'];
                 }
@@ -83,11 +83,11 @@ final class Beanstalk extends AbstractAdapter
             /**
              * @todo Any other fast && reliable options to check if socket is alive?
              */
-            $result = $this->_client->stats();
+            $result = $this->client->stats();
             if ($result) {
                 return true;
             } elseif ($reconnect) {
-                if (true == $this->_client->connect()) {
+                if (true == $this->client->connect()) {
                     return $this->ping(false);
                 }
             }
@@ -101,9 +101,9 @@ final class Beanstalk extends AbstractAdapter
      */
     public function bindRead($queue)
     {
-        if ($this->_connected) {
+        if ($this->connected) {
             try {
-                if ($this->_client->watch($queue)) {
+                if ($this->client->watch($queue)) {
                     return true;
                 }
             } catch (Exception $e) {
@@ -120,9 +120,9 @@ final class Beanstalk extends AbstractAdapter
      */
     public function bindWrite($queue)
     {
-        if ($this->_connected) {
+        if ($this->connected) {
             try {
-                $this->_client->useTube($queue);
+                $this->client->useTube($queue);
                 return true;
             } catch (Exception $e) {
                 @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
@@ -138,9 +138,9 @@ final class Beanstalk extends AbstractAdapter
      */
     public function pickTask()
     {
-        if ($this->_connected) {
+        if ($this->connected) {
             try {
-                $result = $this->_client->reserve();
+                $result = $this->client->reserve();
                 if (is_array($result)) {
                     return array($result['id'], $result['body']);
                 }
@@ -160,7 +160,7 @@ final class Beanstalk extends AbstractAdapter
      */
     public function putTask($body, $params = array())
     {
-        if ($this->_connected) {
+        if ($this->connected) {
             try {
 
                 $priority  = 1024;
@@ -179,7 +179,7 @@ final class Beanstalk extends AbstractAdapter
                     $jobttr    = $params[self::PARAM_JOBTTR];
                 }
 
-                $result = $this->_client->put($priority, $readywait, $jobttr, $body);
+                $result = $this->client->put($priority, $readywait, $jobttr, $body);
 
                 if (false != $result) {
                     return $result;
@@ -198,9 +198,9 @@ final class Beanstalk extends AbstractAdapter
      */
     public function afterWorkFailed($workId)
     {
-        if ($this->_connected) {
+        if ($this->connected) {
             try {
-                if ($this->_client->release($workId)) {
+                if ($this->client->release($workId)) {
                     return true;
                 }
             } catch (Exception $e) {
@@ -217,9 +217,9 @@ final class Beanstalk extends AbstractAdapter
      */
     public function afterWorkSuccess($workId)
     {
-        if ($this->_connected) {
+        if ($this->connected) {
             try {
-                if ($this->_client->delete($workId)) {
+                if ($this->client->delete($workId)) {
                     return true;
                 }
             } catch (Exception $e) {
@@ -236,10 +236,10 @@ final class Beanstalk extends AbstractAdapter
      */
     public function disconnect()
     {
-        if (true === $this->_connected) {
+        if (true === $this->connected) {
             try {
-                $this->_client->disconnect();
-                $this->_connected = false;
+                $this->client->disconnect();
+                $this->connected = false;
                 return true;
             } catch (Exception $e) {
                 @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
