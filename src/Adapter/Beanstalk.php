@@ -153,6 +153,39 @@ final class Beanstalk extends AbstractAdapter
     }
 
     /**
+     * Pick many tasks from queue
+     *
+     * @param int $max maximum number of tasks to reserve
+     * @param int $waitForJob should we try and wait for N seconds for job to be available, default not to wait
+     *
+     * @return boolean|array of [id, payload]
+     */
+    public function pickTasks($max, $waitForJob = 0)
+    {
+        if ($this->connected) {
+            try {
+                $result = array();
+                for ($i=0; $i<$max; $i++) {
+                    /**
+                     * Pick a task or return immediattely if no (more) tasks available
+                     */
+                    $taskreserve = $this->client->reserve($waitForJob);
+                    if (is_array($taskreserve)) {
+                        $result[] = array($taskreserve['id'], $taskreserve['body']);
+                    } else {
+                        break;
+                    }
+                }
+                return $result;
+
+            } catch (Exception $e) {
+                @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+            }
+        }
+        return false;
+    }
+
+    /**
      * Pick task from queue
      *
      * @param  string $data The job body.
