@@ -10,6 +10,8 @@
 **/
 namespace BackQ\Worker;
 
+use RuntimeException;
+
 final class Apnsd extends AbstractWorker
 {
     private $logger;
