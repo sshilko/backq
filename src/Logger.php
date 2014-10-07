@@ -25,9 +25,7 @@ class Logger implements \ApnsPHP_Log_Interface
             return;
         }
 
-        global $config;
-        $log_file = $config['base_dir'] . $this->logFile;
-        if ($log_handler = fopen($log_file, 'a')) {
+        if ($log_handler = fopen($this->logFile, 'a')) {
             fwrite($log_handler, date('Y-m-d H:i:s') . ' - ' . getmypid() . ' - ' . trim($sMessage)."\n");
             fclose($log_handler);
         }
