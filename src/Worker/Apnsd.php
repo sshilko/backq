@@ -123,7 +123,7 @@ final class Apnsd extends AbstractWorker
                     $message   = @unserialize($payload);
                     $processed = true;
 
-                    if (!($message instanceof \ApnsPHP_Message)) {
+                    if (!($message instanceof \ApnsPHP_Message) || !$message->getRecipientsNumber()) {
                         $work->send($processed);
                         @error_log('Worker does not support payload of: ' . gettype($message));
                     } else {
@@ -204,11 +204,11 @@ final class Apnsd extends AbstractWorker
                             /**
                              * Worker not reliable, quitting
                              */
-                            throw new RuntimeException('Worker not reliable, failed to process APNS task: ' . $processed);
+                            throw new \RuntimeException('Worker not reliable, failed to process APNS task: ' . $processed);
                         }
                     }
                 };
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 @error_log('apnsd worker exception: ' . $e->getMessage());
             } finally {
                 if ($push) {
