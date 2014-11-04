@@ -64,11 +64,11 @@ abstract class AbstractWorker
             /**
              * @see http://php.net/manual/en/generator.send.php
              */
-            $result = (yield $job[0] => $job[1]);
+            $response = (yield $job[0] => $job[1]);
             yield;
 
             $ack = false;
-            if ($response === FALSE) {
+            if ($response === false) {
                 $ack = $this->adapter->afterWorkFailed($job[0]);
             } else {
                 $ack = $this->adapter->afterWorkSuccess($job[0]);
