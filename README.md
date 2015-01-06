@@ -12,7 +12,11 @@ Background notifications processing with workers &amp; publisher
 #### Licence
 MIT
 
-#### Usage
+#### Review
+
+[Blog post](http://moar.sshilko.com/2014/09/09/APNS-Workers/) 
+
+#### Basic Usage
 
 Provided
 
