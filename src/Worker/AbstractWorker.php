@@ -20,6 +20,8 @@ abstract class AbstractWorker
 
     /**
      * Specify worker queue to pick job from
+     *
+     * @return string
      */
     abstract public function getQueueName();
 

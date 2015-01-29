@@ -19,6 +19,8 @@ final class Apnsd extends AbstractWorker
     private $caCert;
     private $environment;
 
+    private $queueName = 'apnsd';
+
     public $quitIfModified = true;
 
     /**
@@ -37,10 +39,22 @@ final class Apnsd extends AbstractWorker
 
     /**
      * Queue this worker is read from
+     *
+     * @return string
      */
     public function getQueueName()
     {
-        return 'apnsd';
+        return $this->queueName;
+    }
+
+    /**
+     * Set queue this worker is going to use
+     *
+     * @param $string
+     */
+    public function setQueueName($string)
+    {
+        $this->queueName = (string) $string;
     }
 
     /**
