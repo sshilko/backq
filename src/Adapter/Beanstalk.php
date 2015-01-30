@@ -63,13 +63,26 @@ final class Beanstalk extends AbstractAdapter
      *
      * @return null|int
      */
-    public function hasWorkers($queue)
+    public function hasWorkers($queue = false)
     {
         if ($this->connected) {
             try {
-                $result = $this->client->stats($queue);
-                if ($result && is_array($result) && isset($result['current-workers'])) {
-                    return $result['current-workers'];
+                if ($queue) {
+                    /**
+                     * Workers watching queue
+                     */
+                    $result = $this->client->statsTube($queue);
+                    if ($result && is_array($result) && isset($result['current-watching'])) {
+                        return $result['current-watching'];
+                    }
+                } else {
+                    /**
+                     * Workers at all connected (not very usefull)
+                     */
+                    $result = $this->client->stats();
+                    if ($result && is_array($result) && isset($result['current-workers'])) {
+                        return $result['current-workers'];
+                    }
                 }
             } catch (RuntimeException $e) {}
         }
