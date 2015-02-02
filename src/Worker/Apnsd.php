@@ -96,7 +96,7 @@ final class Apnsd extends AbstractWorker
         $this->debug('started');
         if ($connected) {
             try {
-                $push = new \ApnsPHP_Push($this->environment, $this->pem);
+                $push = new \BackQ\Adapter\ApnsdPush($this->environment, $this->pem);
                 if ($this->logger) {
                     $push->setLogger($this->logger);
                 }
