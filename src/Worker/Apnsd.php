@@ -111,7 +111,12 @@ final class Apnsd extends AbstractWorker
                 $push->setSendRetryTimes(0);
 
                 $push->setConnectRetryTimes(3);
-                $push->setSocketSelectTimeout(1000000);
+                /**
+                 * Even if documentation states its " timeout value is the maximum time that will elapse"
+                 * @see http://php.net/manual/en/function.stream-select.php
+                 * But in reality it always waits this time before returning (php 5.5.22)
+                 */
+                $push->setSocketSelectTimeout(500000);
                 $push->setConnectTimeout(20);
 
                 $work = $this->work();

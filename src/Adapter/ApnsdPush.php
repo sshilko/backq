@@ -44,4 +44,33 @@ final class ApnsdPush extends \ApnsPHP_Push
         'tls://gateway.push.apple.com:2195',
         'tls://gateway.sandbox.push.apple.com:2195'
     );
+
+    protected function _connect()
+    {
+        parent::_connect();
+
+        /**
+         * Manually set blocking & write buffer settings and make sure they are successfuly set
+         * Use non-blocking as we dont want to stuck waiting for socket data while fread() w/o timeout
+         */
+        if (true === stream_set_blocking($this->_hSocket, 0) && 0 === stream_set_read_buffer($this->_hSocket, 0)) {
+
+            /**
+             * ! this is not reliably returns success (0)
+             * ! but default buffer is pretty high (few Kb), so will not affect sending single small pushes
+             *
+             * Output using fwrite() is normally buffered at 8K.
+             * This means that if there are two processes wanting to write to the same output stream (a file),
+             * each is paused after 8K of data to allow the other to write.
+             *
+             * Ensures that all writes with fwrite() are completed
+             * before other processes are allowed to write to that output stream
+             */
+            stream_set_write_buffer($this->_hSocket, 0);
+
+            return true;
+        } else {
+            throw new \ApnsPHP_Exception("Unable to set connection parameters");
+        }
+    }
 }
