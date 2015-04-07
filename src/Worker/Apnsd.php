@@ -21,6 +21,18 @@ final class Apnsd extends AbstractWorker
 
     private $queueName = 'apnsd';
 
+    /**
+     * PHP 5.5.23 & 5.6.7 does not honor the stream_set_timeout()
+     *
+     * Instead it uses the connectionTimeout for operations too
+     * @see https://github.com/duccio/ApnsPHP/issues/84
+     * @see https://bugs.php.net/bug.php?id=69393
+     *
+     * For those versions use connectTimeout as low as 0.5
+     */
+    public $connectTimeout = 5;
+    public $socketSelectTimeout = 500000;
+
     public $quitIfModified = true;
 
     /**
@@ -101,6 +113,9 @@ final class Apnsd extends AbstractWorker
                     $push->setLogger($this->logger);
                 }
                 $push->setRootCertificationAuthority($this->caCert);
+
+                $push->setConnectTimeout($this->connectTimeout);
+
                 $push->connect();
 
                 $this->debug('ios connected');
@@ -116,8 +131,7 @@ final class Apnsd extends AbstractWorker
                  * @see http://php.net/manual/en/function.stream-select.php
                  * But in reality it always waits this time before returning (php 5.5.22)
                  */
-                $push->setSocketSelectTimeout(500000);
-                $push->setConnectTimeout(20);
+                $push->setSocketSelectTimeout($this->socketSelectTimeout);
 
                 $work = $this->work();
                 $this->debug('after init work generator');
