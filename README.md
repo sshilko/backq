@@ -43,6 +43,9 @@ $worker->setCertificate($pem);
 $worker->setEnvironment($env);
 //$worker->toggleDebug(true);
 
+//enable for PHP 5.5.23 & 5.6.7 (does not honor the stream_set_timeout())
+//$worker->connectTimeout = 1;
+
 $worker->run();
 ```
 
