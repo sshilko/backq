@@ -33,7 +33,12 @@ final class Apnsd extends AbstractWorker
     public $connectTimeout = 5;
     public $socketSelectTimeout = 500000;
 
-    public $quitIfModified = true;
+    /**
+     * Check whether worker code changed in runtime,
+     * since production has opcache most of the time enabled
+     * will not work; disabling by default
+     */
+    public $quitIfModified = false;
 
     /**
      * Error codes that require restarting the apns connection
@@ -138,7 +143,7 @@ final class Apnsd extends AbstractWorker
                 foreach ($work as $taskId => $payload) {
                     $this->debug('got some work');
 
-                    if ($quitIfModified) {
+                    if ($this->quitIfModified) {
                         /**
                          * If worker code was modified should exit gracefully
                          */
