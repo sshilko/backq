@@ -27,7 +27,7 @@ Provided
 $adapter = new \BackQ\Adapter\Beanstalk;
 ```
 
-* Worker that dispatches messages
+* Worker (can have multiple per same queue) that dispatches messages
 
 ```
 $log = 'somepath/log.txt';
@@ -41,10 +41,11 @@ $worker->setLogger(new \BackQ\Logger($log));
 $worker->setRootCertificationAuthority($ca);
 $worker->setCertificate($pem);
 $worker->setEnvironment($env);
+$worker->setQueueName('apnsd');
 //$worker->toggleDebug(true);
 
 //enable for PHP 5.5.23 & 5.6.7 (does not honor the stream_set_timeout())
-//$worker->connectTimeout = 1;
+//$worker->connectTimeout = 2;
 
 $worker->run();
 ```
@@ -55,6 +56,7 @@ $worker->run();
 //array of [ApnsPHP_Message_Custom or ApnsPHP_Message]
 $messages  = array();
 $publisher = \BackQ\Publisher\Apnsd::getInstance(new \BackQ\Adapter\Beanstalk);
+$publisher->setQueueName('apnsd');
 
 //try connecting to Beanstalkd and ensure there are workers waiting for a job
 if ($publisher->start() && $publisher->hasWorkers()) {
