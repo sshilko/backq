@@ -44,7 +44,8 @@ $worker->setEnvironment($env);
 $worker->setQueueName('apnsd');
 //$worker->toggleDebug(true);
 
-//enable for PHP 5.5.23 & 5.6.7 (does not honor the stream_set_timeout())
+//enable for PHP 5.5.23,5.5.24 & 5.6.7,5.6.8 (does not honor the stream_set_timeout())
+//see https://bugs.php.net/bug.php?id=69393
 //$worker->connectTimeout = 2;
 
 $worker->run();
