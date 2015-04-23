@@ -26,6 +26,8 @@ final class Beanstalk extends AbstractAdapter
     const PARAM_READYWAIT = 'readywait';
     const PARAM_JOBTTR    = 'jobttr';
 
+    const PRIORITY_DEFAULT = 1024;
+
     private $client;
     private $connected;
 
@@ -210,7 +212,7 @@ final class Beanstalk extends AbstractAdapter
         if ($this->connected) {
             try {
 
-                $priority  = 1024;
+                $priority  = self::PRIORITY_DEFAULT;
                 $readywait = 0;
                 $jobttr    = 60;
 
@@ -247,7 +249,10 @@ final class Beanstalk extends AbstractAdapter
     {
         if ($this->connected) {
             try {
-                if ($this->client->release($workId)) {
+                /**
+                 * Release task back to queue with default priority and 1 second ready-delay
+                 */
+                if ($this->client->release($workId, self::PRIORITY_DEFAULT, 1)) {
                     return true;
                 }
             } catch (Exception $e) {
