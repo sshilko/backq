@@ -34,7 +34,7 @@ final class Beanstalk extends AbstractAdapter
      */
     public function error($msg)
     {
-        @error_log('beanstalk adapter error: ' . $msg);
+        @error_log('beanstalk adapter error: ' . $msg . ' at ' . print_r(debug_backtrace(false, 5), true));
     }
 
     /**
