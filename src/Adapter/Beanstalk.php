@@ -70,8 +70,15 @@ final class Beanstalk extends AbstractAdapter
         if ($this->connected) {
             try {
                 if ($queue) {
+                    # $definedtubes = $this->client->listTubes();
+                    # if (!empty($definedtubes) && in_array($queue, $definedtubes)) {
+                    # Because we already binded to a queue, it will be always shown in list 
+                    
                     /**
                      * Workers watching queue
+                     *
+                     * rarely fails with NOT_FOUND even when we binded (use %tube) successfuly before
+                     * failure produces error-log entries
                      */
                     $result = $this->client->statsTube($queue);
                     if ($result && is_array($result) && isset($result['current-watching'])) {
@@ -138,8 +145,9 @@ final class Beanstalk extends AbstractAdapter
     {
         if ($this->connected) {
             try {
-                $this->client->useTube($queue);
-                return true;
+                if ($this->client->useTube($queue)) {
+                    return true;
+                }
             } catch (Exception $e) {
                 @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
