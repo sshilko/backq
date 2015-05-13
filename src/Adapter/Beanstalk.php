@@ -36,7 +36,15 @@ final class Beanstalk extends AbstractAdapter
      */
     public function error($msg)
     {
-        @error_log('beanstalk adapter error: ' . $msg . ' at ' . print_r(debug_backtrace(false, 5), true));
+        /**
+         * Adapter throws NOT_FOUND error at 
+         * statsTube->_statsRead after the 'use' tube, which is unexpected
+         *
+         * @see https://github.com/davidpersson/beanstalk/issues/12
+         **/
+        if ($msg != 'NOT_FOUND') {
+            @error_log('beanstalk adapter error: ' . $msg . ' at ' . print_r(debug_backtrace(false, 5), true));
+        }
     }
 
     /**
