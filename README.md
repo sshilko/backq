@@ -1,7 +1,10 @@
 backq
 =====
 
-Background notifications processing with workers &amp; publisher
+Perform tasks with workers &amp; publishers (queue)
+
+* push notifications (Apnsd) processing 
+* asynchronous process executon via [proc_open](http://php.net/manual/en/function.proc-open.php) implemented by [symfony/process](http://symfony.com/doc/current/components/process.html) component
 
 #### Requirements
 
