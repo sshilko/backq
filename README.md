@@ -72,6 +72,35 @@ if ($publisher->start() && $publisher->hasWorkers()) {
 }
 ```
 
+#### Process usage
+
+A queue for the [symfony/process](http://symfony.com/doc/current/components/process.html) component usage.
+A simple scheduler is done using Beanstalkd `delay` option for jobs. Or just dispatch projess jobs for async execution.
+
+Worker daemon
+```
+$worker = new \BackQ\Worker\AProcess(new \BackQ\Adapter\Beanstalk);
+$worker->run();
+```
+
+Publisher
+```
+$publisher = \BackQ\Publisher\Process::getInstance(new \BackQ\Adapter\Beanstalk);
+if ($publisher->start() && $publisher->hasWorkers()) {
+    $delay = 4;
+    $message = new \BackQ\Message\Process('echo $( date +%s ) >> /tmp/test');
+    $result = $publisher->publish($message, array(\BackQ\Adapter\Beanstalk::PARAM_JOBTTR => 3,
+                                                  \BackQ\Adapter\Beanstalk::PARAM_READYWAIT => $delay));
+    if ($result > 0) {
+        //Async process job added to queue
+    } else {
+        //fail
+    }
+}
+```
+
+
+
 
 
 

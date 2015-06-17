@@ -53,12 +53,12 @@ final class AProcess extends AbstractWorker
                              * Enclosure in anonymous function
                              */
                             $run = function() use ($message) {
-                                $process = new \Symfony\Component\Process\Process\Process($message->getCommandline(),
-                                                                                          $message->getCwd(),
-                                                                                          $message->getEnv(),
-                                                                                          $message->getInput(),
-                                                                                          $message->getTimeout(),
-                                                                                          $message->getOptions());
+                                $process = new \Symfony\Component\Process\Process($message->getCommandline(),
+                                                                                  $message->getCwd(),
+                                                                                  $message->getEnv(),
+                                                                                  $message->getInput(),
+                                                                                  $message->getTimeout(),
+                                                                                  $message->getOptions());
                                 $process->disableOutput();
 
                                 /**

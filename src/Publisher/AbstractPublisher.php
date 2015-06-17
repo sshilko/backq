@@ -90,7 +90,7 @@ abstract class AbstractPublisher
         if (!$this->bind) {
             return false;
         }
-        return $this->adapter->putTask(serialize($serializable));
+        return $this->adapter->putTask(serialize($serializable), $params);
     }
 
     public function finish()
