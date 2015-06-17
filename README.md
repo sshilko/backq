@@ -8,18 +8,26 @@ Perform tasks with workers &amp; publishers (queue)
 
 #### Requirements
 
-* [ApnsPHP](https://github.com/duccio/ApnsPHP/)
+* [ApnsPHP](https://github.com/duccio/ApnsPHP/) or [symfony/process](http://symfony.com/doc/current/components/process.html) component
 * davidpersson/beanstalk [library](https://github.com/davidpersson/beanstalk) for Beanstalkd 
 * PHP 5.5 ([generators](http://php.net/manual/en/language.generators.overview.php) & coroutines)
 
+#### Push notifications requirements
+
+* [ApnsPHP](https://github.com/duccio/ApnsPHP/) or [symfony/process](http://symfony.com/doc/current/components/process.html) component
+
+#### Process dispatch requirements
+ 
+* [symfony/process](http://symfony.com/doc/current/components/process.html) component
+  
 #### Licence
-MIT
+[MIT](http://opensource.org/licenses/MIT)
 
 #### Review
 
-[Blog post](http://moar.sshilko.com/2014/09/09/APNS-Workers/) 
+[Blog post about sending Apple push notifications](http://moar.sshilko.com/2014/09/09/APNS-Workers/) 
 
-#### Basic Usage
+#### Basic Usage (push notifications)
 
 Provided
 
@@ -75,7 +83,7 @@ if ($publisher->start() && $publisher->hasWorkers()) {
 }
 ```
 
-#### Process usage
+#### Basic usage (processes)
 
 A queue for the [symfony/process](http://symfony.com/doc/current/components/process.html) component usage.
 A simple scheduler is done using Beanstalkd `delay` option for jobs. Or just dispatch projess jobs for async execution.
