@@ -8,7 +8,6 @@ Perform tasks with workers &amp; publishers (queue)
 
 #### Requirements
 
-* [ApnsPHP](https://github.com/duccio/ApnsPHP/) or [symfony/process](http://symfony.com/doc/current/components/process.html) component
 * davidpersson/beanstalk [library](https://github.com/davidpersson/beanstalk) for Beanstalkd 
 * PHP 5.5 ([generators](http://php.net/manual/en/language.generators.overview.php) & coroutines)
 
