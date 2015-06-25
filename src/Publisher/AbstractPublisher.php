@@ -15,7 +15,7 @@ abstract class AbstractPublisher
     private $adapter;
     private $bind;
 
-    protected static $instances = null;
+   #protected static $instances = null;
 
     protected function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
@@ -29,13 +29,15 @@ abstract class AbstractPublisher
 
     public static function getInstance(\BackQ\Adapter\AbstractAdapter $adapter)
     {
-        $cname = get_class($adapter);
+        $class = get_called_class();
+        return new $class($adapter);
 
-        if (null === self::$instances || (is_array(self::$instances) && !isset(self::$instances[$cname]))) {
-            $class = get_called_class();
-            self::$instances[$cname] = new $class($adapter);
-        }
-        return self::$instances[$cname];
+        #$cname = get_class($adapter);
+        #if (null === self::$instances || (is_array(self::$instances) && !isset(self::$instances[$cname]))) {
+        #    $class = get_called_class();
+        #    self::$instances[$cname] = new $class($adapter);
+        #}
+        #return self::$instances[$cname];
     }
 
     /**
