@@ -32,6 +32,7 @@ final class AProcess extends AbstractWorker
         $connected = $this->start();
         $this->debug('started');
         if ($connected) {
+            $forks = array();
             try {
                 $this->debug('connected');
                 $work = $this->work();
@@ -51,25 +52,47 @@ final class AProcess extends AbstractWorker
 
                             /**
                              * Enclosure in anonymous function
+                             *
+                             * ZOMBIE WARNING
+                             * @see http://stackoverflow.com/questions/29037880/start-a-background-symfony-process-from-symfony-console
+                             *
+                             * All the methods that returns results or use results probed by proc_get_status might be wrong
+                             * @see https://github.com/symfony/symfony/issues/5759
+                             * the only solution found is to prepend the command with [exec]
+                             *
+                             * @tip use PHP_BINARY for php path
                              */
                             $run = function() use ($message) {
                                 $process = new \Symfony\Component\Process\Process($message->getCommandline(),
                                                                                   $message->getCwd(),
                                                                                   $message->getEnv(),
                                                                                   $message->getInput(),
+                                                                                  /**
+                                                                                   * timeout does not really work with async (start)
+                                                                                   */
                                                                                   $message->getTimeout(),
                                                                                   $message->getOptions());
+                                /**
+                                 * no win support here
+                                 */
+                                $process->setEnhanceWindowsCompatibility(false);
+
+                                /**
+                                 * ultimately also disables callbacks
+                                 */
                                 $process->disableOutput();
 
                                 /**
                                  * Execute call
+                                 * proc_open($commandline, $descriptors, $this->processPipes->pipes, $this->cwd, $this->env, $this->options);
                                  *
                                  * @throws RuntimeException When process can't be launched
                                  */
                                 $process->start();
+                                return $process;
                             };
 
-                            $run();
+                            $forks[] = $run();
                         } catch (\Exception $e) {
                             /**
                              * Not caching exceptions, just launching processes async
@@ -90,6 +113,22 @@ final class AProcess extends AbstractWorker
             } catch (\Exception $e) {
                 @error_log('Process worker exception: ' . $e->getMessage());
             }
+        }
+        /**
+         * Keep the references to forks until the end of execution,
+         * attempt to prevent zombie processes
+         */
+        foreach ($forks as $f) {
+            try {
+                /**
+                 * stop async process
+                 * @see http://symfony.com/doc/current/components/process.html
+                 */
+                $f->stop(2, SIGINT);
+                if ($f->isRunning()) {
+                    $f->signal(SIGKILL);
+                }
+            } catch (\Exception $e) {}
         }
         $this->finish();
     }
