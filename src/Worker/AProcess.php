@@ -38,6 +38,10 @@ final class AProcess extends AbstractWorker
                 $work = $this->work();
                 $this->debug('after init work generator');
 
+                /**
+                 * Until next job maximum 1 zombie process might be hanging,
+                 * we cleanup-up zombies when receiving next job
+                 */
                 foreach ($work as $taskId => $payload) {
                     $this->debug('got some work');
 
@@ -49,6 +53,7 @@ final class AProcess extends AbstractWorker
                         @error_log('Worker does not support payload of: ' . gettype($message));
                     } else {
                         try {
+                            $this->debug('job timeout=' . $message->getTimeout());
 
                             /**
                              * Enclosure in anonymous function
@@ -58,11 +63,11 @@ final class AProcess extends AbstractWorker
                              *
                              * All the methods that returns results or use results probed by proc_get_status might be wrong
                              * @see https://github.com/symfony/symfony/issues/5759
-                             * the only solution found is to prepend the command with [exec]
                              *
                              * @tip use PHP_BINARY for php path
                              */
                             $run = function() use ($message) {
+                                $this->debug('launching ' . $message->getCommandline());
                                 $process = new \Symfony\Component\Process\Process($message->getCommandline(),
                                                                                   $message->getCwd(),
                                                                                   $message->getEnv(),
@@ -92,6 +97,27 @@ final class AProcess extends AbstractWorker
                                 return $process;
                             };
 
+                            /**
+                             * Loop over previous forks and gracefully stop/close them,
+                             * doing this before pushing new fork in the pool
+                             */
+                            if (!empty($forks)) {
+                                foreach ($forks as $f) {
+                                    try {
+                                        /**
+                                         * here we PREVENTs ZOMBIES
+                                         * isRunning itself closes the process if its ended (not running)
+                                         */
+                                        if ($f->isRunning()) {
+                                            /**
+                                             * If its still running, check the timeouts
+                                             */
+                                            $f->checkTimeout();
+                                        }
+                                    } catch (ProcessTimedOutException $e) {}
+                                }
+                            }
+
                             $forks[] = $run();
                         } catch (\Exception $e) {
                             /**
@@ -116,17 +142,24 @@ final class AProcess extends AbstractWorker
         }
         /**
          * Keep the references to forks until the end of execution,
-         * attempt to prevent zombie processes
+         * attempt to close the forks nicely,
+         * zombies will be killed upon worker death anyway
          */
         foreach ($forks as $f) {
             try {
                 /**
-                 * stop async process
-                 * @see http://symfony.com/doc/current/components/process.html
+                 * isRunning itself closes the process if its ended (not running)
                  */
-                $f->stop(2, SIGINT);
                 if ($f->isRunning()) {
-                    $f->signal(SIGKILL);
+                    /**
+                     * stop async process
+                     * @see http://symfony.com/doc/current/components/process.html
+                     */
+                    $f->checkTimeout();
+                    $f->stop(1, SIGINT);
+                    if ($f->isRunning()) {
+                        $f->signal(SIGKILL);
+                    }
                 }
             } catch (\Exception $e) {}
         }
