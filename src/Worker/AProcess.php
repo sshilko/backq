@@ -107,6 +107,7 @@ final class AProcess extends AbstractWorker
                                         /**
                                          * here we PREVENTs ZOMBIES
                                          * isRunning itself closes the process if its ended (not running)
+                                         * use `pstree` to look out for zombies
                                          */
                                         if ($f->isRunning()) {
                                             /**
