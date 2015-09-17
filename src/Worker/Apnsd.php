@@ -247,7 +247,7 @@ final class Apnsd extends AbstractWorker
                     }
                 };
             } catch (\Exception $e) {
-                @error_log('apnsd worker exception: ' . $e->getMessage());
+                @error_log('[' . date('Y-m-d H:i:s') . '] apnsd worker exception: ' . $e->getMessage());
             } finally {
                 if ($push) {
                     $push->disconnect();
