@@ -69,14 +69,25 @@ $messages  = array();
 $publisher = \BackQ\Publisher\Apnsd::getInstance(new \BackQ\Adapter\Beanstalk);
 $publisher->setQueueName('apnsd');
 
+/**
+ * Give 4 seconds to dispatch the message (time to run)
+ * (wait 4 seconds for worker response on job status, see Beanstalkd protocol for details)
+ */
+$params = array(\BackQ\Adapter\Beanstalk::PARAM_JOBTTR => 4);
+
+/**
+ * Delay sending push by 10 seconds
+ */
+$params[\BackQ\Adapter\Beanstalk::PARAM_READYWAIT] = 10;
+
 //try connecting to Beanstalkd and ensure there are workers waiting for a job
 if ($publisher->start() && $publisher->hasWorkers()) {
-    //wait 3 seconds for worker response on job status, see Beanstalkd protocol for details
-    $ttr = 3;
     for ($i=0; $i < count($messages); $i++) {
-        $result = $publisher->publish($messages[$i], array(\BackQ\Adapter\Beanstalk::PARAM_JOBTTR => $ttr));
+        $result = $publisher->publish($messages[$i], $params);
         if ($result > 0) {
-            //successfull
+            //successfully added to dispatch queue
+        } else {
+            //try something else
         }
     }
 }
@@ -97,10 +108,9 @@ Publisher
 ```
 $publisher = \BackQ\Publisher\Process::getInstance(new \BackQ\Adapter\Beanstalk);
 if ($publisher->start() && $publisher->hasWorkers()) {
-    $delay = 4;
     $message = new \BackQ\Message\Process('echo $( date +%s ) >> /tmp/test');
     $result = $publisher->publish($message, array(\BackQ\Adapter\Beanstalk::PARAM_JOBTTR => 3,
-                                                  \BackQ\Adapter\Beanstalk::PARAM_READYWAIT => $delay));
+                                                  \BackQ\Adapter\Beanstalk::PARAM_READYWAIT => 4));
     if ($result > 0) {
         //Async process job added to queue
     } else {
