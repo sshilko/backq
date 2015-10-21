@@ -54,7 +54,10 @@ final class ApnsdPush extends \ApnsPHP_Push
             $streamContext = stream_context_create(array('ssl' => array('verify_peer' => isset($this->_sRootCertificationAuthorityFile),
                                                                         'cafile'      => $this->_sRootCertificationAuthorityFile,
                                                                         'local_cert'  => $this->_sProviderCertificateFile)));
-            $this->io = new IO\StreamIO($shost, $sport, $this->_nConnectTimeout, 1, $streamContext);
+            /**
+             * @todo customize stream_set_timeout (affects writing operations ?blocking-mode-only?)
+             */
+            $this->io = new IO\StreamIO($shost, $sport, $this->_nConnectTimeout, null, $streamContext);
         } catch (\Exception $e) {
             throw new \ApnsPHP_Exception("Unable to connect: " . $e->getMessage());
         }
