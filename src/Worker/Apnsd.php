@@ -113,6 +113,7 @@ final class Apnsd extends AbstractWorker
         $this->debug('started');
         if ($connected) {
             try {
+                $this->debug('connected to queue');
                 $push = new \BackQ\Adapter\ApnsdPush($this->environment, $this->pem);
                 if ($this->logger) {
                     $push->setLogger($this->logger);
@@ -120,6 +121,8 @@ final class Apnsd extends AbstractWorker
                 $push->setRootCertificationAuthority($this->caCert);
 
                 $push->setConnectTimeout($this->connectTimeout);
+
+                $this->debug('ready to connect to ios');
 
                 $push->connect();
 

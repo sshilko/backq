@@ -40,37 +40,172 @@ final class ApnsdPush extends \ApnsPHP_Push
      * @see https://developer.apple.com/news/?id=10222014a
      * @var array
      */
-    protected $_aServiceURLs = array(
-        'tls://gateway.push.apple.com:2195',
-        'tls://gateway.sandbox.push.apple.com:2195'
+    private $_serviceURLs = array(
+        array('gateway.push.apple.com', '2195'),
+        array('gateway.sandbox.push.apple.com', '2195')
     );
+
+    private $io;
 
     protected function _connect()
     {
-        parent::_connect();
+        list ($shost, $sport) = $this->_serviceURLs[$this->_nEnvironment];
+        try {
+            $streamContext = stream_context_create(array('ssl' => array('verify_peer' => isset($this->_sRootCertificationAuthorityFile),
+                                                                        'cafile'      => $this->_sRootCertificationAuthorityFile,
+                                                                        'local_cert'  => $this->_sProviderCertificateFile)));
+            $this->io = new IO\StreamIO($shost, $sport, $this->_nConnectTimeout, 1, $streamContext);
+        } catch (\Exception $e) {
+            throw new \ApnsPHP_Exception("Unable to connect: " . $e->getMessage());
+        }
+        return true;
+    }
 
-        /**
-         * Manually set blocking & write buffer settings and make sure they are successfuly set
-         * Use non-blocking as we dont want to stuck waiting for socket data while fread() w/o timeout
-         */
-        if (true === stream_set_blocking($this->_hSocket, 0) && 0 === stream_set_read_buffer($this->_hSocket, 0)) {
+    /**
+     * Disconnects from Apple Push Notifications service server.
+     * Does not return anything
+     * @IMPORTANT ApnsPHP_Push.disconnect() returned boolean (but never used result);
+     * @IMPORTANT may break compatibility
+     */
+    public function disconnect()
+    {
+        $this->io->close();
+    }
 
-            /**
-             * ! this is not reliably returns success (0)
-             * ! but default buffer is pretty high (few Kb), so will not affect sending single small pushes
-             *
-             * Output using fwrite() is normally buffered at 8K.
-             * This means that if there are two processes wanting to write to the same output stream (a file),
-             * each is paused after 8K of data to allow the other to write.
-             *
-             * Ensures that all writes with fwrite() are completed
-             * before other processes are allowed to write to that output stream
-             */
-            stream_set_write_buffer($this->_hSocket, 0);
+    /**
+     * Reads an error message (if present) from the main stream.
+     * If the error message is present and valid the error message is returned,
+     * otherwhise null is returned.
+     *
+     * @return @type array|null Return the error message array.
+     */
+    protected function _readErrorMessage()
+    {
+        $sErrorResponse = $this->io->read(self::ERROR_RESPONSE_SIZE, true);
 
-            return true;
-        } else {
-            throw new \ApnsPHP_Exception("Unable to set connection parameters");
+        if ($sErrorResponse === false || strlen($sErrorResponse) != self::ERROR_RESPONSE_SIZE) {
+            return;
+        }
+        $aErrorResponse = $this->_parseErrorMessage($sErrorResponse);
+        if (!is_array($aErrorResponse) || empty($aErrorResponse)) {
+            return;
+        }
+        if (!isset($aErrorResponse['command'], $aErrorResponse['statusCode'], $aErrorResponse['identifier'])) {
+            return;
+        }
+        if ($aErrorResponse['command'] != self::ERROR_RESPONSE_COMMAND) {
+            return;
+        }
+        $aErrorResponse['time'] = time();
+        $aErrorResponse['statusMessage'] = 'None (unknown)';
+        if (isset($this->_aErrorResponseMessages[$aErrorResponse['statusCode']])) {
+            $aErrorResponse['statusMessage'] = $this->_aErrorResponseMessages[$aErrorResponse['statusCode']];
+        }
+        return $aErrorResponse;
+    }
+
+    /**
+     * Sends all messages in the message queue to Apple Push Notification Service.
+     *
+     * @throws ApnsPHP_Push_Exception if not connected to the
+     *         service or no notification queued.
+     */
+    public function send()
+    {
+        if (empty($this->_aMessageQueue)) {
+            throw new \ApnsPHP_Push_Exception(
+                'No notifications queued to be sent'
+            );
+        }
+
+        $this->_aErrors = array();
+        $nRun = 1;
+        while (($nMessages = count($this->_aMessageQueue)) > 0) {
+            $this->_log("INFO: Sending messages queue, run #{$nRun}: $nMessages message(s) left in queue.");
+
+            $bError = false;
+            foreach($this->_aMessageQueue as $k => &$aMessage) {
+                if (function_exists('pcntl_signal_dispatch')) {
+                    pcntl_signal_dispatch();
+                }
+
+                $message = $aMessage['MESSAGE'];
+                $sCustomIdentifier = (string)$message->getCustomIdentifier();
+                $sCustomIdentifier = sprintf('[custom identifier: %s]', empty($sCustomIdentifier) ? 'unset' : $sCustomIdentifier);
+
+                $nErrors = 0;
+                if (!empty($aMessage['ERRORS'])) {
+                    foreach($aMessage['ERRORS'] as $aError) {
+                        if ($aError['statusCode'] == 0) {
+                            $this->_log("INFO: Message ID {$k} {$sCustomIdentifier} has no error ({$aError['statusCode']}), removing from queue...");
+                            $this->_removeMessageFromQueue($k);
+                            continue 2;
+                        } else if ($aError['statusCode'] > 1 && $aError['statusCode'] <= 8) {
+                            $this->_log("WARNING: Message ID {$k} {$sCustomIdentifier} has an unrecoverable error ({$aError['statusCode']}), removing from queue without retrying...");
+                            $this->_removeMessageFromQueue($k, true);
+                            continue 2;
+                        }
+                    }
+                    if (($nErrors = count($aMessage['ERRORS'])) >= $this->_nSendRetryTimes) {
+                        $this->_log(
+                            "WARNING: Message ID {$k} {$sCustomIdentifier} has {$nErrors} errors, removing from queue..."
+                        );
+                        $this->_removeMessageFromQueue($k, true);
+                        continue;
+                    }
+                }
+
+                $nLen = strlen($aMessage['BINARY_NOTIFICATION']);
+                $this->_log("STATUS: Sending message ID {$k} {$sCustomIdentifier} (" . ($nErrors + 1) . "/{$this->_nSendRetryTimes}): {$nLen} bytes.");
+
+                $aErrorMessage = null;
+                try {
+                    $this->io->write($aMessage['BINARY_NOTIFICATION']);
+                } catch (\Exception $e) {
+                    $aErrorMessage = array(
+                        'identifier' => $k,
+                        'statusCode' => self::STATUS_CODE_INTERNAL_ERROR,
+                        'statusMessage' => sprintf('%s (%s)',
+                                                   $this->_aErrorResponseMessages[self::STATUS_CODE_INTERNAL_ERROR], $e->getMessage())
+                    );
+                }
+//                if ($nLen !== ($nWritten = (int)@fwrite($this->_hSocket, $aMessage['BINARY_NOTIFICATION']))) {
+//                    $aErrorMessage = array(
+//                        'identifier' => $k,
+//                        'statusCode' => self::STATUS_CODE_INTERNAL_ERROR,
+//                        'statusMessage' => sprintf('%s (%d bytes written instead of %d bytes)',
+//                                                   $this->_aErrorResponseMessages[self::STATUS_CODE_INTERNAL_ERROR], $nWritten, $nLen
+//                        )
+//                    );
+//                }
+
+                $bError = $this->_updateQueue($aErrorMessage);
+                if ($bError) {
+                    break;
+                }
+            }
+
+            if (!$bError) {
+//                $read = array($this->_hSocket);
+//                $null = NULL;
+//                $nChangedStreams = @stream_select($read, $null, $null, 0, $this->_nSocketSelectTimeout);
+
+                $nChangedStreams = $this->io->select(0, $this->_nSocketSelectTimeout);
+                if ($nChangedStreams === false) {
+                    $this->_log('ERROR: Unable to wait for a stream availability.');
+                    break;
+                } else if ($nChangedStreams > 0) {
+                    $bError = $this->_updateQueue();
+                    if (!$bError) {
+                        $this->_aMessageQueue = array();
+                    }
+                } else {
+                    $this->_aMessageQueue = array();
+                }
+            }
+
+            $nRun++;
         }
     }
+
 }
