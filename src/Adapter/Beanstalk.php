@@ -18,7 +18,7 @@ use RuntimeException;
  *
  * @see https://raw.githubusercontent.com/kr/beanstalkd/master/doc/protocol.txt
  */
-final class Beanstalk extends AbstractAdapter
+class Beanstalk extends AbstractAdapter
 {
     const ADAPTER_NAME = 'beanstalk';
 

@@ -19,7 +19,7 @@ use RuntimeException;
  * @see https://github.com/duccio/ApnsPHP
  * @see https://code.google.com/p/apns-php/
  */
-final class ApnsdPush extends \ApnsPHP_Push
+class ApnsdPush extends \ApnsPHP_Push
 {
     /*
         October 22, 2014
