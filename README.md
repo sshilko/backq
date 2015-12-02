@@ -64,7 +64,7 @@ $worker->run();
 * Publisher that pushes new messages into Beanstalkd queue
 
 ```
-//array of [ApnsPHP_Message_Custom or ApnsPHP_Message]
+//array of [\BackQ\Message\ApnsPHP or ApnsPHP_Message_Custom or ApnsPHP_Message]
 $messages  = array();
 $publisher = \BackQ\Publisher\Apnsd::getInstance(new \BackQ\Adapter\Beanstalk);
 $publisher->setQueueName('apnsd');
