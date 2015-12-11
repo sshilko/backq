@@ -41,6 +41,13 @@ final class Apnsd extends AbstractWorker
     public $quitIfModified = false;
 
     /**
+     * Quit after processing X amount of pushes
+     *
+     * @var int
+     */
+    private $restartThreshold = 0;
+
+    /**
      * Error codes that require restarting the apns connection
      *
      * A status code of 10 indicates that the APNs server closed the connection (for example, to perform maintenance).
@@ -72,6 +79,16 @@ final class Apnsd extends AbstractWorker
     public function setQueueName($string)
     {
         $this->queueName = (string) $string;
+    }
+
+    /**
+     * Quit after processing X amount of pushes
+     *
+     * @param $int
+     */
+    public function setRestartThreshold($int)
+    {
+        $this->restartThreshold = (int) $int;
     }
 
     /**
@@ -143,8 +160,17 @@ final class Apnsd extends AbstractWorker
 
                 $work = $this->work();
                 $this->debug('after init work generator');
+
+                $jobsdone = 0;
                 foreach ($work as $taskId => $payload) {
                     $this->debug('got some work');
+
+                    if ($this->restartThreshold > 0 && ++$jobsdone > $this->restartThreshold) {
+                        $this->debug('restart threshold reached, returning job, quitting');
+                        $work->send(false);
+                        $push->disconnect();
+                        break;
+                    }
 
                     if ($this->quitIfModified) {
                         /**
