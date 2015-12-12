@@ -47,6 +47,13 @@ class ApnsdPush extends \ApnsPHP_Push
 
     private $io;
 
+    /**
+     * stream_set_timeout (affects writing operations ?blocking-mode-only?)
+     *
+     * @var null
+     */
+    private $_nReadWriteTimeout = null;
+
     protected function _connect()
     {
         list ($shost, $sport) = $this->_serviceURLs[$this->_nEnvironment];
@@ -55,13 +62,22 @@ class ApnsdPush extends \ApnsPHP_Push
                                                                         'cafile'      => $this->_sRootCertificationAuthorityFile,
                                                                         'local_cert'  => $this->_sProviderCertificateFile)));
             /**
-             * @todo customize stream_set_timeout (affects writing operations ?blocking-mode-only?)
+             * @todo customize
              */
-            $this->io = new IO\StreamIO($shost, $sport, $this->_nConnectTimeout, null, $streamContext);
+            $this->io = new IO\StreamIO($shost, $sport, $this->_nConnectTimeout, $this->_nReadWriteTimeout, $streamContext);
         } catch (\Exception $e) {
             throw new \ApnsPHP_Exception("Unable to connect: " . $e->getMessage());
         }
         return true;
+    }
+
+    /**
+     * Desired timeout for readwrite operations with stream/socket
+     *
+     * @param $seconds
+     */
+    public function setReadWriteTimeout($seconds) {
+        $this->_nReadWriteTimeout($seconds);
     }
 
     /**

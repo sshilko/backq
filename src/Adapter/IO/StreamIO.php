@@ -28,7 +28,7 @@ class StreamIO extends AbstractIO
 
         if (null !== $read_write_timeout) {
             if (!stream_set_timeout($this->sock, $read_write_timeout)) {
-                throw new \Exception ("Timeout could not be set");
+                throw new \Exception("Timeout (stream_set_timeout) could not be set");
             }
         }
 
@@ -62,7 +62,8 @@ class StreamIO extends AbstractIO
     public function read($n, $unsafe = false)
     {
         if ($unsafe) {
-            if (feof($this->sock)) {
+            $info = stream_get_meta_data($this->sock);
+            if (feof($this->sock) || $info['timed_out']) {
                 return null;
             }
             return @fread($this->sock, $n);
@@ -98,7 +99,7 @@ class StreamIO extends AbstractIO
 
             // get status of socket to determine whether or not it has timed out
             $info = stream_get_meta_data($this->sock);
-            if($info['timed_out']) {
+            if ($info['timed_out']) {
                 throw new TimeoutException("Error sending data. Socket connection timed out");
             }
 

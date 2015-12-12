@@ -32,6 +32,7 @@ final class Apnsd extends AbstractWorker
      */
     public $connectTimeout = 5;
     public $socketSelectTimeout = 500000;
+    public $readWriteTimeout = 10;
 
     /**
      * Check whether worker code changed in runtime,
@@ -155,6 +156,7 @@ final class Apnsd extends AbstractWorker
                 $push->setRootCertificationAuthority($this->caCert);
 
                 $push->setConnectTimeout($this->connectTimeout);
+                $push->setReadWriteTimeout($this->readWriteTimeout);
 
                 $this->debug('ready to connect to ios');
 
