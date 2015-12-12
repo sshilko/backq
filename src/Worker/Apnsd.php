@@ -48,6 +48,13 @@ final class Apnsd extends AbstractWorker
     private $restartThreshold = 0;
 
     /**
+     * Quit if inactive for specified time (seconds)
+     *
+     * @var int
+     */
+    private $idleTimeout = 0;
+
+    /**
      * Error codes that require restarting the apns connection
      *
      * A status code of 10 indicates that the APNs server closed the connection (for example, to perform maintenance).
@@ -89,6 +96,16 @@ final class Apnsd extends AbstractWorker
     public function setRestartThreshold($int)
     {
         $this->restartThreshold = (int) $int;
+    }
+
+    /**
+     * Quit after reaching idle timeout
+     *
+     * @param $int
+     */
+    public function setIdleTimeout($int)
+    {
+        $this->idleTimeout = (int) $int;
     }
 
     /**
@@ -161,9 +178,19 @@ final class Apnsd extends AbstractWorker
                 $work = $this->work();
                 $this->debug('after init work generator');
 
-                $jobsdone = 0;
+                $jobsdone   = 0;
+                $lastactive = time();
                 foreach ($work as $taskId => $payload) {
                     $this->debug('got some work');
+
+                    if ($this->idleTimeout > 0 && (time() - $lastactive) > $this->idleTimeout) {
+                        $this->debug('idle timeout reached, returning job, quitting');
+                        $work->send(false);
+                        $push->disconnect();
+                        break;
+                    }
+
+                    $lastactive = time();
 
                     if ($this->restartThreshold > 0 && ++$jobsdone > $this->restartThreshold) {
                         $this->debug('restart threshold reached, returning job, quitting');
