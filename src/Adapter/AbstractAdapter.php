@@ -50,12 +50,12 @@ abstract class AbstractAdapter
     /**
      * Acknowledge server: callback after successfully processing job
      */
-    abstract protected function afterWorkSuccess($workId);
+    abstract public function afterWorkSuccess($workId);
 
     /**
      * Acknowledge server: callback after failing to process job
      */
-    abstract protected function afterWorkFailed($workId);
+    abstract public function afterWorkFailed($workId);
 
     /**
      * Ping if still has alive connection to server
