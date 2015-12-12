@@ -77,7 +77,7 @@ class ApnsdPush extends \ApnsPHP_Push
      * @param $seconds
      */
     public function setReadWriteTimeout($seconds) {
-        $this->_nReadWriteTimeout($seconds);
+        $this->_nReadWriteTimeout = $seconds;
     }
 
     /**
