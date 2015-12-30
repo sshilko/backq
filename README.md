@@ -1,6 +1,9 @@
 backq
 =====
 
+[![Latest Stable Version](https://poser.pugx.org/sshilko/backq/v/stable)](https://packagist.org/packages/sshilko/backq)
+[![License](https://poser.pugx.org/sshilko/backq/license)](https://packagist.org/packages/sshilko/backq)
+
 Perform tasks with workers &amp; publishers (queue)
 
 * push notifications (Apnsd) processing 
