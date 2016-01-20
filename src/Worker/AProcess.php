@@ -31,8 +31,8 @@ final class AProcess extends AbstractWorker
     {
         $connected = $this->start();
         $this->debug('started');
+        $forks = array();
         if ($connected) {
-            $forks = array();
             try {
                 $this->debug('connected');
                 $work = $this->work();
