@@ -88,7 +88,9 @@ class ApnsdPush extends \ApnsPHP_Push
      */
     public function disconnect()
     {
-        $this->io->close();
+        if ($this->io) {
+            $this->io->close();
+        }
     }
 
     /**
