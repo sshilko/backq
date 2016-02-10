@@ -24,4 +24,14 @@ class Process extends AbstractPublisher
     {
         return $this->queueName;
     }
+
+    /**
+     * Set queue this publisher will publish to
+     *
+     * @param $string
+     */
+    public function setQueueName($string)
+    {
+        $this->queueName = (string) $string;
+    }    
 }
