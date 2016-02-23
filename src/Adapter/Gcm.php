@@ -31,6 +31,9 @@ class Gcm
     private $logLevel;
     private $forceTLS;
 
+    private $hostname;
+    private $mypid;
+
     const GCM_HOST      = 'gcm.googleapis.com';
     const GCM_HOST_PORT = 5235;
 
@@ -57,23 +60,45 @@ class Gcm
     const LOG_DEBUG  = JAXL_DEBUG;
 
     /**
+     * Should NOT bind to on_connect, breaks auth flow
+     */
+    const ON_CONNECT         = 'on_connect';
+    /**
      * Event callbacks
      * @see http://jaxl.readthedocs.org/en/latest/users/jaxl_instance.html#available-event-callbacks
      */
-    const EV_ON_CONNECT      = 'on_connect';
-    const EV_CONNECT_ERROR   = 'on_connect_error';
+    const ON_CONNECT_ERROR   = 'on_connect_error';
     const ON_AUTH_SUCCESS    = 'on_auth_success';
     const ON_AUTH_FAIURE     = 'on_auth_failure';
     const ON_DISCONNECT      = 'on_disconnect';
+    const ON_STREAM_END      = 'on_stream_start';
+    const ON_STREAM_FEA      = 'on_stream_features';
 
     /**
-     * Message IN
+     * Message received
      */
     const ON_NORMAL_MESSAGE = 'on_normal_message';
+
+    /**
+     * (N)ACK Message received
+     */
     const ON_UNDERSCORE_MSG = 'on__message';
 
     const MSG_ACK  = 'ack';
     const MSG_NACK = 'nack';
+
+    /**
+     * Callbacks -->
+     */
+    const CALLBACK_CONNECT_ERR  = 'on_connect_error';
+    const CALLBACK_AUTH_OK      = 'on_auth_success';
+    const CALLBACK_AUTH_ERR     = 'on_auth_failure';
+    const CALLBACK_DISCONNECT   = 'on_disconnect';
+    const CALLBACK_MSG_SENT_OK  = 'on_sent_success';
+    const CALLBACK_MSG_SENT_ERR = 'on_sent_error';
+    /**
+     * Callbacks <--
+     */
 
     /**
      * Total pushed
@@ -88,6 +113,8 @@ class Gcm
      * @var int
      */
     protected $msgAckd = 0;
+
+    protected $callbacks = array();
 
     /**
      * Gcm constructor.
@@ -104,6 +131,19 @@ class Gcm
         $this->isTest   = $isTest;
         $this->logLevel = $logLevel;
         $this->forceTLS = $forceTLS;
+
+        $this->hostname = gethostname();
+        $this->mypid    = getmypid();
+    }
+
+    public function setCallback($event, callable $callback) {
+        $this->callbacks[$event] = $callback;
+    }
+
+    protected function getCallback($event) {
+        if (isset($this->callbacks[$event]) && is_callable($this->callbacks[$event])) {
+            return $this->callbacks[$event];
+        }
     }
 
     /**
@@ -113,12 +153,13 @@ class Gcm
      */
     public function connect() {
         if (is_null($this->client)) {
-            $c = new \Jaxl(
+            $c = new Gcm\Jaxl(
                 array('pass'      => $this->apiKey,
                       'auth_type' => 'PLAIN',
                       'priv_dir'  => sys_get_temp_dir(),
-                      'protocol'  => 'ssl',
+                      'protocol'  => 'tls',
                       'strict'    => false,
+                      'stream_context' => stream_context_create(array('ssl' => array('verify_peer' => true))),
                       'force_tls' => $this->forceTLS,
                       'log_level' => $this->logLevel,
                       'jid'       => $this->senderId . '@' . self::GCM_HOST,
@@ -135,13 +176,10 @@ class Gcm
      * Stop and disconnect
      */
     public function disconnect() {
-        $this->on_before_stop();
         $this->client->send_end_stream();
-        $this->on_after_stop();
     }
 
-
-    public function on_normal_message($stanza) {
+    protected function on_normal_message($stanza) {
         $data = $this->xmppdecode($stanza);
 
         $message = new RecievedMessage($data['category'],
@@ -161,9 +199,9 @@ class Gcm
 
         $data = $this->xmppdecode($stanza);
 
-        $messageType   = $data['message_type'];
-        $messageId     = $data['message_id'];  //message id which was sent from us
-        $from          = $data['from']; //gcm key;
+        $messageType   = $data->message_type;
+        $messageId     = $data->message_id;  //message id which was sent from us
+        $from          = $data->from; //gcm key;
 
         if (self::MSG_NACK == $messageType) {
 
@@ -174,14 +212,15 @@ class Gcm
         } else {
             $this->on_sent_success($from, $messageId, $this->msgAckd, $this->msgSent);
         }
+
     }
 
     /**
      * @see http://jaxl.readthedocs.org/en/latest/users/jaxl_instance.html#available-event-callbacks
      */
-    private function registerCallbacks() {
-        foreach (array(self::EV_ON_CONNECT,
-                       self::EV_CONNECT_ERROR,
+    protected function registerCallbacks() {
+        foreach (array(//self::ON_CONNECT,//binding to on_connect breaks auth flow
+                       self::ON_CONNECT_ERROR,
                        self::ON_AUTH_SUCCESS,
                        self::ON_AUTH_FAIURE,
                        self::ON_DISCONNECT,
@@ -203,10 +242,14 @@ class Gcm
             throw new \LogicException("XMPP CCS Supports 1 recipient per message");
         }
 
+        if (empty($messageId)) {
+            $messageId = md5(microtime() . $this->hostname . $this->mypid);
+        }
+
         $this->sendGcmMessage(array('collapse_key' => $message->getCollapseKey(), // Could be unset
                                     'time_to_live' => $message->getTimeToLive(), //Could be unset
                                     'delay_while_idle' => $message->getDelayWhileIdle(), //Could be unset
-                                    'message_id'       => (string) ($messageId ? $messageId : microtime(true)),
+                                    'message_id'       => $messageId,
                                     'to'   => $message->getTo(true),
                                     'data' => $message->getData())
         );
@@ -223,30 +266,49 @@ class Gcm
         return $data;
     }
 
-    /**
-     * Connected
-     * @see http://jaxl.readthedocs.org/en/latest/users/jaxl_instance.html#available-event-callbacks
-     */
-    public function on_connect()         {}
-    public function on_connect_error()   {}
+    public function on_connect_error() {
+        if ($cb = $this->getCallback(__FUNCTION__)) {
+            call_user_func_array($cb, array());
+        }
+    }
 
     /**
      * Disconnected
      * @see http://jaxl.readthedocs.org/en/latest/users/jaxl_instance.html#available-event-callbacks
      */
-    public function on_disconnect()      {}
-
-    public function on_auth_failure($reason) {
-        $this->disconnect();
+    public function on_disconnect() {
+        if ($cb = $this->getCallback(__FUNCTION__)) {
+            call_user_func_array($cb, array());
+        }
     }
 
-    public function on_before_stop() {}
-    public function on_after_stop() {}
+    public function on_auth_failure($reason) {
+        if ($cb = $this->getCallback(__FUNCTION__)) {
+            call_user_func_array($cb, array($reason));
+        }
+        $this->disconnect();
+    }
 
     /**
      * Ready to send/receive
      */
-    public function on_auth_success() {}
+    public function on_auth_success() {
+        if ($cb = $this->getCallback(__FUNCTION__)) {
+            call_user_func_array($cb, array());
+        }
+    }
+
+    public function on_stream_start() {
+        if ($cb = $this->getCallback(__FUNCTION__)) {
+            call_user_func_array($cb, array());
+        }
+    }
+
+    public function on_stream_features() {
+        if ($cb = $this->getCallback(__FUNCTION__)) {
+            call_user_func_array($cb, array());
+        }
+    }
 
     /**
      * On successful ACK for single message
@@ -256,8 +318,10 @@ class Gcm
      * @param $messagesAcked
      * @param $messagesSent
      */
-    public function on_sent_success($from, $messageId, $messagesAcked, $messagesSent) {
-
+    protected function on_sent_success($from, $messageId, $messagesAcked, $messagesSent) {
+        if ($cb = $this->getCallback(__FUNCTION__)) {
+            call_user_func_array($cb, func_get_args());
+        }
     }
 
     /**
@@ -268,7 +332,9 @@ class Gcm
      * @param $errorCode see ERRO_CODE_* constants
      * @param $errorDescription optional description text
      */
-    public function on_sent_error($from, $messageId, $errorCode, $errorDescription = null) {
-
+    protected function on_sent_error($from, $messageId, $errorCode, $errorDescription = null) {
+        if ($cb = $this->getCallback(__FUNCTION__)) {
+            call_user_func_array($cb, func_get_args());
+        }
     }
 }
