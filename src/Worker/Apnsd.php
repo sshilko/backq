@@ -177,19 +177,27 @@ final class Apnsd extends AbstractWorker
                  */
                 $push->setSocketSelectTimeout($this->socketSelectTimeout);
 
-                $work = $this->work();
+                $workTimeout = 30;
+                $work = $this->work($workTimeout);
                 $this->debug('after init work generator');
 
                 $jobsdone   = 0;
                 $lastactive = time();
                 foreach ($work as $taskId => $payload) {
-                    $this->debug('got some work');
+                    $this->debug('got some work: ' . ($payload ? 'yes' : 'no'));
 
                     if ($this->idleTimeout > 0 && (time() - $lastactive) > $this->idleTimeout) {
                         $this->debug('idle timeout reached, returning job, quitting');
                         $work->send(false);
                         $push->disconnect();
                         break;
+                    }
+
+                    if (!$payload && $workTimeout > 0) {
+                        /**
+                         * Just empty loop, no work fetched
+                         */
+                        continue;
                     }
 
                     $lastactive = time();
