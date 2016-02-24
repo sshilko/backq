@@ -41,8 +41,10 @@ class Beanstalk extends AbstractAdapter
          * statsTube->_statsRead after the 'use' tube, which is unexpected
          *
          * @see https://github.com/davidpersson/beanstalk/issues/12
+         *
+         * Adapter throws TIMED_OUT if reserve specified with timeout
          **/
-        if ($msg != 'NOT_FOUND') {
+        if ($msg != 'NOT_FOUND' && $msg != 'TIMED_OUT') {
             @error_log('beanstalk adapter error: ' . $msg . ' at ' . print_r(debug_backtrace(false, 5), true));
         }
     }
@@ -166,13 +168,14 @@ class Beanstalk extends AbstractAdapter
     /**
      * Pick task from queue
      *
+     * @param $timeout integer $timeout If given specifies number of seconds to wait for a job, '0' returns immediately
      * @return boolean|array [id, payload]
      */
-    public function pickTask()
+    public function pickTask($timeout = null)
     {
         if ($this->connected) {
             try {
-                $result = $this->client->reserve();
+                $result = $this->client->reserve($timeout);
                 if (is_array($result)) {
                     return array($result['id'], $result['body']);
                 }

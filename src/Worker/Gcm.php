@@ -29,6 +29,8 @@ final class Gcm extends AbstractWorker
      */
     private $senderId;
 
+    private $debugLevel;
+
     private $environment;
     private $queueName = 'gcmccs';
 
@@ -98,6 +100,16 @@ final class Gcm extends AbstractWorker
     }
 
     /**
+     * GCM Library debug level
+     * @see JAXLLogger
+     * @var int
+     */
+    public function setDebugLevel($level)
+    {
+        $this->debugLevel = $level;
+    }
+
+    /**
      * GCM Project ID
      */
     public function setSenderId($id)
@@ -115,8 +127,8 @@ final class Gcm extends AbstractWorker
 
     public function run()
     {
-        $connected = $this->start();
         $this->debug('started');
+        $connected = $this->start();
         if ($connected) {
             $daemon = null;
             try {
@@ -124,77 +136,173 @@ final class Gcm extends AbstractWorker
                 $daemon = new \BackQ\Adapter\Gcm($this->senderId,
                                                  $this->apiKey,
                                                  $this->environment,
-                                                 \BackQ\Adapter\Gcm::LOG_INFO,
+                                                 $this->debugLevel,
                                                  true);
+                $this->debug('gcm daemon initialized');
+                $self = $this;
 
-                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_AUTH_OK, function() use ($daemon) {
-                    echo 'Authorized';
-
-                    $message = new GCMMessage("c9IlA3Rkuo8:APA91bFV8LuBqVl2N_v5TlEbyCT8CqpPOBMbry9QlptFp460n72C8hfSurWdXehOlSSJ6IhIvysFhjkL1wVsoa2QJcySvDYbRHyNHdc59sFfadTte_4GQbQEsukJ65XHYWcx8_Fm7vgK",
-                                              ['text'=> time() . ".message from server"],
-                                              "collapse-key" . time());
-                    $daemon->send($message);
-
-                });
-                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_AUTH_ERR, function() {
-                    echo 'Not authorized';
+                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_AUTH_ERR, function() use ($self) {
+                    $self->debug('GCM Authorized error, disconnecting');
                 });
 
-                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_CONNECT_ERR, function() {
-                    echo 'Connection error';
+                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_CONNECT_ERR, function() use ($self) {
+                    $self->debug('GCM Connection error');
                 });
 
-                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_DISCONNECT, function() {
-                    echo 'Disconnected';
+                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_DISCONNECT, function() use ($self) {
+                    $self->debug('GCM Disconnected');
                 });
 
-                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_MSG_SENT_OK, function() {
-                    echo 'Message SENT';
+                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_MSG_SENT_OK, function($recipientId,
+                                                                                        $messageId) use ($self) {
+                    $self->debug('GCM Message sent ok');
                 });
 
-                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_MSG_SENT_ERR, function() {
-                    echo 'Message NOT SENT';
+                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_MSG_SENT_ERR, function($recipientId,
+                                                                                         $messageId,
+                                                                                         $errorCode,
+                                                                                         $errorDescription) use ($self) {
+                    /**
+                     * NACK Received
+                     * @see https://developers.google.com/cloud-messaging/xmpp-server-ref#table4
+                     */
+                    $self->debug('GCM Message sent error: ' . $errorDescription);
+
+                    /**
+                     * Downstream message error response codes.
+                     *
+                     * @see https://developers.google.com/cloud-messaging/xmpp-server-ref#table4
+                     */
+                    switch ($errorCode) {
+                        case \BackQ\Adapter\Gcm::ERR_CODE_INVALID_JSON:
+                            /**
+                             * - Check that the JSON message is properly formatted and contains valid fields
+                             *   (for instance, making sure the right data type is passed in).
+                             * - Check that the total size of the payload data included in a message does not
+                             *   exceed GCM limits: 4096 bytes for most messages
+                             * - Check that the payload data does not contain
+                             *   a key (such as from, or gcm, or any value prefixed by google) that is used internally by GCM
+                             * - Check that the value used in time_to_live is an integer representing
+                             *   a duration in seconds between 0 and 2,419,200 (4 weeks).
+                             */
+                            break;
+
+                        case \BackQ\Adapter\Gcm::ERR_CODE_BAD_REGISTRATION:
+                            /**
+                             * Check the format of the registration token you pass to the server.
+                             * Make sure it matches the registration token the client app receives from registering with GCM.
+                             * Do not truncate or add additional characters.
+                             */
+                            break;
+
+                        case \BackQ\Adapter\Gcm::ERR_CODE_DEVICE_UNREGISTERED:
+                            /**
+                             * An existing registration token may cease to be valid
+                             * - client app unregisters with GCM
+                             * - user uninstalls the application
+                             * - registration token expires
+                             * - app is updated but the new version is not configured to receive messages
+                             *
+                             * Remove this registration token from the app server and stop using it
+                             */
+                            break;
+
+                        case \BackQ\Adapter\Gcm::ERR_CODE_DEVICE_MESSAGE_RATE_EXCEEDED:
+                            /**
+                             * The rate of messages to a particular device is too high.
+                             * Reduce the number of messages sent to this device and do not immediately retry sending to this device.
+                             */
+                            break;
+
+                        case \BackQ\Adapter\Gcm::ERR_CODE_BAD_ACK:
+                            /**
+                             * Check that the 'ack' message is properly formatted before retrying
+                             * @see https://developers.google.com/cloud-messaging/xmpp-server-ref#table6
+                             */
+                            break;
+                        case \BackQ\Adapter\Gcm::ERR_CODE_SERVICE_UNAVAILABLE:
+                            /**
+                             * The server couldn't process the request in time. Retry the same request later:
+                             * - The initial retry delay should be set to 1 second
+                             *
+                             * Senders that cause problems risk being blacklisted.
+                             */
+                            break;
+
+                        case \BackQ\Adapter\Gcm::ERR_CODE_INTERNAL_SERVER_ERROR:
+                            /**
+                             * The server encountered an error while trying to process the request
+                             */
+                            break;
+
+                        case \BackQ\Adapter\Gcm::ERR_CODE_CONNECTION_DRAINING:
+                            /**
+                             * XMPP connection server needs to close down a connection
+                             * Retry the message over another XMPP connection
+                             */
+                            break;
+                    }
                 });
 
+                $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_AUTH_OK, function() use ($self, $daemon) {
+                    $self->debug('GCM Authorized ok');
+                });
+
+                $this->debug('gcm daemon callbacks initialized');
                 $daemon->connect();
+                $this->debug('gcm daemon connect initialized');
 
-                $work = $this->work();
-                $this->debug('after init work generator');
+                $work = $self->work(5);
+                $self->debug('after init work generator');
 
                 $jobsdone   = 0;
                 $lastactive = time();
+                $self->debug('waiting for some work');
                 foreach ($work as $taskId => $payload) {
-                    $this->debug('got some work');
+                    $self->debug('got some work');
 
-                    if ($this->idleTimeout > 0 && (time() - $lastactive) > $this->idleTimeout) {
-                        $this->debug('idle timeout reached, returning job, quitting');
+                    if ($self->idleTimeout > 0 && (time() - $lastactive) > $self->idleTimeout) {
+                        $self->debug('idle timeout reached, returning job, quitting');
                         $work->send(false);
                         $daemon->disconnect();
                         break;
+                    }
+
+                    if (!$taskId || !$payload) {
+                        /**
+                         * Timeout reached while waiting for task
+                         */
+                        $self->debug('no payload yet');
+                        continue;
                     }
 
                     $lastactive = time();
 
-                    if ($this->restartThreshold > 0 && ++$jobsdone > $this->restartThreshold) {
-                        $this->debug('restart threshold reached, returning job, quitting');
+                    if ($self->restartThreshold > 0 && ++$jobsdone > $self->restartThreshold) {
+                        $self->debug('restart threshold reached, returning job, quitting');
                         $work->send(false);
                         $daemon->disconnect();
                         break;
                     }
 
+
+
                     $message   = @unserialize($payload);
                     $processed = true;
 
-                    if (!($message instanceof \BackQ\Message\GCMMessage) || !$message->getRecipientsNumber()) {
+                    /**
+                     * GCM CCS allows only 1 recipient per message
+                     */
+                    if (!($message instanceof GCMMessage) || 1 != $message->getRecipientsNumber()) {
                         $work->send($processed);
                         @error_log('Worker does not support payload of: ' . gettype($message));
                     } else {
 
                         try {
                             $daemon->send($message);
-                            $this->debug('daemon sent message');
+                            $self->debug('daemon sent message');
                         } catch (\Exception $e) {
-                            $this->debug('generic exception: ' . $e->getMessage());
+                            $self->debug('generic exception: ' . $e->getMessage());
                             $processed = $e->getMessage();
                             @error_log($e->getMessage());
                         } finally {
@@ -209,6 +317,7 @@ final class Gcm extends AbstractWorker
                         }
                     }
                 };
+
             } catch (\Exception $e) {
                 @error_log('[' . date('Y-m-d H:i:s') . '] gcm worker exception: ' . $e->getMessage());
             } finally {

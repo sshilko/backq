@@ -15,6 +15,7 @@ class GCMMessage extends AbstractMessage
 {
     /**
      * Rcp. GCM IDs (limited to [1,1000] recipients)
+     * GCM CCS (XMPP) only accepts 1 recipient per message
      * @var array
      */
     private $to = array();
@@ -84,13 +85,17 @@ class GCMMessage extends AbstractMessage
             $this->setTo($toRegId);
         }
 
-        if (!empty($data)) {
+        if (!empty($data) && is_array($data)) {
             $this->setData($data);
         }
 
         if ($collapseKey) {
             $this->setCollapseKey($collapseKey);
         }
+    }
+
+    public function getRecipientsNumber() {
+        return count($this->to);
     }
 
     public function getTo($onlyOne = false) {
@@ -133,8 +138,9 @@ class GCMMessage extends AbstractMessage
     }
 
     public function setData($data) {
-        $this->data = $data;
-
+        if (is_array($data)) {
+            $this->data = $data;
+        }
         return $this;
     }
 
@@ -143,7 +149,7 @@ class GCMMessage extends AbstractMessage
     }
 
     public function setDelayWhileIdle($delayWhileIdle) {
-        $this->delayWhileIdle = intval($delayWhileIdle);
+        $this->delayWhileIdle = (bool) ($delayWhileIdle);
 
         return $this;
     }
@@ -174,7 +180,6 @@ class GCMMessage extends AbstractMessage
 
     public function setDryRun($dryRun) {
         $this->dryRun = $dryRun;
-
         return $this;
     }
 }

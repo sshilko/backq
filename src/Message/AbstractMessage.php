@@ -12,5 +12,5 @@ namespace BackQ\Message;
 
 abstract class AbstractMessage
 {
-
+    abstract public function getRecipientsNumber();
 }

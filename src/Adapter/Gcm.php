@@ -40,10 +40,30 @@ class Gcm
     const GCM_HOST_DEV = 'gcm-preprod.googleapis.com';
     const GCM_HOST_PORT_DEV = 5236;
 
+    /**
+     * COMPLETE LIST of ERROR_CODE's
+     * @see https://developers.google.com/cloud-messaging/xmpp-server-ref#table4
+     */
+
+    /**
+     * Check that the 'ack' message is properly formatted before retrying
+     */
     const ERR_CODE_BAD_ACK                      = 'BAD_ACK';
+
+    /**
+     * InvalidJson: JSON_TYPE_ERROR : Field \"time_to_live\" must be a JSON java.lang.Number: abc
+     */
     const ERR_CODE_INVALID_JSON                 = 'INVALID_JSON';
+
+    const ERR_CODE_JSON_TYPE_ERROR              = 'JSON_TYPE_ERROR';
     const ERR_CODE_QUOTA_EXCEEDED               = 'QUOTA_EXCEEDED';
+
+    /**
+     * Check the format of the registration token you pass to the server.
+     * Make sure it matches the registration token the client app receives from registering with GCM
+     */
     const ERR_CODE_BAD_REGISTRATION             = 'BAD_REGISTRATION';
+
     const ERR_CODE_CONNECTION_DRAINING          = 'CONNECTION_DRAINING';
     const ERR_CODE_DEVICE_UNREGISTERED          = 'DEVICE_UNREGISTERED';
     const ERR_CODE_SERVICE_UNAVAILABLE          = 'SERVICE_UNAVAILABLE';
@@ -62,7 +82,8 @@ class Gcm
     /**
      * Should NOT bind to on_connect, breaks auth flow
      */
-    const ON_CONNECT         = 'on_connect';
+    //const ON_CONNECT         = 'on_connect';
+
     /**
      * Event callbacks
      * @see http://jaxl.readthedocs.org/en/latest/users/jaxl_instance.html#available-event-callbacks
@@ -71,7 +92,6 @@ class Gcm
     const ON_AUTH_SUCCESS    = 'on_auth_success';
     const ON_AUTH_FAIURE     = 'on_auth_failure';
     const ON_DISCONNECT      = 'on_disconnect';
-    const ON_STREAM_END      = 'on_stream_start';
     const ON_STREAM_FEA      = 'on_stream_features';
 
     /**
@@ -105,14 +125,14 @@ class Gcm
      *
      * @var int
      */
-    protected $msgSent = 0;
+    //protected $msgSent = 0;
 
     /**
      * Total got (N)ACK's
      *
      * @var int
      */
-    protected $msgAckd = 0;
+    //protected $msgAckd = 0;
 
     protected $callbacks = array();
 
@@ -168,6 +188,7 @@ class Gcm
             );
             $this->client = $c;
             $this->registerCallbacks();
+            //$this->client->start(array('--with-unix-sock' => true));
             $this->client->start();
         }
     }
@@ -195,22 +216,21 @@ class Gcm
     }
 
     public function on__message($stanza) {
-        $this->msgAckd++;
+        //$this->msgAckd++;
 
         $data = $this->xmppdecode($stanza);
 
-        $messageType   = $data->message_type;
-        $messageId     = $data->message_id;  //message id which was sent from us
-        $from          = $data->from; //gcm key;
+        $messageType   = $data['message_type'];
+        $messageId     = $data['message_id'];  //message id which was sent from us
+        $from          = $data['from']; //gcm key;
 
         if (self::MSG_NACK == $messageType) {
-
             $error            = isset($data['error']) ? $data['error'] : null; //BAD_REGISTRATION
             $errorDescription = isset($data['error_description']) ? $data['error_description'] : null; //Invalid token
             $this->on_sent_error($from, $messageId, $error, $errorDescription);
 
         } else {
-            $this->on_sent_success($from, $messageId, $this->msgAckd, $this->msgSent);
+            $this->on_sent_success($from, $messageId);
         }
 
     }
@@ -253,7 +273,7 @@ class Gcm
                                     'to'   => $message->getTo(true),
                                     'data' => $message->getData())
         );
-        $this->msgSent++;
+        //$this->msgSent++;
     }
 
     protected function sendGcmMessage($payload) {
@@ -262,7 +282,7 @@ class Gcm
     }
 
     protected function xmppdecode(\XMPPStanza $stanza) {
-        $data = json_decode(html_entity_decode($stanza->childrens[0]->text));
+        $data = json_decode(html_entity_decode($stanza->childrens[0]->text), true);
         return $data;
     }
 
@@ -298,12 +318,6 @@ class Gcm
         }
     }
 
-    public function on_stream_start() {
-        if ($cb = $this->getCallback(__FUNCTION__)) {
-            call_user_func_array($cb, array());
-        }
-    }
-
     public function on_stream_features() {
         if ($cb = $this->getCallback(__FUNCTION__)) {
             call_user_func_array($cb, array());
@@ -315,10 +329,8 @@ class Gcm
      *
      * @param $from
      * @param $messageId
-     * @param $messagesAcked
-     * @param $messagesSent
      */
-    protected function on_sent_success($from, $messageId, $messagesAcked, $messagesSent) {
+    protected function on_sent_success($recipientId, $messageId) {
         if ($cb = $this->getCallback(__FUNCTION__)) {
             call_user_func_array($cb, func_get_args());
         }
@@ -332,7 +344,7 @@ class Gcm
      * @param $errorCode see ERRO_CODE_* constants
      * @param $errorDescription optional description text
      */
-    protected function on_sent_error($from, $messageId, $errorCode, $errorDescription = null) {
+    protected function on_sent_error($recipientId, $messageId, $errorCode, $errorDescription = null) {
         if ($cb = $this->getCallback(__FUNCTION__)) {
             call_user_func_array($cb, func_get_args());
         }

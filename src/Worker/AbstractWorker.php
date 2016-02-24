@@ -51,34 +51,41 @@ abstract class AbstractWorker
     /**
      * Process data,
      */
-    protected function work()
+    protected function work($timeout = null)
     {
         if (!$this->bind) {
             return;
         }
 
         while (true) {
-            $job = $this->adapter->pickTask();
-            if (!is_array($job)) {
-                throw new Exception('Worker failed to fetch new job');
-            }
+            $job = $this->adapter->pickTask($timeout);
 
-            /**
-             * @see http://php.net/manual/en/generator.send.php
-             */
-            $response = (yield $job[0] => $job[1]);
-            yield;
+            if (is_array($job)) {
+                /**
+                 * @see http://php.net/manual/en/generator.send.php
+                 */
+                $response = (yield $job[0] => $job[1]);
+                yield;
 
-            $ack = false;
-            if ($response === false) {
-                $ack = $this->adapter->afterWorkFailed($job[0]);
+                $ack = false;
+                if ($response === false) {
+                    $ack = $this->adapter->afterWorkFailed($job[0]);
+                } else {
+                    $ack = $this->adapter->afterWorkSuccess($job[0]);
+                }
+
+                if (!$ack) {
+                    throw new Exception('Worker failed to acknowledge job result');
+                }
+
             } else {
-                $ack = $this->adapter->afterWorkSuccess($job[0]);
+                if (!$timeout) {
+                    throw new Exception('Worker failed to fetch new job');
+                } else {
+                    yield;
+                }
             }
 
-            if (!$ack) {
-                throw new Exception('Worker failed to acknowledge job result');
-            }
         }
     }
 
