@@ -52,4 +52,8 @@ class Process extends AbstractMessage
     public function getOptions() {
         return $this->options;
     }
+
+    public function getRecipientsNumber() {
+        return 1;
+    }
 }
