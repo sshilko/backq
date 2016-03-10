@@ -125,9 +125,11 @@ if ($publisher->start() && $publisher->hasWorkers()) {
 }
 ```
 
+#### Master-dev
 
-
-
-
+Master dev since 1.0.11 release contains unsable code and has some experiments with GCM pusher over XMPP
+via https://github.com/jaxl/JAXL Jaxl library, but unfortunatelly the design of Jaxl and bloking nature of beanstalkd (only with timeout)
+are not best fit to each other, so with basic Jaxl library successfuly connecting to GCM, there is no nice way to bundle it as a working solution atm.
+There isnt any cool XMPP/GCM workers unfortunatelly so i will look into writing one using [async](https://github.com/elazar/asynchronous-php) libraries
 
 
