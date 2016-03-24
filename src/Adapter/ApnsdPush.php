@@ -102,7 +102,14 @@ class ApnsdPush extends \ApnsPHP_Push
      */
     protected function _readErrorMessage()
     {
-        $sErrorResponse = $this->io->read(self::ERROR_RESPONSE_SIZE);
+        try {
+            $sErrorResponse = $this->io->read(self::ERROR_RESPONSE_SIZE);
+        } catch (\Exception $e) {
+            /**
+             * Read IO exception exposed as Push exception so its catched properly
+             */
+            throw new \ApnsPHP_Push_Exception($e->getMessage());
+        }
 
         if (!$sErrorResponse) {
             return null;
