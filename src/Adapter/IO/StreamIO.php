@@ -15,7 +15,7 @@ class StreamIO extends AbstractIO
         $this->sock = null;
 
         if ($context) {
-            $remote = sprintf('tlsv1.2://%s:%s', $host, $port);
+            $remote = sprintf('tls://%s:%s', $host, $port);
             $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT, $context);
         } else {
             $remote = sprintf('tcp://%s:%s', $host, $port);
