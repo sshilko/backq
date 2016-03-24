@@ -31,7 +31,7 @@ final class Apnsd extends AbstractWorker
      * For those versions use connectTimeout as low as 0.5
      */
     public $connectTimeout = 5;
-    public $socketSelectTimeout = 500000;
+    public $socketSelectTimeout = 750000;
     public $readWriteTimeout = 10;
 
     /**

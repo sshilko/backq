@@ -9,13 +9,13 @@ class StreamIO extends AbstractIO
 {
     private $sock = null;
 
-    public function __construct($host, $port, $connection_timeout, $read_write_timeout = null, $context = null, $blocking = 0)
+    public function __construct($host, $port, $connection_timeout, $read_write_timeout = null, $context = null, $blocking = false)
     {
         $errstr = $errno = null;
         $this->sock = null;
 
         if ($context) {
-            $remote = sprintf('tls://%s:%s', $host, $port);
+            $remote = sprintf('tlsv1.2://%s:%s', $host, $port);
             $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT, $context);
         } else {
             $remote = sprintf('tcp://%s:%s', $host, $port);
@@ -88,27 +88,23 @@ class StreamIO extends AbstractIO
 
     public function write($data)
     {
-        $len = strlen($data);
-        while (true) {
-            if (false === ($written = fwrite($this->sock, $data))) {
+        $fwrite = 0;
+        $len    = strlen($data);
+        for ($written = 0; $written < $len; $written += $fwrite) {
+            $fwrite = fwrite($this->sock, substr($data, $written));
+            if ($fwrite === false) {
                 throw new RuntimeException("Error sending data");
             }
-            if ($written === 0) {
-                throw new RuntimeException("Broken pipe or closed connection");
-            }
+        }
 
-            // get status of socket to determine whether or not it has timed out
-            $info = stream_get_meta_data($this->sock);
-            if ($info['timed_out']) {
-                throw new TimeoutException("Error sending data. Socket connection timed out");
-            }
+        if ($fwrite === 0) {
+            throw new RuntimeException("Broken pipe or closed connection");
+        }
 
-            $len = $len - $written;
-            if ($len > 0) {
-                $data = substr($data,0-$len);
-            } else {
-                break;
-            }
+        // get status of socket to determine whether or not it has timed out
+        $info = stream_get_meta_data($this->sock);
+        if ($info['timed_out']) {
+            throw new TimeoutException("Error sending data. Socket connection timed out");
         }
     }
 
