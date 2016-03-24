@@ -23,7 +23,7 @@ class SocketIO extends AbstractIO
         socket_set_option($this->sock, SOL_TCP, TCP_NODELAY, 1);
     }
 
-    public function read($n, $unsafe = false)
+    public function read($n)
     {
         $res = '';
         $read = 0;

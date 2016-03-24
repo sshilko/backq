@@ -165,9 +165,9 @@ final class Apnsd extends AbstractWorker
                 $this->debug('ios connected');
 
                 /**
-                 * Dont retry, will restart worker in case things go south
+                 * Do NOT retry, will restart worker in case things go south
                  */
-                $push->setSendRetryTimes(0);
+                $push->setSendRetryTimes(1);
 
                 $push->setConnectRetryTimes(3);
                 /**

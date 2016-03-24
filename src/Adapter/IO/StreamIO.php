@@ -59,35 +59,35 @@ class StreamIO extends AbstractIO
         stream_set_write_buffer($this->sock, 0);
     }
 
-    public function read($n, $unsafe = false)
+    public function read($n)
     {
-        if ($unsafe) {
-            $info = stream_get_meta_data($this->sock);
-            if (feof($this->sock) || $info['timed_out']) {
-                return null;
+        $info = stream_get_meta_data($this->sock);
+        if ($info['timed_out'] || feof($this->sock)) {
+            throw new TimeoutException("Error reading data. Socket connection timed out");
+        }
+
+        $fread_result = '';
+        while (!feof($this->sock) && strlen($fread_result) < $n) {
+            /**
+             * Up to $n number of bytes read.
+             */
+            $fdata = fread($this->sock, $n);
+            if (false === $fdata) {
+                throw new RuntimeException("Failed to read from stream IO");
             }
-            return @fread($this->sock, $n);
+            $fread_result .= $fdata;
         }
-        $res = '';
-        $read = 0;
-
-        while ($read < $n && !feof($this->sock) &&
-            (false !== ($buf = fread($this->sock, $n - $read)))) {
-
-            $read += strlen($buf);
-            $res .= $buf;
-        }
-
-        if (strlen($res)!=$n) {
-            throw new RuntimeException("Error reading data. Received " .
-                strlen($res) . " instead of expected $n bytes");
-        }
-
-        return $res;
+        return $fread_result;
     }
 
     public function write($data)
     {
+        // get status of socket to determine whether or not it has timed out
+        $info = stream_get_meta_data($this->sock);
+        if ($info['timed_out'] || feof($this->sock)) {
+            throw new TimeoutException("Error sending data. Socket connection timed out");
+        }
+
         $fwrite = 0;
         $len    = strlen($data);
         for ($written = 0; $written < $len; $written += $fwrite) {
@@ -101,11 +101,6 @@ class StreamIO extends AbstractIO
             throw new RuntimeException("Broken pipe or closed connection");
         }
 
-        // get status of socket to determine whether or not it has timed out
-        $info = stream_get_meta_data($this->sock);
-        if ($info['timed_out']) {
-            throw new TimeoutException("Error sending data. Socket connection timed out");
-        }
     }
 
     public function close()
@@ -121,6 +116,15 @@ class StreamIO extends AbstractIO
         return $this->sock;
     }
 
+    /**
+     * Check if stream is available for READING,
+     * timed-out streams are also successfuly returned
+     *
+     * @param $sec
+     * @param $usec
+     *
+     * @return int
+     */
     public function select($sec, $usec)
     {
         $read   = array($this->sock);

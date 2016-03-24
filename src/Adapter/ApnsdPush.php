@@ -102,26 +102,37 @@ class ApnsdPush extends \ApnsPHP_Push
      */
     protected function _readErrorMessage()
     {
-        $sErrorResponse = $this->io->read(self::ERROR_RESPONSE_SIZE, true);
+        $sErrorResponse = $this->io->read(self::ERROR_RESPONSE_SIZE);
 
-        if ($sErrorResponse === false || strlen($sErrorResponse) != self::ERROR_RESPONSE_SIZE) {
-            return;
+        if (!$sErrorResponse) {
+            return null;
         }
-        $aErrorResponse = $this->_parseErrorMessage($sErrorResponse);
-        if (!is_array($aErrorResponse) || empty($aErrorResponse)) {
-            return;
+
+        if (strlen($sErrorResponse) != self::ERROR_RESPONSE_SIZE) {
+            error_log('Read unexpected error response data: ' . $sErrorResponse);
+            return null;
         }
-        if (!isset($aErrorResponse['command'], $aErrorResponse['statusCode'], $aErrorResponse['identifier'])) {
-            return;
+
+        $aErrorResponse = unpack('Ccommand/CstatusCode/Nidentifier', $sErrorResponse);
+
+        if (empty($aErrorResponse)) {
+            return null;
         }
-        if ($aErrorResponse['command'] != self::ERROR_RESPONSE_COMMAND) {
-            return;
+
+        if (!isset($aErrorResponse['command'],
+                   $aErrorResponse['statusCode'],
+                   $aErrorResponse['identifier'])
+            || $aErrorResponse['command'] != self::ERROR_RESPONSE_COMMAND) {
+            throw new \BackQ\Adapter\IO\Exception\RuntimeException('Unpacked error response has unexpected format: ' . json_encode($aErrorResponse));
         }
+
         $aErrorResponse['time'] = time();
         $aErrorResponse['statusMessage'] = 'None (unknown)';
+
         if (isset($this->_aErrorResponseMessages[$aErrorResponse['statusCode']])) {
             $aErrorResponse['statusMessage'] = $this->_aErrorResponseMessages[$aErrorResponse['statusCode']];
         }
+
         return $aErrorResponse;
     }
 
@@ -134,43 +145,57 @@ class ApnsdPush extends \ApnsPHP_Push
     public function send()
     {
         if (empty($this->_aMessageQueue)) {
-            throw new \ApnsPHP_Push_Exception(
-                'No notifications queued to be sent'
-            );
+            throw new \ApnsPHP_Push_Exception('No notifications queued to be sent');
         }
 
         $this->_aErrors = array();
         $nRun = 1;
+
         while (($nMessages = count($this->_aMessageQueue)) > 0) {
             $this->_log("INFO: Sending messages queue, run #{$nRun}: $nMessages message(s) left in queue.");
 
-            $bError = false;
             foreach($this->_aMessageQueue as $k => &$aMessage) {
-                if (function_exists('pcntl_signal_dispatch')) {
-                    pcntl_signal_dispatch();
-                }
+
+                if (function_exists('pcntl_signal_dispatch')) { pcntl_signal_dispatch(); }
 
                 $message = $aMessage['MESSAGE'];
-                $sCustomIdentifier = (string)$message->getCustomIdentifier();
+
+                $sCustomIdentifier = (string) $message->getCustomIdentifier();
                 $sCustomIdentifier = sprintf('[custom identifier: %s]', empty($sCustomIdentifier) ? 'unset' : $sCustomIdentifier);
 
                 $nErrors = 0;
                 if (!empty($aMessage['ERRORS'])) {
+
                     foreach($aMessage['ERRORS'] as $aError) {
-                        if ($aError['statusCode'] == 0) {
-                            $this->_log("INFO: Message ID {$k} {$sCustomIdentifier} has no error ({$aError['statusCode']}), removing from queue...");
-                            $this->_removeMessageFromQueue($k);
-                            continue 2;
-                        } else if ($aError['statusCode'] > 1 && $aError['statusCode'] <= 8) {
-                            $this->_log("WARNING: Message ID {$k} {$sCustomIdentifier} has an unrecoverable error ({$aError['statusCode']}), removing from queue without retrying...");
-                            $this->_removeMessageFromQueue($k, true);
-                            continue 2;
+                        switch ($aError['statusCode']) {
+
+                            case 0: //No errors encountered
+                                $this->_log("INFO: Message ID {$k} {$sCustomIdentifier} has no error ({$aError['statusCode']}), removing from queue...");
+                                $this->_removeMessageFromQueue($k);
+                                continue 3;
+                                break;
+                            case 1: //Processing error
+                            case 2: //Missing device token
+                            case 3: //Missing topic
+                            case 4: //Missing payload
+                            case 5: //Invalid token size
+                            case 6: //Invalid topic size
+                            case 7: //Invalid payload size
+                            case 8:   //Invalid token
+                            case 10:  //Shutdown
+                            case 128: //Protocol error (APNs could not parse the notification)
+                            case 255: //Unknown error
+                            case self::STATUS_CODE_INTERNAL_ERROR:
+                                $this->_log("WARNING: Message ID {$k} {$sCustomIdentifier} has an unrecoverable error ({$aError['statusCode']}), removing from queue without retrying...");
+                                $this->_removeMessageFromQueue($k, true);
+                                continue 3;
+
+                                break;
                         }
                     }
+
                     if (($nErrors = count($aMessage['ERRORS'])) >= $this->_nSendRetryTimes) {
-                        $this->_log(
-                            "WARNING: Message ID {$k} {$sCustomIdentifier} has {$nErrors} errors, removing from queue..."
-                        );
+                        $this->_log("WARNING: Message ID {$k} {$sCustomIdentifier} has {$nErrors} errors, removing from queue...");
                         $this->_removeMessageFromQueue($k, true);
                         continue;
                     }
@@ -184,44 +209,36 @@ class ApnsdPush extends \ApnsPHP_Push
                     $this->io->write($aMessage['BINARY_NOTIFICATION']);
                 } catch (\Exception $e) {
                     $aErrorMessage = array(
-                        'identifier' => $k,
-                        'statusCode' => self::STATUS_CODE_INTERNAL_ERROR,
+                        'identifier'    => $k,
+                        'statusCode'    => self::STATUS_CODE_INTERNAL_ERROR,
                         'statusMessage' => sprintf('%s (%s)',
-                                                   $this->_aErrorResponseMessages[self::STATUS_CODE_INTERNAL_ERROR], $e->getMessage())
+                                                   $this->_aErrorResponseMessages[self::STATUS_CODE_INTERNAL_ERROR],
+                                                   $e->getMessage())
                     );
-                }
-//                if ($nLen !== ($nWritten = (int)@fwrite($this->_hSocket, $aMessage['BINARY_NOTIFICATION']))) {
-//                    $aErrorMessage = array(
-//                        'identifier' => $k,
-//                        'statusCode' => self::STATUS_CODE_INTERNAL_ERROR,
-//                        'statusMessage' => sprintf('%s (%d bytes written instead of %d bytes)',
-//                                                   $this->_aErrorResponseMessages[self::STATUS_CODE_INTERNAL_ERROR], $nWritten, $nLen
-//                        )
-//                    );
-//                }
-
-                $bError = $this->_updateQueue($aErrorMessage);
-                if ($bError) {
-                    break;
+                    $aMessage['ERRORS'][] = $aErrorMessage;
                 }
             }
 
-            if (!$bError) {
-//                $read = array($this->_hSocket);
-//                $null = NULL;
-//                $nChangedStreams = @stream_select($read, $null, $null, 0, $this->_nSocketSelectTimeout);
+            $nChangedStreams = $this->io->select(0, $this->_nSocketSelectTimeout);
 
-                $nChangedStreams = $this->io->select(0, $this->_nSocketSelectTimeout);
-                if ($nChangedStreams === false) {
-                    $this->_log('ERROR: Unable to wait for a stream availability.');
-                    break;
-                } else if ($nChangedStreams > 0) {
-                    $bError = $this->_updateQueue();
-                    if (!$bError) {
+            if (false === $nChangedStreams) {
+                $this->_log('ERROR: Unable to wait for a stream availability.');
+                throw new \ApnsPHP_Push_Exception('Failed to select io stream for reading');
+            } else {
+                if (0 === $nChangedStreams) {
+                    /**
+                     * timeout: expires before anything interesting happened
+                     * After successful publish nothing is expected in response
+                     */
+                    //throw new \ApnsPHP_Push_Exception('Timed out while waiting for io stream become available for reading');
+                    $this->_aMessageQueue = array();
+                } elseif ($nChangedStreams > 0) {
+                    /**
+                     * Read the error message (or nothing) from stream and update the queue/cycle
+                     */
+                    if (!$this->_updateQueue()) {
                         $this->_aMessageQueue = array();
                     }
-                } else {
-                    $this->_aMessageQueue = array();
                 }
             }
 
