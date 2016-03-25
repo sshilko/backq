@@ -208,8 +208,17 @@ class ApnsdPush extends \ApnsPHP_Push
                     }
                 }
 
-                $nLen = strlen($aMessage['BINARY_NOTIFICATION']);
-                $this->_log("STATUS: Sending message ID {$k} {$sCustomIdentifier} (" . ($nErrors + 1) . "/{$this->_nSendRetryTimes}): {$nLen} bytes.");
+                $this->_log("STATUS: Sending message ID {$k} {$sCustomIdentifier} (" .
+                            ($nErrors + 1) .
+                            "/{$this->_nSendRetryTimes}): " . strlen($aMessage['BINARY_NOTIFICATION']) .
+                            " bytes.");
+
+                $readyWrite = $this->io->selectWrite(0, $this->_nSocketSelectTimeout);
+
+                if (false === $readyWrite) {
+                    $this->_log('ERROR: Unable to wait for a write availability.');
+                    throw new \ApnsPHP_Push_Exception('Failed to select io stream for writing');
+                }
 
                 $aErrorMessage = null;
                 try {
@@ -226,10 +235,10 @@ class ApnsdPush extends \ApnsPHP_Push
                 }
             }
 
-            $nChangedStreams = $this->io->select(0, $this->_nSocketSelectTimeout);
+            $nChangedStreams = $this->io->selectRead(0, $this->_nSocketSelectTimeout);
 
             if (false === $nChangedStreams) {
-                $this->_log('ERROR: Unable to wait for a stream availability.');
+                $this->_log('ERROR: Unable to wait for a stream read availability.');
                 throw new \ApnsPHP_Push_Exception('Failed to select io stream for reading');
             } else {
                 if (0 === $nChangedStreams) {
