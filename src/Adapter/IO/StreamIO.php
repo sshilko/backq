@@ -9,6 +9,9 @@ class StreamIO extends AbstractIO
 {
     private $sock = null;
 
+    const FREAD_0_TRIES = 3;
+    const WRITE_0_TRIES = 3;
+
     public function __construct($host, $port, $connection_timeout, $read_write_timeout = null, $context = null, $blocking = false)
     {
         $errstr = $errno = null;
@@ -66,6 +69,7 @@ class StreamIO extends AbstractIO
             throw new TimeoutException("Error reading data. Socket connection timed out");
         }
 
+        $tries = self::FREAD_0_TRIES;
         $fread_result = '';
         while (!feof($this->sock) && strlen($fread_result) < $n) {
             /**
@@ -76,6 +80,18 @@ class StreamIO extends AbstractIO
                 throw new RuntimeException("Failed to read from stream IO");
             }
             $fread_result .= $fdata;
+
+            if (!$fdata) {
+                $tries--;
+            }
+
+            if ($tries <= 0) {
+                /**
+                 * Nothing to read
+                 */
+                break;
+            }
+
         }
         return $fread_result;
     }
@@ -100,7 +116,7 @@ class StreamIO extends AbstractIO
             throw new \RuntimeException('Error (' . $severity . '): ' . $text);
         });
 
-        $tries = 3;
+        $tries = self::WRITE_0_TRIES;
         for ($written = 0; $written < $len; $written += $fwrite) {
 
             $fwrite = fwrite($this->sock, substr($data, $written));
@@ -118,7 +134,7 @@ class StreamIO extends AbstractIO
             }
 
             if ($tries <= 0) {
-                throw new RuntimeException('Failed to write to socket after ' . $tries . ' retries');
+                throw new RuntimeException('Failed to write to socket after ' . self::WRITE_0_TRIES . ' retries');
             }
         }
 
