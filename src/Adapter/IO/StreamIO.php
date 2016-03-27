@@ -90,12 +90,43 @@ class StreamIO extends AbstractIO
 
         $fwrite = 0;
         $len    = strlen($data);
+
+        /**
+         * fwrite throws NOTICE error on broken pipe
+         * send of N bytes failed with errno=32 Broken pipe
+         */
+        $oreporting = error_reporting(E_ALL);
+        $ohandler   = set_error_handler(function($severity, $text) {
+            throw new \RuntimeException('Error (' . $severity . '): ' . $text);
+        });
+
+        $tries = 3;
         for ($written = 0; $written < $len; $written += $fwrite) {
+
             $fwrite = fwrite($this->sock, substr($data, $written));
             if ($fwrite === false) {
+                /**
+                 * This bugged on 7.0.4 and maybe other versions
+                 * @see https://bugs.php.net/bug.php?id=71907
+                 * Actually returns int(0) instead of FALSE
+                 */
                 throw new RuntimeException("Error sending data");
             }
+
+            if ($fwrite === 0) {
+                $tries--;
+            }
+
+            if ($tries <= 0) {
+                throw new RuntimeException('Failed to write to socket after ' . $tries . ' retries');
+            }
         }
+
+        /**
+         * Restore original handlers
+         */
+        error_reporting($oreporting);
+        set_error_handler($ohandler);
 
         if ($fwrite === 0) {
             throw new RuntimeException("Broken pipe or closed connection");
