@@ -62,7 +62,7 @@ class StreamIO extends AbstractIO
     public function read($n)
     {
         $info = stream_get_meta_data($this->sock);
-        if ($info['timed_out'] || feof($this->sock)) {
+        if ($info['eof'] || $info['timed_out'] || feof($this->sock)) {
             throw new TimeoutException("Error reading data. Socket connection timed out");
         }
 
@@ -84,7 +84,7 @@ class StreamIO extends AbstractIO
     {
         // get status of socket to determine whether or not it has timed out
         $info = stream_get_meta_data($this->sock);
-        if ($info['timed_out'] || feof($this->sock)) {
+        if ($info['eof'] || $info['timed_out'] || feof($this->sock)) {
             throw new TimeoutException("Error sending data. Socket connection timed out");
         }
 
