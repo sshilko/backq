@@ -158,11 +158,6 @@ class StreamIO extends AbstractIO
         $this->sock = null;
     }
 
-    public function get_socket()
-    {
-        return $this->sock;
-    }
-
     public function selectWrite($sec, $usec) {
         $read   = null;
         $write  = array($this->sock);
@@ -171,20 +166,6 @@ class StreamIO extends AbstractIO
     }
 
     public function selectRead($sec, $usec) {
-        return $this->select($sec, $usec);
-    }
-
-    /**
-     * Check if stream is available for READING,
-     * timed-out streams are also successfuly returned
-     *
-     * @param $sec
-     * @param $usec
-     *
-     * @return int
-     */
-    public function select($sec, $usec)
-    {
         $read   = array($this->sock);
         $write  = null;
         $except = null;

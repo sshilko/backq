@@ -65,8 +65,7 @@ final class Apnsd extends AbstractWorker
      *
      * @see https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/CommunicatingWIthAPS.html
      */
-    const CODE_APNS_PROCERRN = 1;
-    const CODE_APNS_SHUTDOWN = 10;
+    const CODE_APNS_PARSEERR = 128;
     const CODE_APNS_UNKNOWN  = 255;
 
     /**
@@ -146,6 +145,7 @@ final class Apnsd extends AbstractWorker
         $version   = filemtime(__FILE__);
         $connected = $this->start();
         $this->debug('started');
+        $push = null;
         if ($connected) {
             try {
                 $this->debug('connected to queue');
@@ -226,6 +226,7 @@ final class Apnsd extends AbstractWorker
 
                     $message   = @unserialize($payload);
                     $processed = true;
+                    $reconnect = false;
 
                     if (!($message instanceof \ApnsPHP_Message) || !$message->getRecipientsNumber()) {
                         $work->send($processed);
@@ -239,7 +240,7 @@ final class Apnsd extends AbstractWorker
 
                         try {
                             /**
-                             * We send 1 message per push, thats easier handling errors (see below error handling section, especially error code 10 from apple)
+                             * We send 1 message per push
                              */
                             $push->add($message);
                             $this->debug('job added to apns queue');
@@ -252,6 +253,7 @@ final class Apnsd extends AbstractWorker
                             $this->debug('bad connection network');
                             @error_log($networkIssue->getMessage());
                             $processed = $networkIssue->getMessage();
+                            $reconnect = true;
                         } finally {
                             $work->send((true === $processed));
                         }
@@ -259,48 +261,39 @@ final class Apnsd extends AbstractWorker
                         $errors = $push->getErrors(false);
 
                         if (!empty($errors)) {
-                            if (is_array($errors)) {
-                                /**
-                                 * Sending one message per push will result in one error per push
-                                 * Setting setSendRetryTimes to 0 will result in one error (no retries) per message pushed
-                                 *
-                                 * Also when message 10 arrives from apple, we either check the last successfull message sent and re-try others or just
-                                 * send 1 message per push which is easier code-wise
-                                 */
-                                foreach ($errors as $e) {
-                                    if (isset($e['ERRORS']) && is_array($e['ERRORS'])) {
-                                        foreach ($e['ERRORS'] as $err) {
-                                            if (isset($err['statusCode'])) {
-                                                switch ($err['statusCode']) {
-                                                    /**
-                                                     * Critical errors requiring action
-                                                     */
-                                                    case \ApnsPHP_Push::STATUS_CODE_INTERNAL_ERROR:
-                                                    // no break
-                                                    case self::CODE_APNS_PROCERRN:
-                                                    // no break
-                                                    case self::CODE_APNS_SHUTDOWN:
-                                                    // no break
-                                                    case self::CODE_APNS_UNKNOWN:
-                                                        @error_log('apnsd worker error data: ' . @json_encode($err));
-                                                        $processed = $err['statusCode'] . ' ' . $err['statusMessage'];
-                                                        break;
-                                                    default:
-                                                        /**
-                                                         * All other cases (no error, bad payload, bad token and all other validation, we dont restart worker and report OK to queue)
-                                                         */
-                                                        break;
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        @error_log('apnsd worker error generic: ' . @json_encode($e));
-                                        $processed = false;
-                                    }
-                                }
-                            } else {
-                                @error_log('apnsd worker error string: ' . @json_encode($errors));
+                            $err = isset($errors[0]['ERRORS'][0]['statusCode']) ? $errors[0]['ERRORS'][0] : null;
+                            if (!$err) {
+                                error_log('Unexpected errors: ' . @json_encode($errors));
                                 $processed = false;
+                            } else {
+                                switch ($err['statusCode']) {
+                                    /**
+                                     * Restart the worker
+                                     */
+                                    case self::CODE_APNS_PARSEERR:
+                                    case self::CODE_APNS_UNKNOWN:
+                                        @error_log('apnsd worker error data: ' . @json_encode($err));
+                                        $processed = $err['statusCode'] . ' ' . $err['statusMessage'];
+                                        break;
+                                    default:
+                                        /**
+                                         * 0  - none
+                                         * 2  - missing token
+                                         * 3  - missing topic
+                                         * 4  - missing payload
+                                         * 5  - invalid token size
+                                         * 6  - invalid topic size
+                                         * 7  - invalid payld size
+                                         * 8  - invalid token
+                                         * 10 - shutdown (last message was successfuly sent)
+                                         *
+                                         * Reconnect after APNS response:
+                                         * APNs returns an error-response packet and closes the connection
+                                         * @see https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Appendixes/BinaryProviderAPI.html#//apple_ref/doc/uid/TP40008194-CH106-SW5
+                                         */
+                                        $reconnect = true;
+                                        break;
+                                }
                             }
                         }
 
@@ -309,6 +302,11 @@ final class Apnsd extends AbstractWorker
                              * Worker not reliable, quitting
                              */
                             throw new \RuntimeException('Worker not reliable, failed to process APNS task: ' . $processed);
+                        }
+
+                        if ($reconnect) {
+                            $push->disconnect();
+                            $push->connect();
                         }
                     }
                 };

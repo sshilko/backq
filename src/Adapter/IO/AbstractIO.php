@@ -10,5 +10,7 @@ abstract class AbstractIO
 
     abstract public function close();
 
-    abstract public function select($sec, $usec);
+    abstract public function selectRead($sec, $usec);
+
+    abstract public function selectWrite($sec, $usec);
 }

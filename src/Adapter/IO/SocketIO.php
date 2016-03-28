@@ -73,7 +73,15 @@ class SocketIO extends AbstractIO
         $this->sock = null;
     }
 
-    public function select($sec, $usec)
+    public function selectWrite($sec, $usec)
+    {
+        $read   = null;
+        $write  = array($this->sock);
+        $except = null;
+        return socket_select($read, $write, $except, $sec, $usec);
+    }
+
+    public function selectRead($sec, $usec)
     {
         $read   = array($this->sock);
         $write  = null;
