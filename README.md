@@ -9,6 +9,12 @@ Perform tasks with workers &amp; publishers (queues)
 * [APNS](https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW9) Push notifications sending
 * asynchronous process executon via [proc_open](http://php.net/manual/en/function.proc-open.php) implemented by [symfony/process](http://symfony.com/doc/current/components/process.html) component
 
+#### Installation
+```
+composer require sshilko/backq:dev-master
+composer require sshilko/backq:1.1.0
+```
+
 #### Requirements
 
 * Recommended [PHP >=7.0.4](https://launchpad.net/~ondrej/+archive/ubuntu/php)
