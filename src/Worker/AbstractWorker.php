@@ -109,7 +109,7 @@ abstract class AbstractWorker
     protected function debug($log)
     {
         if ($this->doDebug) {
-            echo "\n" . $log;
+            echo $log . "\n";
         }
     }
 }
