@@ -11,6 +11,9 @@ Perform tasks with workers &amp; publishers (queues)
 
 #### Installation
 ```
+#composer self-update
+#composer clear-cache
+#composer diagnose
 composer require sshilko/backq:dev-master
 composer require sshilko/backq:^1.1
 ```
