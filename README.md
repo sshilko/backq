@@ -35,10 +35,13 @@ Perform tasks with workers &amp; publishers (queues)
 Initialize Queue adapter
 
 * Adapter for Beanstalkd
-
 ```
-//by default connects to 127.0.0.1:11300
+/**
+ * only Beanstalk is supported atm.
+ * Recommended: default settings expect server at 127.0.0.1:11300 with non-persistent connection
+ */ 
 $adapter = new \BackQ\Adapter\Beanstalk;
+//$custom  = new \BackQ\Adapter\Beanstalk($host, $port, $timeout, $persistent);
 ```
 
 * Worker (can have multiple per same queue) that dispatches messages
