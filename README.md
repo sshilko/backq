@@ -12,7 +12,7 @@ Perform tasks with workers &amp; publishers (queues)
 #### Installation
 ```
 composer require sshilko/backq:dev-master
-composer require sshilko/backq:1.1.0
+composer require sshilko/backq:^1.1
 ```
 
 #### Requirements
