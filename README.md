@@ -14,7 +14,7 @@ Perform tasks with workers &amp; publishers (queues)
 #composer self-update
 #composer clear-cache
 #composer diagnose
-composer require sshilko/backq:dev-master
+#composer require sshilko/backq:dev-master
 composer require sshilko/backq:^1.1
 ```
 
@@ -26,7 +26,7 @@ composer require sshilko/backq:^1.1
 
 #### Push notifications requirements
 
-* Basic idea inspired by [ApnsPHP](https://packagist.org/packages/duccio/apns-php) but because package was not maintained for long time, own adapter was implemented (TLS support, payload size >= 256 in iOS8+, fwrite()/fread() error handlind, etc.).
+* Basic idea inspired by [ApnsPHP](https://packagist.org/packages/duccio/apns-php) [original](https://code.google.com/archive/p/apns-php/) but because package was not maintained for long time, own adapter was implemented (TLS support, payload size >= 256 in iOS8+, fwrite()/fread() error handlind, etc.).
 
 #### Process dispatch requirements
  
@@ -69,7 +69,8 @@ $worker = new \BackQ\Worker\Apnsd($adapter);
 $worker->setQueueName($worker->getQueueName() . 'myQueueName1');
 
 /**
- * The longer we wait the less changes we send push into closed socket
+ * The longer we wait
+ * the less chance that we will send push into closed socket (eof)
  * @optional
  */
 $worker->socketSelectTimeout = \BackQ\Worker\Apnsd::SENDSPEED_TIMEOUT_RECOMMENDED;
