@@ -197,6 +197,5 @@ if ($publisher->start() && $publisher->hasWorkers()) {
 
 #### Master-dev
 
-Master dev since 1.0.11 release contains unsable code and has some (unsuccessful) experiments with GCM pusher over XMPP.
-Please use only stable (>=1.1.2) versions, i use dev-master in my own projects and as soon as master code doesnt show any errors its pushed to next stable version.
+Please use only stable (>=1.1.2) versions, everyone <= 1.1.2 should update for latest bugfixes around sockets io.
 
