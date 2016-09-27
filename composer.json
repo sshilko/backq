@@ -1,5 +1,5 @@
 {
-    "name": "sshilko/backq",
+    "name": "viveme/backq",
     "description": "Background push notifications processing with workers & publisher",
     "type": "library",
     "minimum-stability": "dev",
@@ -7,16 +7,7 @@
         "issues": "https://github.com/sshilko/backq/issues"
     },
     "keywords": ["queue", "worker", "apns", "push", "ios", "apple", "notification", "send", "background", "process", "async"],
-    "homepage": "https://github.com/sshilko/backq",
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "Sergei Shilko",
-            "email": "contact@sshilko.com",
-            "homepage": "http://sshilko.com",
-            "role": "Developer"
-        }
-    ],
+    "homepage": "https://github.com/viveme/backq",
     "require": {
         "php": ">=5.5.0",
         "davidpersson/beanstalk": "^2.0",
