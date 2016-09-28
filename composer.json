@@ -12,7 +12,7 @@
         "php": ">=5.5.0",
         "davidpersson/beanstalk": "^2.0",
         "symfony/process": "=2.8.0",        
-        "duccio/apns-php": "1.0.1-dev#e5b7908cdf1d8c8e51caaa1e37af073deb2abcdd"
+        "duccio/apns-php": "=1.0.1"
     },
     "suggest": {
         "php": ">=7.0.4"
