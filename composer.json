@@ -4,7 +4,7 @@
     "type": "library",
     "minimum-stability": "dev",
     "support": {
-        "issues": "https://github.com/sshilko/backq/issues"
+        "issues": "https://github.com/viveme/backq/issues"
     },
     "keywords": ["queue", "worker", "apns", "push", "ios", "apple", "notification", "send", "background", "process", "async"],
     "homepage": "https://github.com/viveme/backq",
@@ -12,7 +12,7 @@
         "php": ">=5.5.0",
         "davidpersson/beanstalk": "^2.0",
         "symfony/process": "=2.8.0",        
-        "duccio/apns-php": "=dev-master#e5b7908cdf1d8c8e51caaa1e37af073deb2abcdd"
+        "duccio/apns-php": "dev-master#e5b7908cdf1d8c8e51caaa1e37af073deb2abcdd"
     },
     "suggest": {
         "php": ">=7.0.4"
