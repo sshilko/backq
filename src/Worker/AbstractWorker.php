@@ -2,7 +2,7 @@
 /**
  *  The MIT License (MIT)
  *
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2016 Tripod Technology GmbH
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,20 @@ abstract class AbstractWorker
     private $adapter;
     private $bind;
     private $doDebug;
+
+    /**
+     * Quit after processing X amount of pushes
+     *
+     * @var int
+     */
+    protected $restartThreshold = 0;
+
+    /**
+     * Quit if inactive for specified time (seconds)
+     *
+     * @var int
+     */
+    protected $idleTimeout = 0;
 
     /**
      * Specify worker queue to pick job from
@@ -73,13 +87,27 @@ abstract class AbstractWorker
             return;
         }
 
+        $jobsdone   = 0;
+        $break      = false;
+        $lastActive = time();
         while (true) {
             $job = $this->adapter->pickTask($timeout);
 
+            /**
+             * @see http://php.net/manual/en/generator.send.php
+             */
+            if ($this->idleTimeout > 0 && (time() - $lastActive) > $this->idleTimeout-$timeout) {
+                $this->debug('Idle timeout reached, returning job, quitting');
+                $break = true;
+            }
+
+            if ($this->restartThreshold > 0 && ++$jobsdone > $this->restartThreshold - 1) {
+                $this->debug('Restart threshold reached, returning job, quitting');
+                $break = true;
+            }
+
+            $lastActive = time();
             if (is_array($job)) {
-                /**
-                 * @see http://php.net/manual/en/generator.send.php
-                 */
                 $response = (yield $job[0] => $job[1]);
                 yield;
 
@@ -94,6 +122,12 @@ abstract class AbstractWorker
                     throw new Exception('Worker failed to acknowledge job result');
                 }
 
+                /**
+                 * Break infinite loop when a limit condition was reached
+                 */
+                if ($break) {
+                    break;
+                }
             } else {
                 if (!$timeout) {
                     throw new Exception('Worker failed to fetch new job');
@@ -127,5 +161,35 @@ abstract class AbstractWorker
         if ($this->doDebug) {
             echo $log . "\n";
         }
+    }
+
+    /**
+     * Set queue this worker is going to use
+     *
+     * @param $string
+     */
+    public function setQueueName($string)
+    {
+        $this->queueName = (string) $string;
+    }
+
+    /**
+     * Quit after processing X amount of pushes
+     *
+     * @param $int
+     */
+    public function setRestartThreshold($int)
+    {
+        $this->restartThreshold = (int) $int;
+    }
+
+    /**
+     * Quit after reaching idle timeout
+     *
+     * @param $int
+     */
+    public function setIdleTimeout($int)
+    {
+        $this->idleTimeout = (int) $int;
     }
 }

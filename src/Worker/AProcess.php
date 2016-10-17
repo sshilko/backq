@@ -43,16 +43,6 @@ final class AProcess extends AbstractWorker
         return $this->queueName;
     }
 
-    /**
-     * Set queue this worker is going to use
-     *
-     * @param $string
-     */
-    public function setQueueName($string)
-    {
-        $this->queueName = (string) $string;
-    }
-
     public function run()
     {
         $connected = $this->start();

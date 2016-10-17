@@ -78,16 +78,6 @@ final class Gcm extends AbstractWorker
     }
 
     /**
-     * Set queue this worker is going to use
-     *
-     * @param $string
-     */
-    public function setQueueName($string)
-    {
-        $this->queueName = (string) $string;
-    }
-
-    /**
      * Quit after processing X amount of pushes
      *
      * @param $int
