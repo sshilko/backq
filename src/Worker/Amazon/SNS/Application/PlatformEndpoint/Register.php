@@ -1,26 +1,32 @@
 <?php
 /**
- *  The MIT License (MIT)
+ * Copyright (c) 2016, Tripod Technology GmbH <support@tandem.net>
+ * All rights reserved.
  *
- * Copyright (c) 2016 Tripod Technology GmbH
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ *    1. Redistributions of source code must retain the above copyright notice,
+ *       this list of conditions and the following disclaimer.
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ *    2. Redistributions in binary form must reproduce the above copyright notice,
+ *       this list of conditions and the following disclaimer in the documentation
+ *       and/or other materials provided with the distribution.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ *    3. Neither the name of Tripod Technology GmbH nor the names of its contributors
+ *       may be used to endorse or promote products derived from this software
+ *       without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  **/
 
@@ -30,14 +36,24 @@ use BackQ\Worker\AbstractWorker;
 
 final class Register extends AbstractWorker
 {
-    protected $queueName = 'aws_sns_endpoints_register';
+    protected $queueName;
 
     /** @var $snsClient \Aws\Sns\SnsClient */
     protected $snsClient;
 
-    protected $platform;
+    /**
+     * Maximum number of times that the same Job can attempt to be reprocessed
+     * after an error that it could be recovered from in a next iteration
+     */
+    const RETRY_MAX = 3;
 
-    protected $applicationArn;
+    public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
+    {
+        $queueSuffix = strtolower(end(explode('\\', get_called_class())));
+        $this->setQueueName('aws_sns_endpoints_' . $queueSuffix . '_');
+
+        parent::__construct($adapter);
+    }
 
     /**
      * Queue this worker is read from
@@ -60,23 +76,14 @@ final class Register extends AbstractWorker
     }
 
     /**
-     * Platform that an endpoint will be registered into
+     * Platform that an endpoint will be registered into, can be extracted from
+     * the queue name
      *
-     * @param $platform
+     * @return string
      */
-    public function setPlatform($platform)
+    public function getPlatform()
     {
-        $this->platform = $platform;
-    }
-
-    /**
-     * Specific Resource Number for the Platform application where the endpoint will be created
-     *
-     * @param $applicationArn
-     */
-    public function setApplicationArn($applicationArn)
-    {
-        $this->applicationArn = $applicationArn;
+        return substr($this->queueName, strpos($this->queueName, '_') + 1);
     }
     
     public function run()
@@ -88,7 +95,7 @@ final class Register extends AbstractWorker
             try {
                 $this->debug('Connected to queue');
 
-                $work = $this->work();
+                $work = $this->work(15);
                 $this->debug('After init work generator');
 
                 /**
@@ -103,15 +110,33 @@ final class Register extends AbstractWorker
                     if (!($message instanceof \ns\Push\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RegisterMessage)) {
                         $work->send($processed);
                         $this->debug('Worker does not support payload of: ' . gettype($message));
+                        continue;
                     } else {
                         try {
                             $endpointResult = $this->snsClient->createPlatformEndpoint([
-                                'PlatformApplicationArn' => $this->applicationArn,
+                                'PlatformApplicationArn' => $message->getApplicationArn(),
                                 'Token'                  => $message->getToken(),
                                 'Attributes'             => $message->getAttributes()
                             ]);
                         } catch (\Aws\Sns\Exception\SnsException $e) {
+                            /**
+                             * We can't do anything on specific errors and then
+                             * the job is marked as processed
+                             */
+                            if (in_array($e->getAwsErrorCode(),
+                                        ['AuthorizationError', 'InvalidParameter', 'NotFound'])) {
+                                $work->send(true === $processed);
+                                break;
+                            }
 
+                            /**
+                             * An internal server error will be considered as a
+                             * temporary issue and we can retry creating the endpoint
+                             */
+                            if ('InternalError' == $e->getAwsErrorCode()) {
+                                $work->send(false);
+                                break;
+                            }
                         }
 
                         /**
@@ -119,7 +144,7 @@ final class Register extends AbstractWorker
                          * If something fails, retry the whole process
                          */
                         if (!empty($endpointResult['EndpointArn'])) {
-                            $serviceProvider = \ns\Nstokenprovider\Service::getServiceProvider($message->getService(), $this->platform);
+                            $serviceProvider = \ns\Nstokenprovider\Service::getServiceProvider($message->getService(), $this->getPlatform());
                             $result = $serviceProvider->register($message->getDeviceId(), $endpointResult['EndpointArn']);
 
                             if (!$result) {
