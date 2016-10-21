@@ -99,6 +99,12 @@ final class Register extends AbstractWorker
                 $this->debug('After init work generator');
 
                 /**
+                 * Keep an array with taskId and the number of times it was
+                 * attempted to be reprocessed to avoid starvation
+                 */
+                $reprocessedTasks = [];
+
+                /**
                  * Now attempt to register all devices
                  */
                 foreach ($work as $taskId => $payload) {
@@ -134,6 +140,21 @@ final class Register extends AbstractWorker
                              * temporary issue and we can retry creating the endpoint
                              */
                             if ('InternalError' == $e->getAwsErrorCode()) {
+                                /**
+                                 * Only retry if the max threshold has not been reached
+                                 */
+                                if (array_key_exists($taskId, $reprocessedTasks)) {
+                                    if ($reprocessedTasks >= self::RETRY_MAX) {
+                                        $this->debug('Retried re-processing the same job too many times');
+                                        unset($reprocessedTasks[$taskId]);
+
+                                        $work->send(true === $processed);
+                                        break;
+                                    }
+                                    $reprocessedTasks[$taskId] += 1;
+                                } else {
+                                    $reprocessedTasks[$taskId] = 1;
+                                }
                                 $work->send(false);
                                 break;
                             }
