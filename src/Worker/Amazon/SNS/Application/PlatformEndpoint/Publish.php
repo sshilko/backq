@@ -34,22 +34,17 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\AbstractWorker;
 
-final class Publish extends AbstractWorker
+class Publish extends AbstractWorker
 {
-    protected $queueName;
+    protected $queueName = 'aws_sns_endpoints_';
 
     /** @var $snsClient \Aws\Sns\SnsClient */
     protected $snsClient;
 
-    /**
-     * Time to run for a job with the remove queue as destination
-     */
-    const REMOVE_JOBTTR_VAL = 15;
-
     public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
-        $queueSuffix = strtolower(end(explode('\\', get_called_class())));
-        $this->setQueueName('aws_sns_endpoints_' . $queueSuffix . '_');
+        $queueSuffix = strtolower(end(explode('\\', get_called_class()))) . '_';
+        $this->setQueueName($this->getQueueName() . $queueSuffix);
 
         parent::__construct($adapter);
     }
@@ -95,11 +90,6 @@ final class Publish extends AbstractWorker
             try {
                 $this->debug('Connected to queue');
 
-                /** @var $endpointsPublisher \BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint\Remove */
-                $removeEndpointsPublisher = \BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint\Remove::getInstance(new \BackQ\Adapter\Beanstalk());
-                $removeEndpointsPublisher->setQueueName($removeEndpointsPublisher->getQueueName() . $this->getPlatform());
-                $removeEndpointsPublisherStart = $removeEndpointsPublisher->start();
-
                 $work = $this->work();
                 $this->debug('After init work generator');
 
@@ -111,54 +101,42 @@ final class Publish extends AbstractWorker
 
                     $message     = @unserialize($payload);
                     $processed   = true;
-                    $validDevice = true;
 
-                    if (!($message instanceof \ns\Push\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Message)) {
+                    if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish)) {
                         $work->send($processed);
                         $this->debug('Worker does not support payload of: ' . gettype($message));
                         continue;
                     } else {
                         try {
-                            $result = $this->snsClient->publish(['Message'           => $message->toJson(),
-                                                                 'MessageAttributes' => $message->getAttributes(),
-                                                                 'TargetArn'         => $message->getTargetArn()]);
+                            $this->snsClient->publish(['Message'           => $message->toJson(),
+                                                       'MessageAttributes' => $message->getAttributes(),
+                                                       'TargetArn'         => $message->getTargetArn()]);
 
                             $this->debug('SNS Client delivered message to endpoint');
                         } catch (\Aws\Sns\Exception\SnsException $e) {
+                            /**
+                             * Network errors will cause the job to be sent back to queue
+                             * @see http://docs.aws.amazon.com/sns/latest/api/API_Publish.html#API_Publish_Errors
+                             */
                             if (in_array($e->getAwsErrorCode(), ['InvalidParameter', 'EndpointDisabled'])) {
-                                $validDevice = false;
+                                /**
+                                 * Current job to be processed by current queue but
+                                 * will send it to a queue to remove endpoints
+                                 */
+                                $this->onFailure($message);
+                            } elseif ('InternalError' == $e->getAwsErrorCode()) {
+                                $processed = false;
                             }
                             $this->debug($e->getAwsErrorCode());
-                        } catch (\Exception $networkError) {
+                        } catch (\RequestException $networkError) {
                             /**
                              * Other errors (Network errors) won't cause any effects
+                             * and the job can be retried
                              */
+                            $processed = false;
+                            $this->debug('Could not publish to endpoint with error ' . $networkError->getMessage());
                         } finally {
                             $work->send(true === $processed);
-                        }
-
-                        if (!$validDevice) {
-                            /**
-                             * On disabled endpoint, send to queue to process invalid tokens/devices/endpoints
-                             * Same case on InvalidParameter, as this is the error after trying to publish to a deleted endpoint
-                             */
-                            if ($removeEndpointsPublisherStart && $removeEndpointsPublisher->hasWorkers()) {
-                                /**
-                                 * Setup fields needed to complete an operation to remove an endpoint
-                                 */
-                                $removeMessage = new \ns\Push\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RemoveMessage();
-                                $removeMessage->addDeviceId($message->getDeviceId());
-                                $removeMessage->addToken($message->getToken());
-                                $removeMessage->addEndpointUUID($message->getEndpointUUID());
-                                $removeMessage->setEndpointArn($this->getPlatform());
-                                $removeMessage->setService($message->getService());
-
-                                $result = $removeEndpointsPublisher->publish($removeMessage,
-                                                                             [\BackQ\Adapter\Beanstalk::PARAM_JOBTTR => self::REMOVE_JOBTTR_VAL]);
-                                if ($result <= 0) {
-                                    @error_log('Failed to publish endpoint to queue for deleting endpoint');
-                                }
-                            }
                         }
                     }
                 };

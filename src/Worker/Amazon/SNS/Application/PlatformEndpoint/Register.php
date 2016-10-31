@@ -34,9 +34,9 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\AbstractWorker;
 
-final class Register extends AbstractWorker
+class Register extends AbstractWorker
 {
-    protected $queueName;
+    protected $queueName = 'aws_sns_endpoints_';
 
     /** @var $snsClient \Aws\Sns\SnsClient */
     protected $snsClient;
@@ -49,8 +49,8 @@ final class Register extends AbstractWorker
 
     public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
-        $queueSuffix = strtolower(end(explode('\\', get_called_class())));
-        $this->setQueueName('aws_sns_endpoints_' . $queueSuffix . '_');
+        $queueSuffix = strtolower(end(explode('\\', get_called_class()))) . '_';
+        $this->setQueueName($this->getQueueName() . $queueSuffix);
 
         parent::__construct($adapter);
     }
@@ -83,7 +83,7 @@ final class Register extends AbstractWorker
      */
     public function getPlatform()
     {
-        return substr($this->queueName, strpos($this->queueName, '_') + 1);
+        return substr($this->queueName, strrpos($this->queueName, '_') + 1);
     }
     
     public function run()
@@ -113,7 +113,7 @@ final class Register extends AbstractWorker
                     $message   = @unserialize($payload);
                     $processed = true;
 
-                    if (!($message instanceof \ns\Push\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RegisterMessage)) {
+                    if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register)) {
                         $work->send($processed);
                         $this->debug('Worker does not support payload of: ' . gettype($message));
                         continue;
@@ -128,6 +128,7 @@ final class Register extends AbstractWorker
                             /**
                              * We can't do anything on specific errors and then
                              * the job is marked as processed
+                             * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html#API_CreatePlatformEndpoint_Errors
                              */
                             if (in_array($e->getAwsErrorCode(),
                                         ['AuthorizationError', 'InvalidParameter', 'NotFound'])) {
@@ -165,8 +166,7 @@ final class Register extends AbstractWorker
                          * If something fails, retry the whole process
                          */
                         if (!empty($endpointResult['EndpointArn'])) {
-                            $serviceProvider = \ns\Nstokenprovider\Service::getServiceProvider($message->getService(), $this->getPlatform());
-                            $result = $serviceProvider->register($message->getDeviceId(), $endpointResult['EndpointArn']);
+                            $result = $this->onSuccess($endpointResult['EndpointArn'], $message);
 
                             if (!$result) {
                                 $work->send(false);

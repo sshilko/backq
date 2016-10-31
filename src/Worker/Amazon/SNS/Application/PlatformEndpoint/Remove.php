@@ -34,17 +34,17 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\AbstractWorker;
 
-final class Remove extends AbstractWorker
+class Remove extends AbstractWorker
 {
-    protected $queueName;
+    protected $queueName = 'aws_sns_endpoints_';
 
     /** @var $snsClient \Aws\Sns\SnsClient */
     protected $snsClient;
 
     public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
-        $queueSuffix = strtolower(end(explode('\\', get_called_class())));
-        $this->setQueueName('aws_sns_endpoints_' . $queueSuffix . '_');
+        $queueSuffix = strtolower(end(explode('\\', get_called_class()))) . '_';
+        $this->setQueueName($this->getQueueName() . $queueSuffix);
 
         parent::__construct($adapter);
     }
@@ -69,6 +69,17 @@ final class Remove extends AbstractWorker
         $this->snsClient = $client;
     }
 
+    /**
+     * Platform that an endpoint will be registered into, can be extracted from
+     * the queue name
+     *
+     * @return string
+     */
+    public function getPlatform()
+    {
+        return substr($this->queueName, strrpos($this->queueName, '_') + 1);
+    }
+
     public function run()
     {
         $this->debug('started');
@@ -89,7 +100,7 @@ final class Remove extends AbstractWorker
 
                     $message   = @unserialize($payload);
                     $processed = true;
-                    if (!($message instanceof \ns\Push\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RemoveMessage)) {
+                    if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove)) {
                         $work->send($processed);
                         $this->debug('Worker does not support payload of: ' . gettype($message));
                         continue;
@@ -102,7 +113,7 @@ final class Remove extends AbstractWorker
                     try {
                         /**
                          * Endpoint creation is idempotent, then there will always be one Arn per token
-                         * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html
+                         * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html#API_DeleteEndpoint_Errors
                          */
                         $this->snsClient->deleteEndpoint(['EndpointArn' => $message->getEndpointArn()]);
 
@@ -126,13 +137,11 @@ final class Remove extends AbstractWorker
                     }
 
                     /**
-                     * Proceed unregistering the device and endpoint (managed by the token provider)
+                     * Proceed un-registering the device and endpoint (managed by the token provider)
                      * Retry sending the job to the queue on error/problems deleting
                      */
                     $this->debug('Deleting device with token ' . $message->getToken());
-
-                    $serviceProvider = \ns\Nstokenprovider\Service::getServiceProvider($message->getService(), $this->platform);
-                    $delSuccess      = $serviceProvider->remove($message->getDeviceId(), $message->getToken(), $message->getEndpointUUID());
+                    $delSuccess = $this->onSuccess($message);
 
                     if (!$delSuccess) {
                         $work->send(false);
