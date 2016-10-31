@@ -44,6 +44,18 @@ class Publish
     protected $targetArn;
 
     /**
+     * Array that contains payload parameters for a message
+     * @var array
+     */
+    protected $notification;
+
+    /**
+     * Data key value pairs
+     * @var array
+     */
+    protected $data;
+
+    /**
      * Takes the data and properly assigns it to a json encoded array to wrap
      * a subset of Gcm format into a customContent key
      *
@@ -57,13 +69,13 @@ class Publish
          * Group all notification's attributes into 'data' key
          * Other attributes such as ttl and collapse key are not needed
          */
-        if (!empty($this->gcmMessage->getNotification())) {
-            foreach ($this->gcmMessage->getNotification() as $nk => $nv) {
-                $this->gcmMessage->addData('notification.' . $nk, $nv);
+        if (!empty($this->notification)) {
+            foreach ($this->notification as $nk => $nv) {
+                $this->addData('notification.' . $nk, $nv);
             }
         }
-        if ($this->gcmMessage->getData()) {
-            $json['data'] = $this->gcmMessage->getData();
+        if ($this->data) {
+            $json['data'] = $this->data;
         }
 
         $result = json_encode(['customContent' => $json]);
@@ -81,6 +93,16 @@ class Publish
     }
 
     /**
+     * Sets up the Resource Identifier for the endpoint that a message will be published to
+     *
+     * @param string $targetArn
+     */
+    public function setTargetArn($targetArn)
+    {
+        $this->targetArn = $targetArn;
+    }
+
+    /**
      * Gets specific attributes to complete a Publish operation to an endpoint
      *
      * @return array
@@ -88,5 +110,34 @@ class Publish
     public function getAttributes()
     {
         return $this->attributes;
+    }
+
+    /**
+     * Sets attributes specific to different platforms in order to publish a message
+     *
+     * @param array $attrs
+     */
+    public function setAttributes($attrs)
+    {
+        $this->attributes = $attrs;
+    }
+
+    /**
+     * Sets/overrides values for data
+     * @param $payload
+     */
+    public function setData($payload)
+    {
+        $this->data = $payload;
+    }
+
+    /**
+     * Adds data keys
+     * @param $key
+     * @param $value
+     */
+    public function addData($key, $value)
+    {
+        $this->data[$key] = $value;
     }
 }

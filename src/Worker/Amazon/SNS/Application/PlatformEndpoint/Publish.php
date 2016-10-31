@@ -150,4 +150,16 @@ class Publish extends AbstractWorker
          */
         $this->finish();
     }
+
+    /**
+     * Handles a different flow when Publishing can't be completed
+     *
+     * @param $message
+     *
+     * @return bool
+     */
+    protected function onFailure($message)
+    {
+        return true;
+    }
 }
