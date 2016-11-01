@@ -32,54 +32,10 @@
 
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
-use BackQ\Worker\AbstractWorker;
+use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
-class Remove extends AbstractWorker
+class Remove extends PlatformEndpoint
 {
-    protected $queueName = 'aws_sns_endpoints_';
-
-    /** @var $snsClient \Aws\Sns\SnsClient */
-    protected $snsClient;
-
-    public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
-    {
-        $queueSuffix = strtolower(end(explode('\\', get_called_class()))) . '_';
-        $this->setQueueName($this->getQueueName() . $queueSuffix);
-
-        parent::__construct($adapter);
-    }
-
-    /**
-     * Queue this worker is read from
-     *
-     * @return string
-     */
-    public function getQueueName()
-    {
-        return $this->queueName;
-    }
-
-    /**
-     * Sets up a client that will Publish SNS messages
-     *
-     * @param $client
-     */
-    public function setClient($client)
-    {
-        $this->snsClient = $client;
-    }
-
-    /**
-     * Platform that an endpoint will be registered into, can be extracted from
-     * the queue name
-     *
-     * @return string
-     */
-    public function getPlatform()
-    {
-        return substr($this->queueName, strrpos($this->queueName, '_') + 1);
-    }
-
     public function run()
     {
         $this->debug('started');
@@ -156,5 +112,16 @@ class Remove extends AbstractWorker
             }
         }
         $this->finish();
+    }
+
+    /**
+     * Handles actions to be performed on correct deletion of an amazon endpoint
+     * @param $message
+     *
+     * @return bool
+     */
+    protected function onSuccess($message)
+    {
+        return true;
     }
 }

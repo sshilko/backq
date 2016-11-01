@@ -32,59 +32,15 @@
 
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
-use BackQ\Worker\AbstractWorker;
+use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
-class Register extends AbstractWorker
+class Register extends PlatformEndpoint
 {
-    protected $queueName = 'aws_sns_endpoints_';
-
-    /** @var $snsClient \Aws\Sns\SnsClient */
-    protected $snsClient;
-
     /**
      * Maximum number of times that the same Job can attempt to be reprocessed
      * after an error that it could be recovered from in a next iteration
      */
     const RETRY_MAX = 3;
-
-    public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
-    {
-        $queueSuffix = strtolower(end(explode('\\', get_called_class()))) . '_';
-        $this->setQueueName($this->getQueueName() . $queueSuffix);
-
-        parent::__construct($adapter);
-    }
-
-    /**
-     * Queue this worker is read from
-     *
-     * @return string
-     */
-    public function getQueueName()
-    {
-        return $this->queueName;
-    }
-
-    /**
-     * Sets up a client that will Create AWS SNS Endpoints
-     *
-     * @param $client
-     */
-    public function setClient($client)
-    {
-        $this->snsClient = $client;
-    }
-
-    /**
-     * Platform that an endpoint will be registered into, can be extracted from
-     * the queue name
-     *
-     * @return string
-     */
-    public function getPlatform()
-    {
-        return substr($this->queueName, strrpos($this->queueName, '_') + 1);
-    }
     
     public function run()
     {
@@ -182,5 +138,18 @@ class Register extends AbstractWorker
             }
         }
         $this->finish();
+    }
+
+    /**
+     * Handles registering a successfully created Amazon endpoint
+     *
+     * @param string $endpointArn
+     * @param        $message
+     *
+     * @return bool
+     */
+    protected function onSuccess($endpointArn, $message)
+    {
+        return true;
     }
 }

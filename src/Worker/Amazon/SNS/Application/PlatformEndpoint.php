@@ -28,36 +28,55 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- */
+ **/
 
-namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
+namespace BackQ\Worker\Amazon\SNS\Application;
 
-class Remove
+use BackQ\Worker\AbstractWorker;
+
+abstract class PlatformEndpoint extends AbstractWorker
 {
-    /**
-     * Amazon Resource name that uniquely identifies an endpoint that wil be removed from Aws
-     *
-     * @var string
-     */
-    protected $endpointArn;
+    protected $queueName = 'aws_sns_endpoints_';
 
-    /**
-     * Returns the Amazon Resource Name for the endpoint to delete
-     *
-     * @return string
-     */
-    public function getEndpointArn()
+    /** @var $snsClient \Aws\Sns\SnsClient */
+    protected $snsClient;
+
+    public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
-        return $this->endpointArn;
+        $queueSuffix = strtolower(end(explode('\\', get_called_class()))) . '_';
+        $this->setQueueName($this->getQueueName() . $queueSuffix);
+
+        parent::__construct($adapter);
     }
 
     /**
-     * Sets up an Amazon Resource Name from an endpoint to remove
+     * Queue this worker is read from
      *
-     * @param string $arn
+     * @return string
      */
-    public function setEndpointArn($arn)
+    public function getQueueName()
     {
-        $this->endpointArn = $arn;
+        return $this->queueName;
+    }
+
+    /**
+     * Sets up a client that will Publish SNS messages
+     *
+     * @param $client
+     */
+    public function setClient($client)
+    {
+        $this->snsClient = $client;
+    }
+
+    /**
+     * Platform that an endpoint will be registered into, can be extracted from
+     * the queue name
+     *
+     * @return string
+     */
+    public function getPlatform()
+    {
+        return substr($this->queueName, strpos($this->queueName, '_') + 1);
     }
 }

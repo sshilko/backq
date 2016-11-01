@@ -44,12 +44,6 @@ class Publish
     protected $targetArn;
 
     /**
-     * Array that contains payload parameters for a message
-     * @var array
-     */
-    protected $notification;
-
-    /**
      * Data key value pairs
      * @var array
      */
@@ -65,15 +59,6 @@ class Publish
     {
         $json = [];
 
-        /**
-         * Group all notification's attributes into 'data' key
-         * Other attributes such as ttl and collapse key are not needed
-         */
-        if (!empty($this->notification)) {
-            foreach ($this->notification as $nk => $nv) {
-                $this->addData('notification.' . $nk, $nv);
-            }
-        }
         if ($this->data) {
             $json['data'] = $this->data;
         }

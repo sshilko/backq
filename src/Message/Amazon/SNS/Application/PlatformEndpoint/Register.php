@@ -57,18 +57,70 @@ class Register
      */
     protected $applicationArn;
 
+    /**
+     * Get the specific attributes to create endpoints
+     * @return array
+     */
     public function getAttributes()
     {
         return $this->attributes;
     }
 
+    /**
+     * Adds specific attributes to a request to register endpoint
+     * 
+     * @param             $attributes
+     * @param null|string $key
+     */
+    public function addAttributes($attributes = null, $key = null)
+    {
+        if (is_array($attributes)) {
+            if (empty($this->attributes)) {
+                $this->attributes = $attributes;
+            } else {
+                foreach ($attributes as $attr => $v) {
+                    $this->attributes[$attr] = $v;
+                }
+            }
+        } elseif ($key && is_scalar($attributes)) {
+            $this->attributes[$key] = $attributes;
+        }
+    }
+
+    /**
+     * Get the resource name for the Application Platform where an endpoint
+     * where an endpoint will be saved
+     * @return string
+     */
     public function getApplicationArn()
     {
         return $this->applicationArn;
     }
 
+    /**
+     * Sets up the Resource Number for a Platform Application
+     * @param $appArn
+     */
+    public function setApplicationArn($appArn)
+    {
+        $this->applicationArn = $appArn;
+    }
+
+    /**
+     * Gets the token or identifier for the device to register
+     * @return string
+     */
     public function getToken()
     {
         return $this->token;
+    }
+
+    /**
+     * Adds a unique identifier created by the notification service for the app on a device
+     * @param $token
+     */
+    public function addToken($token)
+    {
+        $this->token = $token;
     }
 }
