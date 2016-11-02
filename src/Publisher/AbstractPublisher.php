@@ -37,6 +37,8 @@ abstract class AbstractPublisher
     private $adapter;
     private $bind;
 
+    protected $queueName;
+
    #protected static $instances = null;
 
     protected function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
@@ -46,15 +48,20 @@ abstract class AbstractPublisher
 
     /**
      * Specify worker queue to push job to
+     *
+     * @return string
      */
-    abstract public function getQueueName();
+    public function getQueueName()
+    {
+        return $this->queueName;
+    }
 
     /**
      * Set queue a publisher will publish to
      *
      * @param $string
      */
-    public function setQueueName($string)
+    public function setQueueName(string $string)
     {
         $this->queueName = (string) $string;
     }

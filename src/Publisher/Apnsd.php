@@ -35,14 +35,4 @@ namespace BackQ\Publisher;
 final class Apnsd extends AbstractPublisher
 {
     protected $queueName = 'apnsd';
-
-    /**
-     * Queue this publisher will publish to
-     *
-     * @return string
-     */
-    public function getQueueName()
-    {
-        return $this->queueName;
-    }
 }

@@ -30,15 +30,20 @@
  *
  **/
 
-namespace BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint;
+namespace BackQ\Worker\Amazon\SNS\Client\Exception;
 
-use BackQ\Publisher\AbstractPublisher;
-
-final class Register extends AbstractPublisher
+class SnsException extends \Aws\Sns\Exception\SnsException
 {
-    /**
-     * The queue will be used to create AWS platform endpoints
-     * @var string
-     */
-    protected $queueName = 'aws_sns_endpoints_register_';
+    const INTERNAL = 'InternalError';
+
+    const INVALID_PARAM     = 'InvalidParameter';
+    const ENDPOINT_DISABLED = 'EndpointDisabled';
+
+    const AUTHERROR = 'AuthorizationError';
+    const NOTFOUND  = 'NotFound';
+
+
+    public function getAwsErrorCode() {
+        return parent::getAwsErrorCode();
+    }
 }

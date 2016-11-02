@@ -30,15 +30,11 @@
  *
  **/
 
-namespace BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint;
+namespace BackQ\Worker\Amazon\SNS\Client\Exception;
 
-use BackQ\Publisher\AbstractPublisher;
-
-final class Register extends AbstractPublisher
+class NetworkException extends \Aws\Sns\Exception
 {
     /**
-     * The queue will be used to create AWS platform endpoints
-     * @var string
+     * @todo find proper parent
      */
-    protected $queueName = 'aws_sns_endpoints_register_';
 }

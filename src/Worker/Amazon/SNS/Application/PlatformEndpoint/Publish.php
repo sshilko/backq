@@ -34,6 +34,9 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
+use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
+
 class Publish extends PlatformEndpoint
 {
     public function run()
@@ -56,6 +59,7 @@ class Publish extends PlatformEndpoint
                     $this->debug('Got some work');
 
                     $message     = @unserialize($payload);
+
                     $processed   = true;
 
                     if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish)) {
@@ -64,27 +68,28 @@ class Publish extends PlatformEndpoint
                         continue;
                     } else {
                         try {
-                            $this->snsClient->publish(['Message'           => $message->toJson(),
+                            $this->snsClient->publish(['Message'           => $message->getMessage(),
                                                        'MessageAttributes' => $message->getAttributes(),
                                                        'TargetArn'         => $message->getTargetArn()]);
 
                             $this->debug('SNS Client delivered message to endpoint');
-                        } catch (\Aws\Sns\Exception\SnsException $e) {
+                        } catch (SnsException $e) {
                             /**
                              * Network errors will cause the job to be sent back to queue
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_Publish.html#API_Publish_Errors
                              */
-                            if (in_array($e->getAwsErrorCode(), ['InvalidParameter', 'EndpointDisabled'])) {
+                            if (in_array($e->getAwsErrorCode(), [SnsException::INVALID_PARAM,
+                                                                 SnsException::ENDPOINT_DISABLED])) {
                                 /**
                                  * Current job to be processed by current queue but
                                  * will send it to a queue to remove endpoints
                                  */
                                 $this->onFailure($message);
-                            } elseif ('InternalError' == $e->getAwsErrorCode()) {
+                            } elseif (SnsException::INTERNAL == $e->getAwsErrorCode()) {
                                 $processed = false;
                             }
                             $this->debug($e->getAwsErrorCode());
-                        } catch (\RequestException $networkError) {
+                        } catch (NetworkException $networkError) {
                             /**
                              * Other errors (Network errors) won't cause any effects
                              * and the job can be retried
@@ -110,12 +115,12 @@ class Publish extends PlatformEndpoint
     /**
      * Handles a different flow when Publishing can't be completed
      *
-     * @param $message
+     * @param \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message
      *
-     * @return bool
+     * @return null
      */
-    protected function onFailure($message)
+    protected function onFailure(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message) : void
     {
-        return true;
+        return null;
     }
 }

@@ -61,38 +61,26 @@ class Register
      * Get the specific attributes to create endpoints
      * @return array
      */
-    public function getAttributes()
+    public function getAttributes() : array
     {
         return $this->attributes;
     }
 
     /**
-     * Adds specific attributes to a request to register endpoint
-     * 
-     * @param             $attributes
-     * @param null|string $key
+     * Sets attributes specific to different platforms in order to publish a message
+     *
+     * @param array $attrs
      */
-    public function addAttributes($attributes = null, $key = null)
+    public function setAttributes(array $attrs)
     {
-        if (is_array($attributes)) {
-            if (empty($this->attributes)) {
-                $this->attributes = $attributes;
-            } else {
-                foreach ($attributes as $attr => $v) {
-                    $this->attributes[$attr] = $v;
-                }
-            }
-        } elseif ($key && is_scalar($attributes)) {
-            $this->attributes[$key] = $attributes;
-        }
+        $this->attributes = $attrs;
     }
-
     /**
      * Get the resource name for the Application Platform where an endpoint
      * where an endpoint will be saved
      * @return string
      */
-    public function getApplicationArn()
+    public function getApplicationArn() : string
     {
         return $this->applicationArn;
     }
@@ -101,7 +89,7 @@ class Register
      * Sets up the Resource Number for a Platform Application
      * @param $appArn
      */
-    public function setApplicationArn($appArn)
+    public function setApplicationArn(string $appArn)
     {
         $this->applicationArn = $appArn;
     }
@@ -110,7 +98,7 @@ class Register
      * Gets the token or identifier for the device to register
      * @return string
      */
-    public function getToken()
+    public function getToken() : string
     {
         return $this->token;
     }
@@ -119,7 +107,7 @@ class Register
      * Adds a unique identifier created by the notification service for the app on a device
      * @param $token
      */
-    public function addToken($token)
+    public function addToken(string $token)
     {
         $this->token = $token;
     }

@@ -30,15 +30,38 @@
  *
  **/
 
-namespace BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint;
+namespace BackQ\Worker\Amazon\SNS;
 
-use BackQ\Publisher\AbstractPublisher;
-
-final class Register extends AbstractPublisher
+abstract class Client extends \Aws\Sns\SnsClient
 {
     /**
-     * The queue will be used to create AWS platform endpoints
-     * @var string
+     * @see http://docs.aws.amazon.com/sns/latest/api/API_Publish.html
+     * @param array $data
+     *
+     * @return mixed
      */
-    protected $queueName = 'aws_sns_endpoints_register_';
+    public function publish(array $data) {
+        return parent::publish($data);
+    }
+
+    /**
+     * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html#API_DeleteEndpoint_Errors
+     * @param array $data
+     *
+     * @return mixed
+     */
+    public function deleteEndpoint(array $data) {
+        return parent::deleteEndpoint($data);
+    }
+
+    /**
+     * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html
+     * @param array $data
+     *
+     * @return mixed
+     */
+    public function createPlatformEndpoint(array $data) {
+        return parent::createPlatformEndpoint($data);
+    }
+
 }

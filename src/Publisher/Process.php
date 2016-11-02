@@ -34,15 +34,5 @@ namespace BackQ\Publisher;
 
 final class Process extends AbstractPublisher
 {
-    private $queueName = 'process';
-
-    /**
-     * Queue this publisher will publish to
-     *
-     * @return string
-     */
-    public function getQueueName()
-    {
-        return $this->queueName;
-    }
+    protected $queueName = 'process';
 }

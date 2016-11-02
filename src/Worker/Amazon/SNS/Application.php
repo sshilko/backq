@@ -30,15 +30,23 @@
  *
  **/
 
-namespace BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint;
+namespace BackQ\Worker\Amazon\SNS;
 
-use BackQ\Publisher\AbstractPublisher;
+use BackQ\Worker\AbstractWorker;
+use BackQ\Worker\Amazon\SNS\Client as AwsSnsClient;
 
-final class Register extends AbstractPublisher
+abstract class Application extends AbstractWorker
 {
+    /** @var $snsClient AwsSnsClient */
+    protected $snsClient;
+
     /**
-     * The queue will be used to create AWS platform endpoints
-     * @var string
+     * Sets up a client that will Publish SNS messages
+     *
+     * @param AwsSnsClient $awsSnsClient
      */
-    protected $queueName = 'aws_sns_endpoints_register_';
+    public function setClient($awsSnsClient)
+    {
+        $this->snsClient = $awsSnsClient;
+    }
 }

@@ -47,8 +47,8 @@ final class Gcm extends AbstractWorker
 
     private $debugLevel;
 
-    private $environment;
-    private $queueName = 'gcmccs';
+    private   $environment;
+    protected $queueName = 'gcmccs';
 
     const ENVIRONMENT_SANDBOX = true;
     const ENVIRONMENT_PRODUCT = false;
@@ -66,16 +66,6 @@ final class Gcm extends AbstractWorker
      * @var int
      */
     private $idleTimeout = 0;
-
-    /**
-     * Queue this worker is read from
-     *
-     * @return string
-     */
-    public function getQueueName()
-    {
-        return $this->queueName;
-    }
 
     /**
      * Quit after processing X amount of pushes

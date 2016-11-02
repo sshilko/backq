@@ -46,7 +46,7 @@ class Remove
      *
      * @return string
      */
-    public function getEndpointArn()
+    public function getEndpointArn() : string
     {
         return $this->endpointArn;
     }
@@ -56,7 +56,7 @@ class Remove
      *
      * @param string $arn
      */
-    public function setEndpointArn($arn)
+    public function setEndpointArn(string $arn)
     {
         $this->endpointArn = $arn;
     }

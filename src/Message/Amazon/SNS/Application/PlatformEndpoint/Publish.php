@@ -44,10 +44,21 @@ class Publish
     protected $targetArn;
 
     /**
-     * Data key value pairs
+     * Message payload
+     * @see http://docs.aws.amazon.com/sns/latest/dg/mobile-push-send-custommessage.html
+     *
      * @var array
      */
-    protected $data;
+    protected $message;
+
+    /**
+     * Message payload
+     *
+     * @param array $message
+     */
+    public function setMessage(array $message) {
+        $this->message = $message;
+    }
 
     /**
      * Takes the data and properly assigns it to a json encoded array to wrap
@@ -55,16 +66,9 @@ class Publish
      *
      * @return string
      */
-    public function toJson()
+    public function getMessage() : string
     {
-        $json = [];
-
-        if ($this->data) {
-            $json['data'] = $this->data;
-        }
-
-        $result = json_encode(['customContent' => $json]);
-        return $result;
+        return json_encode($this->message);
     }
 
     /**
@@ -72,7 +76,7 @@ class Publish
      *
      * @return string
      */
-    public function getTargetArn()
+    public function getTargetArn() : string
     {
         return $this->targetArn;
     }
@@ -82,7 +86,7 @@ class Publish
      *
      * @param string $targetArn
      */
-    public function setTargetArn($targetArn)
+    public function setTargetArn(string $targetArn)
     {
         $this->targetArn = $targetArn;
     }
@@ -92,7 +96,7 @@ class Publish
      *
      * @return array
      */
-    public function getAttributes()
+    public function getAttributes() : array
     {
         return $this->attributes;
     }
@@ -102,27 +106,8 @@ class Publish
      *
      * @param array $attrs
      */
-    public function setAttributes($attrs)
+    public function setAttributes(array $attrs)
     {
         $this->attributes = $attrs;
-    }
-
-    /**
-     * Sets/overrides values for data
-     * @param $payload
-     */
-    public function setData($payload)
-    {
-        $this->data = $payload;
-    }
-
-    /**
-     * Adds data keys
-     * @param $key
-     * @param $value
-     */
-    public function addData($key, $value)
-    {
-        $this->data[$key] = $value;
     }
 }

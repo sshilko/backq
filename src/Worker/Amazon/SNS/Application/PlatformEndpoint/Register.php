@@ -34,6 +34,8 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
+use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+
 class Register extends PlatformEndpoint
 {
     /**
@@ -80,14 +82,16 @@ class Register extends PlatformEndpoint
                                 'Token'                  => $message->getToken(),
                                 'Attributes'             => $message->getAttributes()
                             ]);
-                        } catch (\Aws\Sns\Exception\SnsException $e) {
+                        } catch (SnsException $e) {
                             /**
                              * We can't do anything on specific errors and then
                              * the job is marked as processed
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html#API_CreatePlatformEndpoint_Errors
                              */
                             if (in_array($e->getAwsErrorCode(),
-                                        ['AuthorizationError', 'InvalidParameter', 'NotFound'])) {
+                                        [SnsException::AUTHERROR,
+                                         SnsException::INVALID_PARAM,
+                                         SnsException::NOTFOUND])) {
                                 $work->send(true === $processed);
                                 break;
                             }
@@ -96,7 +100,7 @@ class Register extends PlatformEndpoint
                              * An internal server error will be considered as a
                              * temporary issue and we can retry creating the endpoint
                              */
-                            if ('InternalError' == $e->getAwsErrorCode()) {
+                            if (SnsException::INTERNAL == $e->getAwsErrorCode()) {
                                 /**
                                  * Only retry if the max threshold has not been reached
                                  */
@@ -148,7 +152,7 @@ class Register extends PlatformEndpoint
      *
      * @return bool
      */
-    protected function onSuccess($endpointArn, $message)
+    protected function onSuccess(string $endpointArn, \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register $message)
     {
         return true;
     }

@@ -41,14 +41,4 @@ final class Publish extends AbstractPublisher
      * @var string
      */
     protected $queueName = 'aws_sns_endpoints_publish_';
-
-    /**
-     * Queue this publisher will publish to
-     *
-     * @return string
-     */
-    public function getQueueName()
-    {
-        return $this->queueName;
-    }
 }

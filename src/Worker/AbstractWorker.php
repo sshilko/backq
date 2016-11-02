@@ -40,6 +40,8 @@ abstract class AbstractWorker
     private $bind;
     private $doDebug;
 
+    protected $queueName;
+
     /**
      * Quit after processing X amount of pushes
      *
@@ -59,7 +61,21 @@ abstract class AbstractWorker
      *
      * @return string
      */
-    abstract public function getQueueName();
+    public function getQueueName() : string
+    {
+        return $this->queueName;
+    }
+
+    /**
+     * Set queue this worker is going to use
+     *
+     * @param $string
+     */
+    public function setQueueName(string $string)
+    {
+        $this->queueName = (string) $string;
+    }
+
 
     abstract public function run();
 
@@ -175,21 +191,11 @@ abstract class AbstractWorker
     }
 
     /**
-     * Set queue this worker is going to use
-     *
-     * @param $string
-     */
-    public function setQueueName($string)
-    {
-        $this->queueName = (string) $string;
-    }
-
-    /**
      * Quit after processing X amount of pushes
      *
      * @param $int
      */
-    public function setRestartThreshold($int)
+    public function setRestartThreshold(int $int)
     {
         $this->restartThreshold = (int) $int;
     }
@@ -199,7 +205,7 @@ abstract class AbstractWorker
      *
      * @param $int
      */
-    public function setIdleTimeout($int)
+    public function setIdleTimeout(int $int)
     {
         $this->idleTimeout = (int) $int;
     }

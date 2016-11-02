@@ -31,17 +31,7 @@ use \Symfony\Component\Process\Process;
 
 final class AProcess extends AbstractWorker
 {
-    private $queueName = 'process';
-
-    /**
-     * Queue this worker is read from
-     *
-     * @return string
-     */
-    public function getQueueName()
-    {
-        return $this->queueName;
-    }
+    protected $queueName = 'process';
 
     public function run()
     {

@@ -32,14 +32,11 @@
 
 namespace BackQ\Worker\Amazon\SNS\Application;
 
-use BackQ\Worker\AbstractWorker;
+use BackQ\Worker\Amazon\SNS\Application;
 
-abstract class PlatformEndpoint extends AbstractWorker
+abstract class PlatformEndpoint extends Application
 {
     protected $queueName = 'aws_sns_endpoints_';
-
-    /** @var $snsClient \Aws\Sns\SnsClient */
-    protected $snsClient;
 
     public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
@@ -47,26 +44,6 @@ abstract class PlatformEndpoint extends AbstractWorker
         $this->setQueueName($this->getQueueName() . $queueSuffix);
 
         parent::__construct($adapter);
-    }
-
-    /**
-     * Queue this worker is read from
-     *
-     * @return string
-     */
-    public function getQueueName()
-    {
-        return $this->queueName;
-    }
-
-    /**
-     * Sets up a client that will Publish SNS messages
-     *
-     * @param $client
-     */
-    public function setClient($client)
-    {
-        $this->snsClient = $client;
     }
 
     /**

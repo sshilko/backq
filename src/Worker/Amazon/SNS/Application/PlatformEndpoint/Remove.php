@@ -34,6 +34,8 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
+use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+
 class Remove extends PlatformEndpoint
 {
     public function run()
@@ -73,12 +75,13 @@ class Remove extends PlatformEndpoint
                          */
                         $this->snsClient->deleteEndpoint(['EndpointArn' => $message->getEndpointArn()]);
 
-                    } catch (\Aws\Sns\Exception\SnsException $e) {
+                    } catch (SnsException $e) {
                         /**
                          * With issues regarding Authorization or parameters, nothing to be done
                          * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html
                          */
-                        if (in_array($e->getAwsErrorCode(), ['AuthorizationError', 'InvalidParameter'])) {
+                        if (in_array($e->getAwsErrorCode(), [SnsException::AUTHERROR,
+                                                             SnsException::INVALID_PARAM])) {
                             $work->send(true === $processed);
                             break;
                         }
@@ -86,7 +89,7 @@ class Remove extends PlatformEndpoint
                         /**
                          * Retry deletion on Internal Server error
                          */
-                        if ('InternalError' == $e->getAwsErrorCode()) {
+                        if (SnsException::INTERNAL == $e->getAwsErrorCode()) {
                             $work->send(false);
                             break;
                         }
@@ -116,11 +119,11 @@ class Remove extends PlatformEndpoint
 
     /**
      * Handles actions to be performed on correct deletion of an amazon endpoint
-     * @param $message
+     * @param \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message
      *
      * @return bool
      */
-    protected function onSuccess($message)
+    protected function onSuccess(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message)
     {
         return true;
     }

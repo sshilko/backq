@@ -9,13 +9,13 @@
     "keywords": ["queue", "worker", "apns", "push", "ios", "apple", "notification", "send", "background", "process", "async"],
     "homepage": "https://github.com/viveme/backq",
     "require": {
-        "php": ">=5.5.0",
+        "php": ">=7.0.4",
         "davidpersson/beanstalk": "^2.0",
         "symfony/process": "=2.8.0",        
         "duccio/apns-php": "=1.0.1"
     },
     "suggest": {
-        "php": ">=7.0.4"
+        "php": ">=7.0.12"
     },
     "conflict": {
         "php": "5.5.23,5.5.24,5.6.7,5.6.8"
