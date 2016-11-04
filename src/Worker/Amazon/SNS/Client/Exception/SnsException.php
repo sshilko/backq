@@ -30,9 +30,20 @@
  *
  **/
 
-namespace BackQ\Publisher;
+namespace BackQ\Worker\Amazon\SNS\Client\Exception;
 
-final class Apnsd extends AbstractPublisher
+class SnsException extends \Aws\Sns\Exception\SnsException
 {
-    protected $queueName = 'apnsd';
+    const INTERNAL = 'InternalError';
+
+    const INVALID_PARAM     = 'InvalidParameter';
+    const ENDPOINT_DISABLED = 'EndpointDisabled';
+
+    const AUTHERROR = 'AuthorizationError';
+    const NOTFOUND  = 'NotFound';
+
+
+    public function getAwsErrorCode() {
+        return parent::getAwsErrorCode();
+    }
 }

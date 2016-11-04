@@ -30,9 +30,11 @@
  *
  **/
 
-namespace BackQ\Publisher;
+namespace BackQ\Worker\Amazon\SNS\Client\Exception;
 
-final class Apnsd extends AbstractPublisher
+class NetworkException extends \Aws\Sns\Exception
 {
-    protected $queueName = 'apnsd';
+    /**
+     * @todo find proper parent
+     */
 }

@@ -30,9 +30,23 @@
  *
  **/
 
-namespace BackQ\Publisher;
+namespace BackQ\Worker\Amazon\SNS;
 
-final class Apnsd extends AbstractPublisher
+use BackQ\Worker\AbstractWorker;
+use BackQ\Worker\Amazon\SNS\Client as AwsSnsClient;
+
+abstract class Application extends AbstractWorker
 {
-    protected $queueName = 'apnsd';
+    /** @var $snsClient AwsSnsClient */
+    protected $snsClient;
+
+    /**
+     * Sets up a client that will Publish SNS messages
+     *
+     * @param AwsSnsClient $awsSnsClient
+     */
+    public function setClient($awsSnsClient)
+    {
+        $this->snsClient = $awsSnsClient;
+    }
 }

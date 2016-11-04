@@ -28,11 +28,36 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- **/
+ */
 
-namespace BackQ\Publisher;
+namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
-final class Apnsd extends AbstractPublisher
+class Remove
 {
-    protected $queueName = 'apnsd';
+    /**
+     * Amazon Resource name that uniquely identifies an endpoint that wil be removed from Aws
+     *
+     * @var string
+     */
+    protected $endpointArn;
+
+    /**
+     * Returns the Amazon Resource Name for the endpoint to delete
+     *
+     * @return string
+     */
+    public function getEndpointArn() : string
+    {
+        return $this->endpointArn;
+    }
+
+    /**
+     * Sets up an Amazon Resource Name from an endpoint to remove
+     *
+     * @param string $arn
+     */
+    public function setEndpointArn(string $arn)
+    {
+        $this->endpointArn = $arn;
+    }
 }

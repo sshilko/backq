@@ -35,7 +35,7 @@ final class Apnsd extends AbstractWorker
     private $caCert;
     private $environment;
 
-    private $queueName = 'apnsd';
+    protected $queueName = 'apnsd';
 
     /**
      * PHP 5.5.23 & 5.6.7 does not honor the stream_set_timeout()
@@ -99,26 +99,6 @@ final class Apnsd extends AbstractWorker
      * @var int
      */
     private $idleTimeout = 0;
-
-    /**
-     * Queue this worker is read from
-     *
-     * @return string
-     */
-    public function getQueueName()
-    {
-        return $this->queueName;
-    }
-
-    /**
-     * Set queue this worker is going to use
-     *
-     * @param $string
-     */
-    public function setQueueName($string)
-    {
-        $this->queueName = (string) $string;
-    }
 
     /**
      * Quit after processing X amount of pushes

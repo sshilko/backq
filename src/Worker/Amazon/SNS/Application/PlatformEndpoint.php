@@ -30,9 +30,30 @@
  *
  **/
 
-namespace BackQ\Publisher;
+namespace BackQ\Worker\Amazon\SNS\Application;
 
-final class Apnsd extends AbstractPublisher
+use BackQ\Worker\Amazon\SNS\Application;
+
+abstract class PlatformEndpoint extends Application
 {
-    protected $queueName = 'apnsd';
+    protected $queueName = 'aws_sns_endpoints_';
+
+    public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
+    {
+        $queueSuffix = strtolower(end(explode('\\', get_called_class()))) . '_';
+        $this->setQueueName($this->getQueueName() . $queueSuffix);
+
+        parent::__construct($adapter);
+    }
+
+    /**
+     * Platform that an endpoint will be registered into, can be extracted from
+     * the queue name
+     *
+     * @return string
+     */
+    public function getPlatform()
+    {
+        return substr($this->queueName, strrpos($this->queueName, '_') + 1);
+    }
 }

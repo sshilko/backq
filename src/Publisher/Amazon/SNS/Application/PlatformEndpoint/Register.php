@@ -30,9 +30,15 @@
  *
  **/
 
-namespace BackQ\Publisher;
+namespace BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint;
 
-final class Apnsd extends AbstractPublisher
+use BackQ\Publisher\AbstractPublisher;
+
+final class Register extends AbstractPublisher
 {
-    protected $queueName = 'apnsd';
+    /**
+     * The queue will be used to create AWS platform endpoints
+     * @var string
+     */
+    protected $queueName = 'aws_sns_endpoints_register_';
 }

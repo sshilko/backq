@@ -55,8 +55,9 @@ abstract class AbstractAdapter
 
     /**
      * Get job to process
+     * @param int $timeout seconds
      */
-    abstract public function pickTask();
+    abstract public function pickTask($timeout = null);
 
     /**
      * Put job to process

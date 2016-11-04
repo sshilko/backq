@@ -30,9 +30,15 @@
  *
  **/
 
-namespace BackQ\Publisher;
+namespace BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint;
 
-final class Apnsd extends AbstractPublisher
+use BackQ\Publisher\AbstractPublisher;
+
+final class Remove extends AbstractPublisher
 {
-    protected $queueName = 'apnsd';
+    /**
+     * The queue will be used to delete remote endpoints that are disabled/inactive
+     * @var string
+     */
+    protected $queueName = 'aws_sns_endpoints_remove_';
 }
