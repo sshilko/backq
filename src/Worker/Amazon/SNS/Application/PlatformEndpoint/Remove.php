@@ -121,7 +121,7 @@ class Remove extends PlatformEndpoint
      * Handles actions to be performed on correct deletion of an amazon endpoint
      * @param \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message
      *
-     * @return bool
+     * @return bool|array
      */
     protected function onSuccess(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message)
     {
