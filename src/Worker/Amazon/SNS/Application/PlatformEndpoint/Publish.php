@@ -119,7 +119,7 @@ class Publish extends PlatformEndpoint
      *
      * @return null
      */
-    protected function onFailure(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message) : void
+    protected function onFailure(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message)
     {
         return null;
     }
