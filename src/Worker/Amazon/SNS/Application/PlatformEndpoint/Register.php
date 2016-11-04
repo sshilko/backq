@@ -133,8 +133,11 @@ class Register extends PlatformEndpoint
                                 break;
                             }
                             $this->debug('Endpoint registered successfully on Service provider and backend');
-                            $work->send(true === $processed);
+                        } else {
+                            $processed = false;
                         }
+
+                        $work->send(true === $processed);
                     }
                 }
             } catch (\Exception $e) {
