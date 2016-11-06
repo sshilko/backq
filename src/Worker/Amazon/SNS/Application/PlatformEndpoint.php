@@ -38,6 +38,12 @@ abstract class PlatformEndpoint extends Application
 {
     protected $queueName = 'aws_sns_endpoints_';
 
+    /**
+     * Maximum number of times that the same Job can attempt to be reprocessed
+     * after an error that it could be recovered from in a next iteration
+     */
+    const RETRY_MAX = 3;
+
     public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
         $queueSuffix = strtolower(end(explode('\\', get_called_class()))) . '_';

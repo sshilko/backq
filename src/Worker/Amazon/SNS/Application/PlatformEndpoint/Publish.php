@@ -33,9 +33,7 @@
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
-
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
-use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 
 class Publish extends PlatformEndpoint
 {
@@ -51,6 +49,12 @@ class Publish extends PlatformEndpoint
 
                 $work = $this->work();
                 $this->debug('After init work generator');
+
+                /**
+                 * Keep an array with taskId and the number of times it was
+                 * attempted to be reprocessed to avoid starvation
+                 */
+                $reprocessedTasks = [];
 
                 /**
                  * Attempt sending all messages in the queue
@@ -73,29 +77,58 @@ class Publish extends PlatformEndpoint
                                                        'TargetArn'         => $message->getTargetArn()]);
 
                             $this->debug('SNS Client delivered message to endpoint');
-                        } catch (SnsException $e) {
-                            /**
-                             * Network errors will cause the job to be sent back to queue
-                             * @see http://docs.aws.amazon.com/sns/latest/api/API_Publish.html#API_Publish_Errors
-                             */
-                            if (in_array($e->getAwsErrorCode(), [SnsException::INVALID_PARAM,
-                                                                 SnsException::ENDPOINT_DISABLED])) {
+                        } catch (\Exception $e) {
+
+                            if (is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
+                                               get_class($e))) {
+
                                 /**
-                                 * Current job to be processed by current queue but
-                                 * will send it to a queue to remove endpoints
+                                 * @see http://docs.aws.amazon.com/sns/latest/api/API_Publish.html#API_Publish_Errors
+                                 * @var $e \Aws\Exception\AwsException
                                  */
-                                $this->onFailure($message);
-                            } elseif (SnsException::INTERNAL == $e->getAwsErrorCode()) {
-                                $processed = false;
+                                $this->debug('Could not publish to endpoint with error ' . $e->getAwsErrorType());
+
+                                /**
+                                 * When an endpoint was marked as disabled or the
+                                 * request is not valid, the operation can't be performed
+                                 * and the endpoint should be removed, send to the specific queue
+                                 */
+                                if (in_array($e->getAwsErrorCode(), [SnsException::INVALID_PARAM,
+                                                                     SnsException::ENDPOINT_DISABLED])) {
+                                    /**
+                                     * Current job to be processed by current queue but
+                                     * will send it to a queue to remove endpoints
+                                     */
+                                    $this->onFailure($message);
+                                }
+
+                                /**
+                                 * Aws Internal errors and general network error
+                                 * will cause the job to be sent back to queue
+                                 */
+                                if (SnsException::INTERNAL == $e->getAwsErrorCode() ||
+                                    is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
+                                                   get_class($e->getPrevious()))) {
+                                    /**
+                                     * Only retry if the max threshold has not been reached
+                                     */
+                                    if (array_key_exists($taskId, $reprocessedTasks)) {
+
+                                        if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
+                                            $this->debug('Retried re-processing the same job too many times');
+                                            unset($reprocessedTasks[$taskId]);
+
+                                            $work->send(true === $processed);
+                                            continue;
+                                        }
+                                        $reprocessedTasks[$taskId] += 1;
+                                    } else {
+                                        $reprocessedTasks[$taskId] = 1;
+                                    }
+                                    $work->send(false);
+                                    continue;
+                                }
                             }
-                            $this->debug($e->getAwsErrorCode());
-                        } catch (NetworkException $networkError) {
-                            /**
-                             * Other errors (Network errors) won't cause any effects
-                             * and the job can be retried
-                             */
-                            $processed = false;
-                            $this->debug('Could not publish to endpoint with error ' . $networkError->getMessage());
                         } finally {
                             $work->send(true === $processed);
                         }

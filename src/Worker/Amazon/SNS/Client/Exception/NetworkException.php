@@ -32,9 +32,8 @@
 
 namespace BackQ\Worker\Amazon\SNS\Client\Exception;
 
-class NetworkException extends \Aws\Sns\Exception
+
+class NetworkException extends \GuzzleHttp\Exception\RequestException
 {
-    /**
-     * @todo find proper parent
-     */
+
 }

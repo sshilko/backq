@@ -33,17 +33,10 @@
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
-
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
 
 class Register extends PlatformEndpoint
 {
-    /**
-     * Maximum number of times that the same Job can attempt to be reprocessed
-     * after an error that it could be recovered from in a next iteration
-     */
-    const RETRY_MAX = 3;
-    
     public function run()
     {
         $this->debug('Started');
@@ -82,42 +75,49 @@ class Register extends PlatformEndpoint
                                 'Token'                  => $message->getToken(),
                                 'Attributes'             => $message->getAttributes()
                             ]);
-                        } catch (SnsException $e) {
-                            /**
-                             * We can't do anything on specific errors and then
-                             * the job is marked as processed
-                             * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html#API_CreatePlatformEndpoint_Errors
-                             */
-                            if (in_array($e->getAwsErrorCode(),
-                                        [SnsException::AUTHERROR,
-                                         SnsException::INVALID_PARAM,
-                                         SnsException::NOTFOUND])) {
-                                $work->send(true === $processed);
-                                break;
-                            }
+                        } catch (\Exception $e) {
 
-                            /**
-                             * An internal server error will be considered as a
-                             * temporary issue and we can retry creating the endpoint
-                             */
-                            if (SnsException::INTERNAL == $e->getAwsErrorCode()) {
+                            if (is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
+                                               get_class($e))) {
                                 /**
-                                 * Only retry if the max threshold has not been reached
+                                 * We can't do anything on specific errors and then the job is marked as processed
+                                 * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html#API_CreatePlatformEndpoint_Errors
+                                 * @var $e \Aws\Exception\AwsException
                                  */
-                                if (array_key_exists($taskId, $reprocessedTasks)) {
-                                    if ($reprocessedTasks >= self::RETRY_MAX) {
-                                        $this->debug('Retried re-processing the same job too many times');
-                                        unset($reprocessedTasks[$taskId]);
-
-                                        $work->send(true === $processed);
-                                        break;
-                                    }
-                                    $reprocessedTasks[$taskId] += 1;
-                                } else {
-                                    $reprocessedTasks[$taskId] = 1;
+                                if (in_array($e->getAwsErrorCode(),
+                                             [SnsException::AUTHERROR,
+                                              SnsException::INVALID_PARAM,
+                                              SnsException::NOTFOUND])) {
+                                    $work->send(true);
+                                    continue;
                                 }
-                                $work->send(false);
-                                break;
+
+                                /**
+                                 * An internal server error will be considered as a
+                                 * temporary issue and we can retry creating the endpoint
+                                 * Same process for general network issues
+                                 */
+                                if (SnsException::INTERNAL == $e->getAwsErrorCode() ||
+                                    is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
+                                                   get_class($e->getPrevious()))) {
+                                    /**
+                                     * Only retry if the max threshold has not been reached
+                                     */
+                                    if (array_key_exists($taskId, $reprocessedTasks)) {
+                                        if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
+                                            $this->debug('Retried re-processing the same job too many times');
+                                            unset($reprocessedTasks[$taskId]);
+
+                                            $work->send(true === $processed);
+                                            continue;
+                                        }
+                                        $reprocessedTasks[$taskId] += 1;
+                                    } else {
+                                        $reprocessedTasks[$taskId] = 1;
+                                    }
+                                    $work->send(false);
+                                    continue;
+                                }
                             }
                         }
 
@@ -136,7 +136,6 @@ class Register extends PlatformEndpoint
                         } else {
                             $processed = false;
                         }
-
                         $work->send(true === $processed);
                     }
                 }
