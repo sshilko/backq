@@ -63,9 +63,9 @@ class Remove extends PlatformEndpoint
                     $this->debug('got some work');
 
                     $message   = @unserialize($payload);
-                    $processed = true;
+
                     if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove)) {
-                        $work->send($processed);
+                        $work->send(true);
                         $this->debug('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
@@ -88,7 +88,7 @@ class Remove extends PlatformEndpoint
 
                             /**
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html#API_DeleteEndpoint_Errors
-                             * @var $e \Aws\Exception\AwsException
+                             * @var $e SnsException
                              */
                             $this->debug('Could not delete endpoint with error: ' . $e->getAwsErrorCode());
 
@@ -97,8 +97,8 @@ class Remove extends PlatformEndpoint
                              * can be done, mark as processed
                              */
                             if (in_array($e->getAwsErrorCode(), [SnsException::AUTHERROR,
-                                SnsException::INVALID_PARAM])) {
-                                $work->send(true === $processed);
+                                                                 SnsException::INVALID_PARAM])) {
+                                $work->send(true);
                                 continue;
                             }
 
@@ -112,19 +112,20 @@ class Remove extends PlatformEndpoint
                                 /**
                                  * Only retry if the max threshold has not been reached
                                  */
-                                if (array_key_exists($taskId, $reprocessedTasks)) {
+                                if (isset($reprocessedTasks[$taskId])) {
 
                                     if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
                                         $this->debug('Retried re-processing the same job too many times');
                                         unset($reprocessedTasks[$taskId]);
 
-                                        $work->send(true === $processed);
+                                        $work->send(true);
                                         continue;
                                     }
                                     $reprocessedTasks[$taskId] += 1;
                                 } else {
                                     $reprocessedTasks[$taskId] = 1;
                                 }
+
                                 $work->send(false);
                                 continue;
                             }
@@ -139,11 +140,15 @@ class Remove extends PlatformEndpoint
                     $delSuccess = $this->onSuccess($message);
 
                     if (!$delSuccess) {
+                        /**
+                         * @todo what happens onSuccess if it fails?
+                         */
                         $work->send(false);
                         continue;
+                    } else {
+                        $this->debug('Endpoint/Device successfully deleted on Service provider and backend');
+                        $work->send(true);
                     }
-                    $this->debug('Endpoint/Device successfully deleted on Service provider and backend');
-                    $work->send(true === $processed);
                 }
 
             } catch (\Exception $e) {
