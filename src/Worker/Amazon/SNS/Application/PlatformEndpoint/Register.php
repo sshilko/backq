@@ -33,17 +33,10 @@
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
-
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
 
 class Register extends PlatformEndpoint
 {
-    /**
-     * Maximum number of times that the same Job can attempt to be reprocessed
-     * after an error that it could be recovered from in a next iteration
-     */
-    const RETRY_MAX = 3;
-    
     public function run()
     {
         $this->debug('Started');
@@ -72,73 +65,83 @@ class Register extends PlatformEndpoint
                     $processed = true;
 
                     if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register)) {
-                        $work->send($processed);
+                        $work->send(true);
                         $this->debug('Worker does not support payload of: ' . gettype($message));
                         continue;
-                    } else {
-                        try {
-                            $endpointResult = $this->snsClient->createPlatformEndpoint([
-                                'PlatformApplicationArn' => $message->getApplicationArn(),
-                                'Token'                  => $message->getToken(),
-                                'Attributes'             => $message->getAttributes()
-                            ]);
-                        } catch (SnsException $e) {
+                    }
+
+                    try {
+                        $endpointResult = $this->snsClient->createPlatformEndpoint([
+                            'PlatformApplicationArn' => $message->getApplicationArn(),
+                            'Token'                  => $message->getToken(),
+                            'Attributes'             => $message->getAttributes()
+                        ]);
+                    } catch (\Exception $e) {
+
+                        if (is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
+                                           get_class($e))) {
                             /**
-                             * We can't do anything on specific errors and then
-                             * the job is marked as processed
+                             * We can't do anything on specific errors and then the job is marked as processed
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html#API_CreatePlatformEndpoint_Errors
+                             * @var $e SnsException
                              */
                             if (in_array($e->getAwsErrorCode(),
-                                        [SnsException::AUTHERROR,
-                                         SnsException::INVALID_PARAM,
-                                         SnsException::NOTFOUND])) {
-                                $work->send(true === $processed);
-                                break;
+                                         [SnsException::AUTHERROR,
+                                          SnsException::INVALID_PARAM,
+                                          SnsException::NOTFOUND])) {
+                                $work->send(true);
+                                continue;
                             }
 
                             /**
                              * An internal server error will be considered as a
                              * temporary issue and we can retry creating the endpoint
+                             * Same process for general network issues
                              */
-                            if (SnsException::INTERNAL == $e->getAwsErrorCode()) {
+                            if (SnsException::INTERNAL == $e->getAwsErrorCode() ||
+                                is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
+                                               get_class($e->getPrevious()))) {
                                 /**
                                  * Only retry if the max threshold has not been reached
                                  */
-                                if (array_key_exists($taskId, $reprocessedTasks)) {
-                                    if ($reprocessedTasks >= self::RETRY_MAX) {
+                                if (isset($reprocessedTasks[$taskId])) {
+                                    if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
                                         $this->debug('Retried re-processing the same job too many times');
                                         unset($reprocessedTasks[$taskId]);
 
-                                        $work->send(true === $processed);
-                                        break;
+                                        /**
+                                         * Network error or AWS Internal or other stuff we cant fix,
+                                         * pretend it worked
+                                         */
+                                        $work->send(true);
+                                        continue;
                                     }
                                     $reprocessedTasks[$taskId] += 1;
                                 } else {
                                     $reprocessedTasks[$taskId] = 1;
                                 }
                                 $work->send(false);
-                                break;
+                                continue;
                             }
                         }
-
-                        /**
-                         * Save the new Application endpoint into database
-                         * If something fails, retry the whole process
-                         */
-                        if (!empty($endpointResult['EndpointArn'])) {
-                            $result = $this->onSuccess($endpointResult['EndpointArn'], $message);
-
-                            if (!$result) {
-                                $work->send(false);
-                                break;
-                            }
-                            $this->debug('Endpoint registered successfully on Service provider and backend');
-                        } else {
-                            $processed = false;
-                        }
-
-                        $work->send(true === $processed);
                     }
+
+                    /**
+                     * Save the new Application endpoint into database
+                     * If something fails, retry the whole process
+                     */
+                    if (!empty($endpointResult['EndpointArn'])) {
+                        $result = $this->onSuccess($endpointResult['EndpointArn'], $message);
+
+                        if (!$result) {
+                            $work->send(false);
+                            break;
+                        }
+                        $this->debug('Endpoint registered successfully on Service provider and backend');
+                    } else {
+                        $processed = false;
+                    }
+                    $work->send(true === $processed);
                 }
             } catch (\Exception $e) {
                 @error_log('[' . date('Y-m-d H:i:s') . '] Register SNS worker exception: ' . $e->getMessage());

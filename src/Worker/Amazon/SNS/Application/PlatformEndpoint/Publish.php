@@ -33,9 +33,7 @@
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
-
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
-use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 
 class Publish extends PlatformEndpoint
 {
@@ -53,6 +51,12 @@ class Publish extends PlatformEndpoint
                 $this->debug('After init work generator');
 
                 /**
+                 * Keep an array with taskId and the number of times it was
+                 * attempted to be reprocessed to avoid starvation
+                 */
+                $reprocessedTasks = [];
+
+                /**
                  * Attempt sending all messages in the queue
                  */
                 foreach ($work as $taskId => $payload) {
@@ -60,23 +64,33 @@ class Publish extends PlatformEndpoint
 
                     $message     = @unserialize($payload);
 
-                    $processed   = true;
-
                     if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish)) {
-                        $work->send($processed);
+                        $work->send(true);
                         $this->debug('Worker does not support payload of: ' . gettype($message));
                         continue;
-                    } else {
-                        try {
-                            $this->snsClient->publish(['Message'           => $message->getMessage(),
-                                                       'MessageAttributes' => $message->getAttributes(),
-                                                       'TargetArn'         => $message->getTargetArn()]);
+                    }
 
-                            $this->debug('SNS Client delivered message to endpoint');
-                        } catch (SnsException $e) {
+                    try {
+                        $this->snsClient->publish(['Message'           => $message->getMessage(),
+                                                   'MessageAttributes' => $message->getAttributes(),
+                                                   'TargetArn'         => $message->getTargetArn()]);
+
+                        $this->debug('SNS Client delivered message to endpoint');
+                    } catch (\Exception $e) {
+
+                        if (is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
+                                           get_class($e))) {
+
                             /**
-                             * Network errors will cause the job to be sent back to queue
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_Publish.html#API_Publish_Errors
+                             * @var $e SnsException
+                             */
+                            $this->debug('Could not publish to endpoint with error ' . $e->getAwsErrorCode());
+
+                            /**
+                             * When an endpoint was marked as disabled or the
+                             * request is not valid, the operation can't be performed
+                             * and the endpoint should be removed, send to the specific queue
                              */
                             if (in_array($e->getAwsErrorCode(), [SnsException::INVALID_PARAM,
                                                                  SnsException::ENDPOINT_DISABLED])) {
@@ -85,30 +99,54 @@ class Publish extends PlatformEndpoint
                                  * will send it to a queue to remove endpoints
                                  */
                                 $this->onFailure($message);
-                            } elseif (SnsException::INTERNAL == $e->getAwsErrorCode()) {
-                                $processed = false;
                             }
-                            $this->debug($e->getAwsErrorCode());
-                        } catch (NetworkException $networkError) {
+
                             /**
-                             * Other errors (Network errors) won't cause any effects
-                             * and the job can be retried
+                             * Aws Internal errors and general network error
+                             * will cause the job to be sent back to queue
                              */
-                            $processed = false;
-                            $this->debug('Could not publish to endpoint with error ' . $networkError->getMessage());
-                        } finally {
-                            $work->send(true === $processed);
+                            if (SnsException::INTERNAL == $e->getAwsErrorCode() ||
+                                is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
+                                               get_class($e->getPrevious()))) {
+                                /**
+                                 * Only retry if the max threshold has not been reached
+                                 */
+                                if (isset($reprocessedTasks[$taskId])) {
+
+                                    if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
+                                        $this->debug('Retried re-processing the same job too many times');
+                                        unset($reprocessedTasks[$taskId]);
+
+                                        /**
+                                         * Network error or AWS Internal or other stuff we cant fix,
+                                         * pretend it worked
+                                         */
+                                        $work->send(true);
+                                        continue;
+                                    }
+                                    $reprocessedTasks[$taskId] += 1;
+                                } else {
+                                    $reprocessedTasks[$taskId] = 1;
+                                }
+                                /**
+                                 * Send back to queue for re-try (maybe another process/worker, so
+                                 * max retry = NUM_WORKERS*NUM_RETRIES)
+                                 */
+                                $work->send(false);
+                                continue;
+                            }
                         }
+                    } finally {
+                        $work->send(true);
                     }
                 };
             } catch (\Exception $e) {
                 @error_log('[' . date('Y-m-d H:i:s') . '] SNS worker exception: ' . $e->getMessage());
             }
+        } else {
+            $this->debug('Unable to connect');
         }
 
-        /**
-         * Finish removeEndpoints publisher
-         */
         $this->finish();
     }
 
