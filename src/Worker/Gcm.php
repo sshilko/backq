@@ -54,40 +54,6 @@ final class Gcm extends AbstractWorker
     const ENVIRONMENT_PRODUCT = false;
 
     /**
-     * Quit after processing X amount of pushes
-     *
-     * @var int
-     */
-    private $restartThreshold = 0;
-
-    /**
-     * Quit if inactive for specified time (seconds)
-     *
-     * @var int
-     */
-    private $idleTimeout = 0;
-
-    /**
-     * Quit after processing X amount of pushes
-     *
-     * @param $int
-     */
-    public function setRestartThreshold($int)
-    {
-        $this->restartThreshold = (int) $int;
-    }
-
-    /**
-     * Quit after reaching idle timeout
-     *
-     * @param $int
-     */
-    public function setIdleTimeout($int)
-    {
-        $this->idleTimeout = (int) $int;
-    }
-
-    /**
      * GCM Server Api Key
      */
     public function setApiKey($key)
