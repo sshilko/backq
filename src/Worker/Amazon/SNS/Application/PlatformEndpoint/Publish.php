@@ -34,6 +34,7 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+use \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\PublishMessageInterface;
 
 class Publish extends PlatformEndpoint
 {
@@ -64,7 +65,7 @@ class Publish extends PlatformEndpoint
 
                     $message     = @unserialize($payload);
 
-                    if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish)) {
+                    if (!($message instanceof PublishMessageInterface)) {
                         $work->send(true);
                         $this->debug('Worker does not support payload of: ' . gettype($message));
                         continue;

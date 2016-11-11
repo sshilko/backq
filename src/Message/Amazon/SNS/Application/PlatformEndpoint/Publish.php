@@ -32,7 +32,7 @@
 
 namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
-class Publish
+class Publish implements PublishMessageInterface
 {
     protected $attributes;
 

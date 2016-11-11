@@ -32,7 +32,7 @@
 
 namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
-class Register
+class Register implements RegisterMessageInterface
 {
     /**
      * Associative array of string keys mapping to values, they'll be the attributes

@@ -34,6 +34,7 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+use \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RegisterMessageInterface;
 
 class Register extends PlatformEndpoint
 {
@@ -64,7 +65,7 @@ class Register extends PlatformEndpoint
                     $message   = @unserialize($payload);
                     $processed = true;
 
-                    if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register)) {
+                    if (!($message instanceof RegisterMessageInterface)) {
                         $work->send(true);
                         $this->debug('Worker does not support payload of: ' . gettype($message));
                         continue;
