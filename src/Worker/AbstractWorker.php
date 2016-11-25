@@ -124,8 +124,9 @@ abstract class AbstractWorker
         while (true) {
             $job = $this->adapter->pickTask($timeout);
 
-            $lastActive = time();
             if (is_array($job)) {
+                $lastActive = time();
+
                 /**
                  * @see http://php.net/manual/en/generator.send.php
                  */

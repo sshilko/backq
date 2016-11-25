@@ -160,17 +160,17 @@ final class Apnsd extends AbstractWorker
                 $this->debug('after init work generator');
 
                 $jobsdone   = 0;
-                $lastactive = time();
+                #$lastactive = time();
 
                 foreach ($work as $taskId => $payload) {
                     $this->debug('got some work: ' . ($payload ? 'yes' : 'no'));
 
-                    if ($this->idleTimeout > 0 && (time() - $lastactive) > $this->idleTimeout) {
-                        $this->debug('idle timeout reached, returning job, quitting');
-                        $work->send(false);
-                        $push->disconnect();
-                        break;
-                    }
+                    #if ($this->idleTimeout > 0 && (time() - $lastactive) > $this->idleTimeout) {
+                    #    $this->debug('idle timeout reached, returning job, quitting');
+                    #    $work->send(false);
+                    #    $push->disconnect();
+                    #    break;
+                    #}
 
                     if (!$payload && $workTimeout > 0) {
                         /**
@@ -179,14 +179,14 @@ final class Apnsd extends AbstractWorker
                         continue;
                     }
 
-                    $lastactive = time();
+                    #$lastactive = time();
 
-                    if ($this->restartThreshold > 0 && ++$jobsdone > $this->restartThreshold) {
-                        $this->debug('restart threshold reached, returning job, quitting');
-                        $work->send(false);
-                        $push->disconnect();
-                        break;
-                    }
+                    #if ($this->restartThreshold > 0 && ++$jobsdone > $this->restartThreshold) {
+                    #    $this->debug('restart threshold reached, returning job, quitting');
+                    #    $work->send(false);
+                    #    $push->disconnect();
+                    #    break;
+                    #}
 
                     $message   = @unserialize($payload);
                     $processed = true;
