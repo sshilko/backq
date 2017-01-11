@@ -151,14 +151,24 @@ abstract class AbstractWorker
              */
             if ($this->idleTimeout > 0 && (time() - $lastActive) > ($this->idleTimeout - $timeout)) {
                 $this->debug('Idle timeout reached, returning job, quitting');
+                $this->onIdleTimeout();
                 break;
             }
 
             if ($this->restartThreshold > 0 && ++$jobsdone > ($this->restartThreshold - 1)) {
                 $this->debug('Restart threshold reached, returning job, quitting');
+                $this->onRestartThreshold();
                 break;
             }
         }
+    }
+
+    protected function onIdleTimeout() {
+
+    }
+
+    protected function onRestartThreshold() {
+
     }
 
     protected function finish()
