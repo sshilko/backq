@@ -47,65 +47,11 @@ final class Gcm extends AbstractWorker
 
     private $debugLevel;
 
-    private $environment;
-    private $queueName = 'gcmccs';
+    private   $environment;
+    protected $queueName = 'gcmccs';
 
     const ENVIRONMENT_SANDBOX = true;
     const ENVIRONMENT_PRODUCT = false;
-
-    /**
-     * Quit after processing X amount of pushes
-     *
-     * @var int
-     */
-    private $restartThreshold = 0;
-
-    /**
-     * Quit if inactive for specified time (seconds)
-     *
-     * @var int
-     */
-    private $idleTimeout = 0;
-
-    /**
-     * Queue this worker is read from
-     *
-     * @return string
-     */
-    public function getQueueName()
-    {
-        return $this->queueName;
-    }
-
-    /**
-     * Set queue this worker is going to use
-     *
-     * @param $string
-     */
-    public function setQueueName($string)
-    {
-        $this->queueName = (string) $string;
-    }
-
-    /**
-     * Quit after processing X amount of pushes
-     *
-     * @param $int
-     */
-    public function setRestartThreshold($int)
-    {
-        $this->restartThreshold = (int) $int;
-    }
-
-    /**
-     * Quit after reaching idle timeout
-     *
-     * @param $int
-     */
-    public function setIdleTimeout($int)
-    {
-        $this->idleTimeout = (int) $int;
-    }
 
     /**
      * GCM Server Api Key

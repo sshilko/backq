@@ -34,12 +34,42 @@ abstract class AbstractWorker
     private $bind;
     private $doDebug;
 
+    protected $queueName;
+
+    /**
+     * Quit after processing X amount of pushes
+     *
+     * @var int
+     */
+    protected $restartThreshold = 0;
+
+    /**
+     * Quit if inactive for specified time (seconds)
+     *
+     * @var int
+     */
+    protected $idleTimeout = 0;
+
     /**
      * Specify worker queue to pick job from
      *
      * @return string
      */
-    abstract public function getQueueName();
+    public function getQueueName() : string
+    {
+        return $this->queueName;
+    }
+
+    /**
+     * Set queue this worker is going to use
+     *
+     * @param $string
+     */
+    public function setQueueName(string $string)
+    {
+        $this->queueName = (string) $string;
+    }
+
 
     abstract public function run();
 
@@ -73,10 +103,24 @@ abstract class AbstractWorker
             return;
         }
 
+        /**
+         * Make sure that, if an timeout and idle timeout were set, the timeout is
+         * less than the idle timeout
+         */
+        if ($timeout && $this->idleTimeout > 0) {
+            if ($this->idleTimeout <= $timeout) {
+                throw new Exception('Time to pick next task cannot be lower than idle timeout');
+            }
+        }
+
+        $jobsdone   = 0;
+        $lastActive = time();
         while (true) {
             $job = $this->adapter->pickTask($timeout);
 
             if (is_array($job)) {
+                $lastActive = time();
+
                 /**
                  * @see http://php.net/manual/en/generator.send.php
                  */
@@ -102,6 +146,18 @@ abstract class AbstractWorker
                 }
             }
 
+            /**
+             * Break infinite loop when a limit condition is reached
+             */
+            if ($this->idleTimeout > 0 && (time() - $lastActive) > ($this->idleTimeout - $timeout)) {
+                $this->debug('Idle timeout reached, returning job, quitting');
+                break;
+            }
+
+            if ($this->restartThreshold > 0 && ++$jobsdone > ($this->restartThreshold - 1)) {
+                $this->debug('Restart threshold reached, returning job, quitting');
+                break;
+            }
         }
     }
 
@@ -127,5 +183,25 @@ abstract class AbstractWorker
         if ($this->doDebug) {
             echo $log . "\n";
         }
+    }
+
+    /**
+     * Quit after processing X amount of pushes
+     *
+     * @param $int
+     */
+    public function setRestartThreshold(int $int)
+    {
+        $this->restartThreshold = (int) $int;
+    }
+
+    /**
+     * Quit after reaching idle timeout
+     *
+     * @param $int
+     */
+    public function setIdleTimeout(int $int)
+    {
+        $this->idleTimeout = (int) $int;
     }
 }
