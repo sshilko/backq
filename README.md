@@ -1,9 +1,6 @@
 backq
 =====
 
-[![Latest Stable Version](https://poser.pugx.org/sshilko/backq/v/stable)](https://packagist.org/packages/sshilko/backq)
-[![License](https://poser.pugx.org/sshilko/backq/license)](https://packagist.org/packages/sshilko/backq)
-
 Perform tasks with workers &amp; publishers (queues)
 
 * [APNS](https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW9) Push notifications sending
@@ -14,8 +11,8 @@ Perform tasks with workers &amp; publishers (queues)
 #composer self-update
 #composer clear-cache
 #composer diagnose
-#composer require sshilko/backq:dev-master
-composer require sshilko/backq:^1.1
+#composer require viveme/backq:dev-master
+composer require viveme/backq:^1.1
 ```
 
 #### Requirements
