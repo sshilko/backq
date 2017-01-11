@@ -195,7 +195,7 @@ if ($publisher->start() && $publisher->hasWorkers()) {
 }
 ```
 
-#### Master-dev
+#### Versions
 
-Please use only stable (>=1.1.2) versions, everyone <= 1.1.2 should update for latest bugfixes around sockets io.
+Current stable is 1.1.2
 
