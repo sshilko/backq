@@ -47,7 +47,8 @@ class Remove extends PlatformEndpoint
             try {
                 $this->debug('connected to queue');
 
-                $work = $this->work();
+                $workTimeout = 150;
+                $work = $this->work($workTimeout);
                 $this->debug('after init work generator');
 
                 /**
@@ -62,8 +63,14 @@ class Remove extends PlatformEndpoint
                 foreach ($work as $taskId => $payload) {
                     $this->debug('got some work');
 
-                    $message   = @unserialize($payload);
+                    if (!$payload && $workTimeout > 0) {
+                        /**
+                         * Just empty loop, no work fetched
+                         */
+                        continue;
+                    }
 
+                    $message = @unserialize($payload);
                     if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove)) {
                         $work->send(true);
                         $this->debug('Worker does not support payload of: ' . gettype($message));

@@ -47,7 +47,8 @@ class Publish extends PlatformEndpoint
             try {
                 $this->debug('Connected to queue');
 
-                $work = $this->work();
+                $workTimeout = 5;
+                $work = $this->work($workTimeout);
                 $this->debug('After init work generator');
 
                 /**
@@ -62,8 +63,14 @@ class Publish extends PlatformEndpoint
                 foreach ($work as $taskId => $payload) {
                     $this->debug('Got some work');
 
-                    $message     = @unserialize($payload);
+                    if (!$payload && $workTimeout > 0) {
+                        /**
+                         * Just empty loop, no work fetched
+                         */
+                        continue;
+                    }
 
+                    $message = @unserialize($payload);
                     if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish)) {
                         $work->send(true);
                         $this->debug('Worker does not support payload of: ' . gettype($message));

@@ -46,7 +46,8 @@ class Register extends PlatformEndpoint
             try {
                 $this->debug('Connected to queue');
 
-                $work = $this->work(15);
+                $workTimeout = 15;
+                $work = $this->work($workTimeout);
                 $this->debug('After init work generator');
 
                 /**
@@ -61,6 +62,12 @@ class Register extends PlatformEndpoint
                 foreach ($work as $taskId => $payload) {
                     $this->debug('Got some work');
 
+                    if (!$payload && $workTimeout > 0) {
+                        /**
+                         * Just empty loop, no work fetched
+                         */
+                        continue;
+                    }
                     $message   = @unserialize($payload);
                     $processed = true;
 
