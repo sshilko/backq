@@ -124,8 +124,9 @@ abstract class AbstractWorker
         while (true) {
             $job = $this->adapter->pickTask($timeout);
 
-            $lastActive = time();
             if (is_array($job)) {
+                $lastActive = time();
+
                 /**
                  * @see http://php.net/manual/en/generator.send.php
                  */
@@ -156,14 +157,26 @@ abstract class AbstractWorker
              */
             if ($this->idleTimeout > 0 && (time() - $lastActive) > ($this->idleTimeout - $timeout)) {
                 $this->debug('Idle timeout reached, returning job, quitting');
-                break;
+                if ($this->onIdleTimeout()) {
+                    break;
+                }
             }
 
             if ($this->restartThreshold > 0 && ++$jobsdone > ($this->restartThreshold - 1)) {
                 $this->debug('Restart threshold reached, returning job, quitting');
-                break;
+                if ($this->onRestartThreshold()) {
+                    break;
+                }
             }
         }
+    }
+
+    protected function onIdleTimeout() {
+        return true;
+    }
+
+    protected function onRestartThreshold() {
+        return true;
     }
 
     protected function finish()

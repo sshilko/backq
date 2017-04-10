@@ -35,6 +35,7 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+use \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RemoveMessageInterface;
 
 class Remove extends PlatformEndpoint
 {
@@ -71,7 +72,8 @@ class Remove extends PlatformEndpoint
                     }
 
                     $message = @unserialize($payload);
-                    if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove)) {
+
+                    if (!($message instanceof RemoveMessageInterface)) {
                         $work->send(true);
                         $this->debug('Worker does not support payload of: ' . gettype($message));
                         continue;

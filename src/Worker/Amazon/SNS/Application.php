@@ -33,7 +33,7 @@
 namespace BackQ\Worker\Amazon\SNS;
 
 use BackQ\Worker\AbstractWorker;
-use BackQ\Worker\Amazon\SNS\Client as AwsSnsClient;
+use BackQ\Worker\Amazon\SNS\SnsClient as AwsSnsClient;
 
 abstract class Application extends AbstractWorker
 {

@@ -32,32 +32,14 @@
 
 namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
-class Remove implements RemoveMessageInterface
+interface RegisterMessageInterface
 {
-    /**
-     * Amazon Resource name that uniquely identifies an endpoint that wil be removed from Aws
-     *
-     * @var string
-     */
-    protected $endpointArn;
+    public function getAttributes() : array;
+    public function setAttributes(array $attrs);
 
-    /**
-     * Returns the Amazon Resource Name for the endpoint to delete
-     *
-     * @return string
-     */
-    public function getEndpointArn() : string
-    {
-        return $this->endpointArn;
-    }
+    public function getApplicationArn() : string;
+    public function setApplicationArn(string $appArn);
 
-    /**
-     * Sets up an Amazon Resource Name from an endpoint to remove
-     *
-     * @param string $arn
-     */
-    public function setEndpointArn(string $arn)
-    {
-        $this->endpointArn = $arn;
-    }
+    public function getToken() : string;
+    public function addToken(string $token);
 }

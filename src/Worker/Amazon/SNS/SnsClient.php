@@ -32,7 +32,7 @@
 
 namespace BackQ\Worker\Amazon\SNS;
 
-class Client extends \Aws\Sns\SnsClient
+class SnsClient extends \Aws\Sns\SnsClient
 {
     /**
      * Sends a message to all of a topic's subscribed endpoints. When a messageId is returned,
