@@ -62,7 +62,7 @@ class Publish extends PlatformEndpoint
                  * Attempt sending all messages in the queue
                  */
                 foreach ($work as $taskId => $payload) {
-                    $this->debug('Got some work');
+                    $this->debug('got some work: ' . ($payload ? 'yes' : 'no'));
 
                     if (!$payload && $workTimeout > 0) {
                         /**
