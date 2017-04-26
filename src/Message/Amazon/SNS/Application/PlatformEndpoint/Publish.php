@@ -51,6 +51,8 @@ class Publish implements PublishMessageInterface
      */
     protected $message;
 
+    protected $messageStructure;
+
     /**
      * Message payload
      *
@@ -110,4 +112,13 @@ class Publish implements PublishMessageInterface
     {
         $this->attributes = $attrs;
     }
+
+    public function getMessageStructure() : string {
+        return $this->messageStructure;
+    }
+
+    public function setMessageStructure(string $structure) {
+        $this->messageStructure = $structure;
+    }
+
 }

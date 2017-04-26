@@ -79,9 +79,20 @@ class Publish extends PlatformEndpoint
                     }
 
                     try {
-                        $this->snsClient->publish(['Message'           => $message->getMessage(),
-                                                   'MessageAttributes' => $message->getAttributes(),
-                                                   'TargetArn'         => $message->getTargetArn()]);
+                        $payload = ['Message'   => $message->getMessage(),
+                                    'TargetArn' => $message->getTargetArn()];
+
+                        $attributes = $message->getAttributes();
+                        if ($attributes) {
+                            $payload['MessageAttributes'] = $attributes;
+                        }
+
+                        $messageStructure = $message->getMessageStructure();
+                        if ($messageStructure) {
+                            $payload['MessageStructure'] = $messageStructure;
+                        }
+
+                        $this->snsClient->publish($payload);
 
                         $this->debug('SNS Client delivered message to endpoint');
                     } catch (\Exception $e) {

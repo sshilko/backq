@@ -42,4 +42,8 @@ interface PublishMessageInterface
 
     public function getAttributes() : array;
     public function setAttributes(array $attrs);
+
+    public function getMessageStructure() : string;
+    public function setMessageStructure(string $structure);
+
 }
