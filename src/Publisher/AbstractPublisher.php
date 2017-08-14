@@ -66,6 +66,11 @@ abstract class AbstractPublisher
         $this->queueName = (string) $string;
     }
 
+    /**
+     * @param \BackQ\Adapter\AbstractAdapter $adapter
+     *
+     * @return AbstractPublisher
+     */
     public static function getInstance(\BackQ\Adapter\AbstractAdapter $adapter)
     {
         $class = get_called_class();
