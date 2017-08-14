@@ -73,9 +73,15 @@ class Beanstalk extends AbstractAdapter
     public function connect($host = '127.0.0.1', $port = 11300, $timeout = 1, $persistent = false)
     {
         try {
-            $bconfig = array('host' => $host, 'port' => $port, 'timeout' => $timeout, 'persistent' => $persistent);
-            $bconfig['logger'] = $this;
-            $this->client = new \Beanstalk\Client($bconfig);
+            $bconfig = array('host' => $host,
+                             'port' => $port,
+                             'timeout' => $timeout,
+                             'persistent' => $persistent,
+                             'logger'  => $this);
+
+            //$this->client = new \Beanstalk\Client($bconfig);
+            $this->client = new \BackQ\Adapter\Beanstalk\Client($bconfig);
+
             if ($this->client->connect()) {
                 $this->connected = true;
                 return true;

@@ -37,4 +37,14 @@ abstract class AbstractIO
     abstract public function selectRead($sec, $usec);
 
     abstract public function selectWrite($sec, $usec);
-}
+
+    /**
+     * Advanced functions -->
+     */
+    abstract public function stream_get_contents(int $length);
+    abstract public function stream_get_line(int $length, string $delimiter);
+    abstract public function stream_set_timeout($read_write_timeout);
+    /**
+     * Advanced functions <--
+     */
+    }

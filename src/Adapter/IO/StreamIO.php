@@ -31,22 +31,50 @@ use \BackQ\Adapter\IO\Exception\TimeoutException;
 
 class StreamIO extends AbstractIO
 {
-    private $sock = null;
+    private $sock       = null;
+    private $persistent = null;
 
     const FREAD_0_TRIES = 3;
     const WRITE_0_TRIES = 3;
 
-    public function __construct($host, $port, $connection_timeout, $read_write_timeout = null, $context = null, $blocking = false)
+    const READ_EOF_CODE  = 901;
+    const READ_TIME_CODE = 902;
+    const READ_ERR_CODE  = 900;
+
+    /**
+     * StreamIO constructor.
+     *
+     * @param      $host
+     * @param      $port
+     * @param      $connection_timeout
+     * @param null $read_write_timeout
+     * @param null $context
+     * @param bool $blocking
+     * @param string $persistent persistent connection identifier
+     *
+     * @throws \BackQ\Adapter\IO\Exception\RuntimeException
+     * @throws \Exception
+     */
+    public function __construct($host, $port, $connection_timeout, $read_write_timeout = null, $context = null, $blocking = false, string $persistent = '')
     {
-        $errstr = $errno = null;
-        $this->sock = null;
+        $errstr = $errno  = null;
+        $this->sock       = null;
+        $this->persistent = ($persistent) ? true : false;
 
         if ($context) {
-            $remote = sprintf('tls://%s:%s', $host, $port);
-            $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT, $context);
+            $remote = sprintf('tls://%s:%s/%s', $host, $port, strval($persistent));
+            if ($persistent) {
+                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT, $context);
+            } else {
+                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT, $context);
+            }
         } else {
-            $remote = sprintf('tcp://%s:%s', $host, $port);
-            $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT);
+            $remote = sprintf('tcp://%s:%s/%s', $host, $port, strval($persistent));
+            if ($persistent) {
+                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT);
+            } else {
+                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT);
+            }
         }
 
         if (!$this->sock) {
@@ -97,11 +125,11 @@ class StreamIO extends AbstractIO
         $info = stream_get_meta_data($this->sock);
 
         if ($info['eof'] || feof($this->sock))  {
-            throw new TimeoutException("Error reading data. Socket connection EOF");
+            throw new TimeoutException('Error reading data. Socket connection EOF', self::READ_EOF_CODE);
         }
 
         if ($info['timed_out']) {
-            throw new TimeoutException("Error reading data. Socket connection TIMED OUT");
+            throw new TimeoutException('Error reading data. Socket connection TIME OUT', self::READ_TIME_CODE);
         }
 
         $tries = self::FREAD_0_TRIES;
@@ -112,7 +140,7 @@ class StreamIO extends AbstractIO
              */
             $fdata = fread($this->sock, $n);
             if (false === $fdata) {
-                throw new RuntimeException("Failed to fread() from socket");
+                throw new RuntimeException("Failed to fread() from socket", self::READ_ERR_CODE);
             }
             $fread_result .= $fdata;
 
@@ -129,6 +157,12 @@ class StreamIO extends AbstractIO
 
         }
         return $fread_result;
+    }
+
+    public function stream_set_timeout($read_write_timeout) {
+        if (!stream_set_timeout($this->sock, $read_write_timeout)) {
+            throw new \Exception("Timeout (stream_set_timeout) could not be set");
+        }
     }
 
     public function write($data)
@@ -163,16 +197,21 @@ class StreamIO extends AbstractIO
         $tries  = self::WRITE_0_TRIES;
         $len    = strlen($data);
 
-        for ($written = 0; $written < $len; $written += $fwrite) {
+        for ($written = 0; $written < $len; true) {
 
-            $fwrite = fwrite($this->sock, substr($data, $written));
-            if ($fwrite === false || feof($this->sock)) {
+            $fwrite   = fwrite($this->sock, substr($data, $written));
+            $written += intval($fwrite);
+
+            if ($fwrite === false || (feof($this->sock) && $written < $len)) {
                 /**
                  * This bugged on 7.0.4 and maybe other versions
                  * @see https://bugs.php.net/bug.php?id=71907
                  * Actually returns int(0) instead of FALSE
+                 *
+                 * Some writes execute remote connection close, then its not uncommon to see
+                 * connection being closed after write is successful
                  */
-                throw new RuntimeException("Failed to fwrite() to socket");
+                throw new RuntimeException("Failed to fwrite() to socket: " . ($len - $written) .'bytes left');
             }
 
             if ($fwrite === 0) {
@@ -198,6 +237,51 @@ class StreamIO extends AbstractIO
             fclose($this->sock);
         }
         $this->sock = null;
+    }
+
+    /**
+     * Returns a string of up to length bytes read, If an error occurs, returns false
+     *
+     * @param int    $length
+     * @param string $delimiter
+     *
+     * @throws \BackQ\Adapter\IO\Exception\TimeoutException
+     * @return string|false
+     */
+    public function stream_get_line(int $length, string $delimiter = "\r\n") {
+        $info = stream_get_meta_data($this->sock);
+
+        if ($info['eof'] || feof($this->sock))  {
+            throw new TimeoutException('Error reading data. Socket connection EOF', self::READ_EOF_CODE);
+        }
+
+        if ($info['timed_out']) {
+            throw new TimeoutException('Error reading data. Socket connection TIME OUT', self::READ_TIME_CODE);
+        }
+        $data = stream_get_line($this->sock, $length, $delimiter);
+        return $data;
+    }
+
+    /**
+     * Reads remainder of a stream into a string, return a string or false on failure.
+     *
+     * @param int $length
+     *
+     * @throws \BackQ\Adapter\IO\Exception\TimeoutException
+     * @return string|false
+     */
+    public function stream_get_contents(int $length) {
+        $info = stream_get_meta_data($this->sock);
+
+        if ($info['eof'] || feof($this->sock))  {
+            throw new TimeoutException('Error reading data. Socket connection EOF', self::READ_EOF_CODE);
+        }
+
+        if ($info['timed_out']) {
+            throw new TimeoutException('Error reading data. Socket connection TIME OUT', self::READ_TIME_CODE);
+        }
+        $data = stream_get_contents($this->sock, $length);
+        return $data;
     }
 
     public function selectWrite($sec, $usec) {
