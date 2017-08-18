@@ -171,14 +171,23 @@ abstract class AbstractWorker
         }
     }
 
+    /**
+     * @return bool
+     */
     protected function onIdleTimeout() {
         return true;
     }
 
+    /**
+     * @return bool
+     */
     protected function onRestartThreshold() {
         return true;
     }
 
+    /**
+     * @return bool
+     */
     protected function finish()
     {
         if ($this->bind) {
