@@ -197,37 +197,46 @@ class StreamIO extends AbstractIO
         $tries  = self::WRITE_0_TRIES;
         $len    = strlen($data);
 
-        for ($written = 0; $written < $len; true) {
+        try {
+            for ($written = 0; $written < $len; true) {
 
-            $fwrite   = fwrite($this->sock, substr($data, $written));
-            $written += intval($fwrite);
+                $fwrite = fwrite($this->sock, substr($data, $written));
+                $written += intval($fwrite);
 
-            if ($fwrite === false || (feof($this->sock) && $written < $len)) {
-                /**
-                 * This bugged on 7.0.4 and maybe other versions
-                 * @see https://bugs.php.net/bug.php?id=71907
-                 * Actually returns int(0) instead of FALSE
-                 *
-                 * Some writes execute remote connection close, then its not uncommon to see
-                 * connection being closed after write is successful
-                 */
-                throw new RuntimeException("Failed to fwrite() to socket: " . ($len - $written) .'bytes left');
+                if ($fwrite === false || (feof($this->sock) && $written < $len)) {
+                    /**
+                     * This bugged on 7.0.4 and maybe other versions
+                     * @see https://bugs.php.net/bug.php?id=71907
+                     * Actually returns int(0) instead of FALSE
+                     *
+                     * Some writes execute remote connection close, then its not uncommon to see
+                     * connection being closed after write is successful
+                     */
+                    throw new RuntimeException("Failed to fwrite() to socket: " . ($len - $written) . 'bytes left');
+                }
+
+                if ($fwrite === 0) {
+                    $tries--;
+                }
+
+                if ($tries <= 0) {
+                    throw new RuntimeException('Failed to write to socket after ' . self::WRITE_0_TRIES . ' retries');
+                }
             }
 
-            if ($fwrite === 0) {
-                $tries--;
-            }
-
-            if ($tries <= 0) {
-                throw new RuntimeException('Failed to write to socket after ' . self::WRITE_0_TRIES . ' retries');
-            }
+            /**
+             * Restore original handlers after normal operations
+             */
+            error_reporting($oreporting);
+            set_error_handler($ohandler);
+        } catch (\Exception $t) {
+            /**
+             * Restore original handlers if exception happens
+             */
+            error_reporting($oreporting);
+            set_error_handler($ohandler);
+            throw new RuntimeException($t->getMessage(), $t->getCode());
         }
-
-        /**
-         * Restore original handlers
-         */
-        error_reporting($oreporting);
-        set_error_handler($ohandler);
     }
 
     public function close()
