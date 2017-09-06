@@ -50,11 +50,16 @@ class Gcm
     private $hostname;
     private $mypid;
 
-    const GCM_HOST      = 'gcm.googleapis.com';
+    /**
+     * @see https://firebase.google.com/docs/cloud-messaging/server#implementing-the-xmpp-server-protocol
+     */
+    const GCM_HOST      = 'fcm-xmpp.googleapis.com';
     const GCM_HOST_PORT = 5235;
 
-    const GCM_HOST_DEV = 'gcm-preprod.googleapis.com';
+    const GCM_HOST_DEV      = 'fcm-xmpp.googleapis.com';
     const GCM_HOST_PORT_DEV = 5236;
+
+    const GCM_SENDERID_POSTFIX = 'gcm.googleapis.com';
 
     /**
      * COMPLETE LIST of ERROR_CODE's
@@ -189,19 +194,18 @@ class Gcm
      */
     public function connect() {
         if (is_null($this->client)) {
-            $c = new Gcm\Jaxl(
-                array('pass'      => $this->apiKey,
-                      'auth_type' => 'PLAIN',
-                      'priv_dir'  => sys_get_temp_dir(),
-                      'protocol'  => 'tls',
-                      'strict'    => false,
-                      'stream_context' => stream_context_create(array('ssl' => array('verify_peer' => true))),
-                      'force_tls' => $this->forceTLS,
-                      'log_level' => $this->logLevel,
-                      'jid'       => $this->senderId . '@' . self::GCM_HOST,
-                      'host'      => $this->isTest ? self::GCM_HOST_DEV : self::GCM_HOST,
-                      'port'      => $this->isTest ? self::GCM_HOST_PORT_DEV : self::GCM_HOST_PORT)
-            );
+            $config = array('pass'      => $this->apiKey,
+                            'auth_type' => 'PLAIN',
+                            'priv_dir'  => sys_get_temp_dir(),
+                            'protocol'  => 'tls',
+                            'strict'    => false,
+                            'stream_context' => stream_context_create(array('ssl' => array('verify_peer' => true))),
+                            'force_tls' => $this->forceTLS,
+                            'log_level' => $this->logLevel,
+                            'jid'       => $this->senderId . '@' . self::GCM_SENDERID_POSTFIX,
+                            'host'      => $this->isTest ? self::GCM_HOST_DEV : self::GCM_HOST,
+                            'port'      => $this->isTest ? self::GCM_HOST_PORT_DEV : self::GCM_HOST_PORT);
+            $c = new Gcm\Jaxl($config);
             $this->client = $c;
             $this->registerCallbacks();
             //$this->client->start(array('--with-unix-sock' => true));
@@ -282,13 +286,21 @@ class Gcm
             $messageId = md5(microtime() . $this->hostname . $this->mypid);
         }
 
-        $this->sendGcmMessage(array('collapse_key' => $message->getCollapseKey(), // Could be unset
-                                    'time_to_live' => $message->getTimeToLive(), //Could be unset
-                                    'delay_while_idle' => $message->getDelayWhileIdle(), //Could be unset
-                                    'message_id'       => $messageId,
-                                    'to'   => $message->getTo(true),
-                                    'data' => $message->getData())
-        );
+        $data = ['to'         => $message->getTo(true),
+                 'message_id' => $messageId,
+                 'data'       => $message->getData()];
+
+        if ($ck = $message->getCollapseKey()) {
+            $data['collapse_key'] = $ck;
+        }
+        if ($ttl = $message->getTimeToLive()) {
+            $data['time_to_live'] = $ttl;
+        }
+        if ($delay = $message->getDelayWhileIdle()) {
+            $data['delay_while_idle'] = $delay;
+        }
+
+        $this->sendGcmMessage($data);
         //$this->msgSent++;
     }
 

@@ -29,9 +29,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-namespace BackQ\Publisher;
+namespace BackQ\Worker\Amazon\SNS;
 
-final class Process extends AbstractPublisher
+use BackQ\Worker\AbstractWorker;
+use BackQ\Worker\Amazon\SNS\SnsClient as AwsSnsClient;
+
+abstract class Application extends AbstractWorker
 {
-    protected $queueName = 'process';
+    /** @var $snsClient AwsSnsClient */
+    protected $snsClient;
+
+    /**
+     * Sets up a client that will Publish SNS messages
+     *
+     * @param AwsSnsClient $awsSnsClient
+     */
+    public function setClient($awsSnsClient)
+    {
+        $this->snsClient = $awsSnsClient;
+    }
 }

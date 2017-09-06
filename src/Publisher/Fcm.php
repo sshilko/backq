@@ -31,7 +31,7 @@
  */
 namespace BackQ\Publisher;
 
-final class Process extends AbstractPublisher
+final class Fcm extends AbstractPublisher
 {
-    protected $queueName = 'process';
+    protected $queueName = 'fcm';
 }

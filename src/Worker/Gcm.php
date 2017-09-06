@@ -32,6 +32,11 @@ use RuntimeException;
 final class Gcm extends AbstractWorker
 {
     /**
+     * FCM XMPP Reference
+     * @see https://firebase.google.com/docs/cloud-messaging/server#implementing-the-xmpp-server-protocol
+     */
+
+    /**
      * This is "Server" Api Key that your project owns
      * @see http://www.androiddocs.com/google/gcm/gs.html
      * @see http://www.androiddocs.com/google/gcm/ccs.html#auth
@@ -46,6 +51,11 @@ final class Gcm extends AbstractWorker
     private $senderId;
 
     private $debugLevel;
+
+    /**
+     * @var \BackQ\Adapter\Gcm
+     */
+    private $daemon;
 
     private   $environment;
     protected $queueName = 'gcmccs';
@@ -109,10 +119,12 @@ final class Gcm extends AbstractWorker
 
                 $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_CONNECT_ERR, function() use ($self) {
                     $self->debug('GCM Connection error');
+                    throw new \Exception('GCM Connection error');
                 });
 
                 $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_DISCONNECT, function() use ($self) {
                     $self->debug('GCM Disconnected');
+                    //throw new \Exception('Disconnected');
                 });
 
                 $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_MSG_SENT_OK, function($recipientId,
@@ -208,86 +220,65 @@ final class Gcm extends AbstractWorker
 
                 $daemon->setCallback(\BackQ\Adapter\Gcm::CALLBACK_AUTH_OK, function() use ($self, $daemon) {
                     $self->debug('GCM Authorized ok');
+
+                    $self->debug('waiting for some work');
+                    $work = $self->work(1);
+
+                    foreach ($work as $taskId => $payload) {
+                        $self->debug('got some work');
+
+                        if (!$taskId || !$payload) {
+                            $self->debug('no payload yet');
+                            continue;
+                        }
+
+                        $message   = @unserialize($payload);
+                        $processed = true;
+
+                        /**
+                         * GCM CCS allows only 1 recipient per message
+                         */
+                        if (!($message instanceof GCMMessage) || 1 != $message->getRecipientsNumber()) {
+                            $work->send($processed);
+                            @error_log('Worker does not support payload of: ' . gettype($message));
+                        } else {
+
+                            try {
+                                $daemon->send($message);
+                                $self->debug('daemon sent message');
+                            } catch (\Exception $e) {
+                                $self->debug('generic exception: ' . $e->getMessage());
+                                $processed = $e->getMessage();
+                                @error_log($e->getMessage());
+                            } finally {
+                                $work->send((true === $processed));
+                            }
+
+                            if (true !== $processed) {
+                                /**
+                                 * Worker not reliable, quitting
+                                 */
+                                throw new \RuntimeException('Worker not reliable, failed to process GCM task: ' . $processed);
+                            }
+                        }
+                    };
+                    $this->finish();
                 });
 
-                $this->debug('gcm daemon callbacks initialized');
-                $daemon->connect();
-                $this->debug('gcm daemon connect initialized');
-
-                $work = $self->work(5);
-                $self->debug('after init work generator');
-
-                $jobsdone   = 0;
-                $lastactive = time();
-                $self->debug('waiting for some work');
-                foreach ($work as $taskId => $payload) {
-                    $self->debug('got some work');
-
-                    if ($self->idleTimeout > 0 && (time() - $lastactive) > $self->idleTimeout) {
-                        $self->debug('idle timeout reached, returning job, quitting');
-                        $work->send(false);
-                        $daemon->disconnect();
-                        break;
-                    }
-
-                    if (!$taskId || !$payload) {
-                        /**
-                         * Timeout reached while waiting for task
-                         */
-                        $self->debug('no payload yet');
-                        continue;
-                    }
-
-                    $lastactive = time();
-
-                    if ($self->restartThreshold > 0 && ++$jobsdone > $self->restartThreshold) {
-                        $self->debug('restart threshold reached, returning job, quitting');
-                        $work->send(false);
-                        $daemon->disconnect();
-                        break;
-                    }
-
-
-
-                    $message   = @unserialize($payload);
-                    $processed = true;
-
-                    /**
-                     * GCM CCS allows only 1 recipient per message
-                     */
-                    if (!($message instanceof GCMMessage) || 1 != $message->getRecipientsNumber()) {
-                        $work->send($processed);
-                        @error_log('Worker does not support payload of: ' . gettype($message));
-                    } else {
-
-                        try {
-                            $daemon->send($message);
-                            $self->debug('daemon sent message');
-                        } catch (\Exception $e) {
-                            $self->debug('generic exception: ' . $e->getMessage());
-                            $processed = $e->getMessage();
-                            @error_log($e->getMessage());
-                        } finally {
-                            $work->send((true === $processed));
-                        }
-
-                        if (true !== $processed) {
-                            /**
-                             * Worker not reliable, quitting
-                             */
-                            throw new \RuntimeException('Worker not reliable, failed to process GCM task: ' . $processed);
-                        }
-                    }
-                };
-
+                $this->daemon = $daemon;
+                $this->daemon->connect();
             } catch (\Exception $e) {
                 @error_log('[' . date('Y-m-d H:i:s') . '] gcm worker exception: ' . $e->getMessage());
             } finally {
-                if ($daemon) {
-                    $daemon->disconnect();
+                if ($this->daemon) {
+                    $this->daemon->disconnect();
                 }
             }
         }
-        $this->finish();
+    }
+
+    public function finish() {
+        $this->daemon->disconnect();
+        return parent::finish();
     }
 }

@@ -29,9 +29,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-namespace BackQ\Publisher;
+namespace BackQ\Worker\Amazon\SNS\Client\Exception;
 
-final class Process extends AbstractPublisher
+
+class NetworkException extends \GuzzleHttp\Exception\RequestException
 {
-    protected $queueName = 'process';
+
 }

@@ -2,7 +2,7 @@
 /**
  *  The MIT License (MIT)
  *
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,27 +24,8 @@
  *
  **/
 
-namespace BackQ\Adapter\IO;
+namespace BackQ\Message;
 
-abstract class AbstractIO
+class Fcm extends \Zend_Mobile_Push_Message_Gcm
 {
-    abstract public function read($n);
-
-    abstract public function write($data);
-
-    abstract public function close();
-
-    abstract public function selectRead($sec, $usec);
-
-    abstract public function selectWrite($sec, $usec);
-
-    /**
-     * Advanced functions -->
-     */
-    abstract public function stream_get_contents(int $length);
-    abstract public function stream_get_line(int $length, string $delimiter);
-    abstract public function stream_set_timeout($read_write_timeout);
-    /**
-     * Advanced functions <--
-     */
-    }
+}

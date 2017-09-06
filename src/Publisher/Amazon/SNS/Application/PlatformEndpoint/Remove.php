@@ -29,9 +29,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-namespace BackQ\Publisher;
+namespace BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint;
 
-final class Process extends AbstractPublisher
+use BackQ\Publisher\AbstractPublisher;
+
+final class Remove extends AbstractPublisher
 {
-    protected $queueName = 'process';
+    /**
+     * The queue will be used to delete remote endpoints that are disabled/inactive
+     * @var string
+     */
+    protected $queueName = 'aws_sns_endpoints_remove_';
 }

@@ -29,9 +29,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-namespace BackQ\Publisher;
+namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
-final class Process extends AbstractPublisher
+interface RemoveMessageInterface
 {
-    protected $queueName = 'process';
+    public function getEndpointArn() : string;
+    public function setEndpointArn(string $arn);
 }

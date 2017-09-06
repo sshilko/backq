@@ -15,7 +15,7 @@ Perform tasks with workers &amp; publishers (queues)
 #composer clear-cache
 #composer diagnose
 #composer require sshilko/backq:dev-master
-composer require sshilko/backq:^1.1
+composer require sshilko/backq:^1.2
 ```
 
 #### Requirements
@@ -41,26 +41,24 @@ composer require sshilko/backq:^1.1
 
 #### API / Basic Usage / APNS push notifications
 
-Initialize Queue adapter
-
 * Adapter for Beanstalkd
 ```
 /**
- * only Beanstalk is supported atm.
- * Recommended: default settings expect server at 127.0.0.1:11300 with non-persistent connection
+ * Only Beanstalk is supported atm. there is possibility to add new Queue adapters
+ * Beanstalk could be configured to use persistent connections and works reliably
  */ 
-$adapter = new \BackQ\Adapter\Beanstalk;
-//$custom  = new \BackQ\Adapter\Beanstalk($host, $port, $timeout, $persistent);
+$adapter = new \BackQ\Adapter\Beanstalk('127.0.0.1', 11300, 1, ('cli' != PHP_SAPI));
 ```
 
-* Worker (can have multiple per same queue) that dispatches messages
+* APNS Worker
 
 ```
 $ca  = 'somepath/entrust_2048_ca.cer';
 $pem = 'somepath/apnscertificate.pem';
 $env = \ApnsPHP_Abstract::ENVIRONMENT_SANDBOX;
 
-$worker = new \BackQ\Worker\Apnsd($adapter);
+$adapter = new \BackQ\Adapter\Beanstalk('127.0.0.1', 11300, 1, ('cli' != PHP_SAPI));
+$worker  = new \BackQ\Worker\Apnsd($adapter);
 
 /**
  * We can listen to custom queue and have multiple queues & multiple workers per queue
@@ -104,21 +102,14 @@ $worker->setIdleTimeout(600);
  */
 $worker->readWriteTimeout = 5;
 
-/**
- * Workaround for
- * PHP 5.5.23,5.5.24 & 5.6.7,5.6.8
- * does not honor the stream_set_timeout()
- * @see https://bugs.php.net/bug.php?id=69393
- */
-//$worker->connectTimeout = 2;
-
 $worker->run();
 ```
 
-* Publisher pushes new messages into Beanstalkd queue
+* APNS Publisher
 
 ```
-$publisher = \BackQ\Publisher\Apnsd::getInstance(new \BackQ\Adapter\Beanstalk);
+$adapter   = new \BackQ\Adapter\Beanstalk('127.0.0.1', 11300, 1, ('cli' != PHP_SAPI));
+$publisher = \BackQ\Publisher\Apnsd::getInstance($adapter);
 
 /**
  * We can publish to custom queue
@@ -169,20 +160,24 @@ if ($publisher->start() && $publisher->hasWorkers()) {
 }
 ```
 
-#### Basic usage (processes)
+#### Basic usage (process spawner)
 
 A queue for the [symfony/process](http://symfony.com/doc/current/components/process.html) component usage.
 A simple scheduler is done using Beanstalkd `delay` option for jobs. Or just dispatch projess jobs for async execution.
 
-Worker daemon
+* Process worker
+
 ```
-$worker = new \BackQ\Worker\AProcess(new \BackQ\Adapter\Beanstalk);
+$adapter = new \BackQ\Adapter\Beanstalk('127.0.0.1', 11300, 1, ('cli' != PHP_SAPI));
+$worker  = new \BackQ\Worker\AProcess($adapter);
 $worker->run();
 ```
 
-Publisher
+* Process publisher
+
 ```
-$publisher = \BackQ\Publisher\Process::getInstance(new \BackQ\Adapter\Beanstalk);
+$adapter   = new \BackQ\Adapter\Beanstalk('127.0.0.1', 11300, 1, ('cli' != PHP_SAPI));
+$publisher = \BackQ\Publisher\Process::getInstance($adapter);
 if ($publisher->start() && $publisher->hasWorkers()) {
     $message = new \BackQ\Message\Process('echo $( date +%s ) >> /tmp/test');
     $result = $publisher->publish($message, array(\BackQ\Adapter\Beanstalk::PARAM_JOBTTR => 3,
@@ -195,7 +190,38 @@ if ($publisher->start() && $publisher->hasWorkers()) {
 }
 ```
 
-#### Versions
+#### Firebase Cloud Messaging (FCM Notifications)
 
-Current stable is 1.1.2
+A worker for the [Google/Firebase Notifications](https://firebase.google.com/docs/cloud-messaging/) .
+
+* FCM worker
+
+```
+$fcmKey  = 123;
+$adapter = new \BackQ\Adapter\Beanstalk('127.0.0.1', 11300, 1, ('cli' != PHP_SAPI));
+$worker  = new \BackQ\Worker\Fcm($adapter);
+$worker->setRestartThreshold(100);
+$worker->setIdleTimeout(600);
+$worker->setPusher(new \BackQ\Adapter\Fcm($fcmKey));
+$worker->run();
+```
+
+* Process publisher
+
+```
+$adapter   = new \BackQ\Adapter\Beanstalk('127.0.0.1', 11300, 1, ('cli' != PHP_SAPI));
+$publisher = \BackQ\Publisher\Fcm::getInstance($adapter);
+if ($publisher->start() && $publisher->hasWorkers()) {
+    //https://framework.zend.com/manual/1.12/en/zend.mobile.push.gcm.html
+    $message = new BackQ\Message\Fcm();
+    
+    $result  = $publisher->publish($message);
+    if ($result > 0) {
+        //Async process job added to queue
+    } else {
+        //fail
+    }
+}
+```
+
 

@@ -29,7 +29,7 @@ namespace BackQ\Worker;
 use \RuntimeException;
 use \Symfony\Component\Process\Process;
 
-class AProcess extends AbstractWorker
+final class AProcess extends AbstractWorker
 {
     protected $queueName = 'process';
 
