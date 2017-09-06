@@ -206,7 +206,7 @@ $worker->setPusher(new \BackQ\Adapter\Fcm($fcmKey));
 $worker->run();
 ```
 
-* Process publisher
+* FCM publisher
 
 ```
 $adapter   = new \BackQ\Adapter\Beanstalk('127.0.0.1', 11300, 1, ('cli' != PHP_SAPI));
