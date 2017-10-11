@@ -40,6 +40,13 @@ abstract class AbstractWorker
     private $bind;
     private $doDebug;
 
+    /**
+     * Whether syscalls should be delayed
+     * @var bool
+     */
+    protected $manualDelaySignal  = false;
+    protected $delaySignalPending = 0;
+
     protected $queueName;
 
     /**
@@ -94,6 +101,51 @@ abstract class AbstractWorker
         if (true === $this->adapter->connect()) {
             if ($this->adapter->bindRead($this->getQueueName())) {
                 $this->bind = true;
+
+                /**
+                 * Intercept & DELAY SIGNAL EXECUTION-->
+                 * @see https://wiki.php.net/rfc/async_signals
+                 * @see http://us1.php.net/manual/en/control-structures.declare.php
+                 * @see https://github.com/tpunt/PHP7-Reference/blob/master/php71-reference.md
+                 */
+                $this->delaySignalPending = 0;
+                $me = $this;
+                if (function_exists('pcntl_signal')) {
+                    $signalHandler = function($n) use (&$me) {
+                        $me->delaySignalPending = $n;
+                    };
+
+                    /**
+                     * Termination request
+                     */
+
+                    pcntl_signal(SIGTERM, $signalHandler);
+
+                    /**
+                     * CTRL+C
+                     */
+
+                    pcntl_signal(SIGINT, $signalHandler);
+
+                    /**
+                     * shell sends a SIGHUP to all jobs when an interactive login shell exits
+                     */
+
+                    pcntl_signal(SIGHUP, $signalHandler);
+
+                    if (function_exists('pcntl_async_signals')) {
+                        /**
+                         * Asynchronously process triggers w/o manual check
+                         */
+                        pcntl_async_signals(true);
+                    } else {
+                        /**
+                         * Manually process/check delayed triggers
+                         */
+                        $this->manualDelaySignal = true;
+                    }
+                }
+
                 return true;
             }
         }
@@ -122,6 +174,17 @@ abstract class AbstractWorker
         $jobsdone   = 0;
         $lastActive = time();
         while (true) {
+            /**
+             * Manually process pending signals, updates $requestExit value
+             * declare(ticks=1) is needed ONLY if we DONT HAVE pcntl_signal_dispatch() call, makes
+             * EVERY N TICK's check for signal dispatch,
+             * instead we call pcntl_signal_dispatch() manually where we want to check if there was signal
+             * @see http://zguide.zeromq.org/php:interrupt
+             */
+            if ((!$this->manualDelaySignal || pcntl_signal_dispatch()) && $this->isTerminationRequested()) {
+                break;
+            }
+
             $job = $this->adapter->pickTask($timeout);
 
             if (is_array($job)) {
@@ -183,6 +246,23 @@ abstract class AbstractWorker
      */
     protected function onRestartThreshold() {
         return true;
+    }
+
+    /**
+     * @return bool
+     */
+    protected function isTerminationRequested() : bool {
+        if ($this->delaySignalPending > 0) {
+            if ($this->delaySignalPending == SIGTERM ||
+                $this->delaySignalPending == SIGINT  ||
+                $this->delaySignalPending == SIGHUP) {
+                /**
+                 * Received request to stop/terminate process
+                 */
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
