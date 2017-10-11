@@ -155,7 +155,7 @@ final class Apnsd extends AbstractWorker
                  */
                 $push->setSocketSelectTimeout($this->socketSelectTimeout);
 
-                $workTimeout = 30;
+                $workTimeout = 15;
                 $work = $this->work($workTimeout);
                 $this->debug('after init work generator');
 
