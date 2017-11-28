@@ -4,6 +4,7 @@ namespace BackQ\Worker;
 final class Guzzle extends AbstractWorker
 {
     protected $queueName = 'guzzle';
+    public $workTimeout  = 4;
 
     public function run()
     {
@@ -15,13 +16,13 @@ final class Guzzle extends AbstractWorker
                 $client  = new \GuzzleHttp\Client();
                 $this->debug('connected to queue');
 
-                $work = $this->work(10);
+                $work = $this->work($this->workTimeout);
                 $this->debug('after init work generator');
 
                 foreach ($work as $taskId => $payload) {
                     $this->debug('got some work: ' . ($payload ? 'yes' : 'no'));
 
-                    if (!$payload) {
+                    if (!$payload && $this->workTimeout > 0) {
                         continue;
                     }
 

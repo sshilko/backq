@@ -48,6 +48,8 @@ final class Apnsd extends AbstractWorker
      */
     public $connectTimeout = 4;
 
+    public $waitTimeout = 11;
+
     /**
      * Microseconds
      * 750000 = 0.75 sec
@@ -155,8 +157,7 @@ final class Apnsd extends AbstractWorker
                  */
                 $push->setSocketSelectTimeout($this->socketSelectTimeout);
 
-                $workTimeout = 15;
-                $work = $this->work($workTimeout);
+                $work = $this->work($this->waitTimeout);
                 $this->debug('after init work generator');
 
                 $jobsdone   = 0;
@@ -172,7 +173,7 @@ final class Apnsd extends AbstractWorker
                     #    break;
                     #}
 
-                    if (!$payload && $workTimeout > 0) {
+                    if (!$payload && $this->waitTimeout > 0) {
                         /**
                          * Just empty loop, no work fetched
                          */

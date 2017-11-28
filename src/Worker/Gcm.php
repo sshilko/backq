@@ -29,6 +29,9 @@ namespace BackQ\Worker;
 use BackQ\Message\GCMMessage;
 use RuntimeException;
 
+/**
+ * @deprecated
+ */
 final class Gcm extends AbstractWorker
 {
     /**

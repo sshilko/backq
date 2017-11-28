@@ -35,6 +35,8 @@ final class Fcm extends AbstractWorker
      */
     protected $pusher = null;
 
+    public $workTimeout = 4;
+
     public function setPusher(\Zend_Mobile_Push_Gcm $pusher) {
         $this->pusher = $pusher;
     }
@@ -48,13 +50,13 @@ final class Fcm extends AbstractWorker
             try {
                 $this->debug('connected to queue');
 
-                $work = $this->work(10);
+                $work = $this->work($this->workTimeout);
                 $this->debug('after init work generator');
 
                 foreach ($work as $taskId => $payload) {
                     $this->debug('got some work: ' . ($payload ? 'yes' : 'no'));
 
-                    if (!$payload) {
+                    if (!$payload && $this->workTimeout > 0) {
                         continue;
                     }
 
