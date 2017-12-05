@@ -72,6 +72,10 @@ class Beanstalk extends AbstractAdapter
      */
     public function connect($host = '127.0.0.1', $port = 11300, $timeout = 1, $persistent = false)
     {
+        if (true === $this->connected && $this->client) {
+            return true;
+        }
+
         try {
             $bconfig = array('host' => $host,
                              'port' => $port,
