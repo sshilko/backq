@@ -48,7 +48,7 @@ class Remove extends PlatformEndpoint
             try {
                 $this->debug('connected to queue');
 
-                $workTimeout = 15;
+                $workTimeout = 5;
                 $work = $this->work($workTimeout);
                 $this->debug('after init work generator');
 

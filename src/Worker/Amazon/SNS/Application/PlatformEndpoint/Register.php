@@ -47,7 +47,7 @@ class Register extends PlatformEndpoint
             try {
                 $this->debug('Connected to queue');
 
-                $workTimeout = 15;
+                $workTimeout = 5;
                 $work = $this->work($workTimeout);
                 $this->debug('After init work generator');
 
