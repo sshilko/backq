@@ -2,7 +2,7 @@
 /**
  *  The MIT License (MIT)
  *
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,7 @@ use \Symfony\Component\Process\Process;
 final class AProcess extends AbstractWorker
 {
     protected $queueName = 'process';
+    public $workTimeout  = 4;
 
     public function run()
     {
@@ -41,7 +42,7 @@ final class AProcess extends AbstractWorker
         if ($connected) {
             try {
                 $this->debug('connected');
-                $work = $this->work();
+                $work = $this->work($this->workTimeout);
                 $this->debug('after init work generator');
 
                 /**
@@ -49,6 +50,13 @@ final class AProcess extends AbstractWorker
                  * we cleanup-up zombies when receiving next job
                  */
                 foreach ($work as $taskId => $payload) {
+                    if (!$payload && $this->workTimeout > 0) {
+                        /**
+                         * Just empty loop, no work fetched
+                         */
+                        continue;
+                    }
+
                     $this->debug('got some work');
 
                     $message   = @unserialize($payload);

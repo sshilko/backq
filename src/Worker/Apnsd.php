@@ -2,7 +2,7 @@
 /**
  *  The MIT License (MIT)
  *
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -47,6 +47,8 @@ final class Apnsd extends AbstractWorker
      * For those versions use connectTimeout as low as 0.5
      */
     public $connectTimeout = 4;
+
+    public $waitTimeout = 11;
 
     /**
      * Microseconds
@@ -155,8 +157,7 @@ final class Apnsd extends AbstractWorker
                  */
                 $push->setSocketSelectTimeout($this->socketSelectTimeout);
 
-                $workTimeout = 30;
-                $work = $this->work($workTimeout);
+                $work = $this->work($this->waitTimeout);
                 $this->debug('after init work generator');
 
                 $jobsdone   = 0;
@@ -172,7 +173,7 @@ final class Apnsd extends AbstractWorker
                     #    break;
                     #}
 
-                    if (!$payload && $workTimeout > 0) {
+                    if (!$payload && $this->waitTimeout > 0) {
                         /**
                          * Just empty loop, no work fetched
                          */

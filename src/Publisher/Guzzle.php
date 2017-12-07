@@ -24,10 +24,9 @@
  *
  **/
 
-namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
+namespace BackQ\Publisher;
 
-interface RemoveMessageInterface
+final class Guzzle extends AbstractPublisher
 {
-    public function getEndpointArn() : string;
-    public function setEndpointArn(string $arn);
+    protected $queueName = 'guzzle';
 }

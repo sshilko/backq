@@ -5,7 +5,7 @@
  * Queues a process execution
  * Publishes a job into default queue="process"
  *
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
  */
 
 

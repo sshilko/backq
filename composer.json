@@ -6,14 +6,8 @@
     "support": {
         "issues": "https://github.com/sshilko/backq/issues"
     },
-    "keywords": ["queue", "worker", "apns", "push", "ios", "apple", "notification", "send", "background", "process", "async"],
+    "keywords": ["queue", "worker", "guzzle", "aws", "sns", "fcm", "apns", "push", "ios", "apple", "notification", "send", "background", "process", "async"],
     "homepage": "https://github.com/sshilko/backq",
-    "license": "MIT",
-    "authors": [{"name": "Sergei Shilko",
-                 "email": "contact@sshilko.com",
-                 "homepage": "http://sshilko.com",
-                 "role": "Developer"}
-    ],
     "require": {
         "php": ">=7.0.2",
         "davidpersson/beanstalk": "^2.0",
