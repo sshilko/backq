@@ -50,7 +50,7 @@ final class AProcess extends AbstractWorker
                  * we cleanup-up zombies when receiving next job
                  */
                 foreach ($work as $taskId => $payload) {
-                    if (!$payload && $this->waitTimeout > 0) {
+                    if (!$payload && $this->workTimeout > 0) {
                         /**
                          * Just empty loop, no work fetched
                          */
