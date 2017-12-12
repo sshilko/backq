@@ -1,21 +1,23 @@
 {
     "name": "sshilko/backq",
-    "description": "Background push notifications processing with workers & publisher",
+    "description": "Background asynchronous job processing with queue, workers & publishers",
     "type": "library",
     "minimum-stability": "dev",
     "support": {
         "issues": "https://github.com/sshilko/backq/issues"
     },
-    "keywords": ["queue", "worker", "guzzle", "aws", "sns", "fcm", "apns", "push", "ios", "apple", "notification", "send", "background", "process", "async"],
+    "keywords": ["queue", "worker", "guzzle", "aws", "sns", "fcm", "apns", "push", "ios", "apple", "notification", "send", "background", "process", "async", "psr7"],
     "homepage": "https://github.com/sshilko/backq",
     "require": {
-        "php": ">=7.0.2",
+        "php": ">=7.0.4",
         "davidpersson/beanstalk": "^2.0",
         "symfony/process": "=2.8.0",        
-        "duccio/apns-php": "=1.0.1"
+        "duccio/apns-php": "=1.0.1",
+        "zf1/zend-mobile": "^1.12",
+        "guzzlehttp/guzzle": "=6.2.3@dev"
     },
     "suggest": {
-        "php": ">=7.0.12"
+        "php": ">=7.1.12"
     },
     "conflict": {
         "php": "5.5.23,5.5.24,5.6.7,5.6.8"
