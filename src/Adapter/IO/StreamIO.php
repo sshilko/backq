@@ -190,7 +190,8 @@ class StreamIO extends AbstractIO
          * continued sending the data, we will catch feof() only after some time
          */
         $oreporting = error_reporting(E_ALL);
-        $ohandler   = set_error_handler(function($severity, $text) {
+        set_error_handler(function($severity, $text) {
+        //$ohandler   = set_error_handler(function($severity, $text) {
             throw new \RuntimeException('fwrite() error (' . $severity . '): ' . $text);
         });
 
@@ -228,13 +229,15 @@ class StreamIO extends AbstractIO
              * Restore original handlers after normal operations
              */
             error_reporting($oreporting);
-            set_error_handler($ohandler);
+            //set_error_handler($ohandler);
+            restore_error_handler();
         } catch (\Exception $t) {
             /**
              * Restore original handlers if exception happens
              */
             error_reporting($oreporting);
-            set_error_handler($ohandler);
+            //set_error_handler($ohandler);
+            restore_error_handler();
             throw new RuntimeException($t->getMessage(), $t->getCode());
         }
     }
