@@ -31,6 +31,18 @@ use \BackQ\Adapter\IO\Exception\TimeoutException;
 
 class StreamIO extends AbstractIO
 {
+    /**
+     * Attempt to connect N times before give up
+     * @var int
+     */
+    public $connAttempts        = 3;
+
+    /**
+     * Sleep between connection attempts
+     * @var int
+     */
+    public $connRetryIntervalMs = 100;
+
     private $sock       = null;
     private $persistent = null;
 
@@ -60,20 +72,27 @@ class StreamIO extends AbstractIO
         $errstr = $errno  = null;
         $this->sock       = null;
         $this->persistent = ($persistent) ? true : false;
+        $triesLeft        = $this->connAttempts;
 
-        if ($context) {
-            $remote = sprintf('tls://%s:%s/%s', $host, $port, strval($persistent));
-            if ($persistent) {
-                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT, $context);
+        while (!$this->sock && $triesLeft > 0) {
+            if ($context) {
+                $remote = sprintf('tls://%s:%s/%s', $host, $port, strval($persistent));
+                if ($persistent) {
+                    $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT, $context);
+                } else {
+                    $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT, $context);
+                }
             } else {
-                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT, $context);
+                $remote = sprintf('tcp://%s:%s/%s', $host, $port, strval($persistent));
+                if ($persistent) {
+                    $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT);
+                } else {
+                    $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT);
+                }
             }
-        } else {
-            $remote = sprintf('tcp://%s:%s/%s', $host, $port, strval($persistent));
-            if ($persistent) {
-                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT);
-            } else {
-                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT);
+            if (!$this->sock) {
+                $triesLeft--;
+                usleep($this->connRetryIntervalMs * 1000);
             }
         }
 
