@@ -151,6 +151,10 @@ class StreamIO extends AbstractIO
             throw new TimeoutException('Error reading data. Socket connection TIME OUT', self::READ_TIME_CODE);
         }
 
+        /**
+         * @todo add custom error handler as in write()
+         */
+
         $tries = self::FREAD_0_TRIES;
         $fread_result = '';
         while (!@feof($this->sock) && strlen($fread_result) < $n) {

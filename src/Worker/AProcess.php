@@ -50,25 +50,39 @@ final class AProcess extends AbstractWorker
                  * we cleanup-up zombies when receiving next job
                  */
                 foreach ($work as $taskId => $payload) {
-                    if (!$payload && $this->workTimeout > 0) {
-                        /**
-                         * Just empty loop, no work fetched
-                         */
-                        continue;
-                    }
+                    /**
+                     * Whatever happends, always report successful processing
+                     */
+                    $processed = true;
 
                     $this->debug('got some work');
 
-                    $message   = @unserialize($payload);
-                    $processed = true;
-
-                    if (!($message instanceof \BackQ\Message\Process)) {
-                        $work->send($processed);
-                        @error_log('Worker does not support payload of: ' . gettype($message));
+                    if ($payload) {
+                        $message = @unserialize($payload);
+                        if (!($message instanceof \BackQ\Message\Process)) {
+                            $run = false;
+                            @error_log('Worker does not support payload of: ' . gettype($message));
+                        } else {
+                            $run = true;
+                        }
                     } else {
-                        try {
-                            $this->debug('job timeout=' . $message->getTimeout());
+                        $message   = null;
+                        $run       = false;
+                    }
 
+                    try {
+                        $this->debug('job timeout=' . $message->getTimeout());
+
+                        if ($run && $deadline = $message->getDeadline()) {
+                            if ($deadline < time()) {
+                                /**
+                                 * Do not run any tasks beyond their deadline
+                                 */
+                                $run = false;
+                            }
+                        }
+
+                        if ($run) {
                             /**
                              * Enclosure in anonymous function
                              *
@@ -86,9 +100,9 @@ final class AProcess extends AbstractWorker
                                                                                   $message->getCwd(),
                                                                                   $message->getEnv(),
                                                                                   $message->getInput(),
-                                                                                  /**
-                                                                                   * timeout does not really work with async (start)
-                                                                                   */
+                                    /**
+                                     * timeout does not really work with async (start)
+                                     */
                                                                                   $message->getTimeout(),
                                                                                   $message->getOptions());
                                 /**
@@ -108,47 +122,50 @@ final class AProcess extends AbstractWorker
                                  * @throws RuntimeException When process can't be launched
                                  */
                                 $process->start();
+
                                 return $process;
                             };
+                        }
 
-                            /**
-                             * Loop over previous forks and gracefully stop/close them,
-                             * doing this before pushing new fork in the pool
-                             */
-                            if (!empty($forks)) {
-                                foreach ($forks as $f) {
-                                    try {
+                        /**
+                         * Loop over previous forks and gracefully stop/close them,
+                         * doing this before pushing new fork in the pool
+                         */
+                        if (!empty($forks)) {
+                            foreach ($forks as $f) {
+                                try {
+                                    /**
+                                     * here we PREVENTs ZOMBIES
+                                     * isRunning itself closes the process if its ended (not running)
+                                     * use `pstree` to look out for zombies
+                                     */
+                                    if ($f->isRunning()) {
                                         /**
-                                         * here we PREVENTs ZOMBIES
-                                         * isRunning itself closes the process if its ended (not running)
-                                         * use `pstree` to look out for zombies
+                                         * If its still running, check the timeouts
                                          */
-                                        if ($f->isRunning()) {
-                                            /**
-                                             * If its still running, check the timeouts
-                                             */
-                                            $f->checkTimeout();
-                                        }
-                                    } catch (ProcessTimedOutException $e) {}
-                                }
+                                        $f->checkTimeout();
+                                    }
+                                } catch (ProcessTimedOutException $e) {}
                             }
+                        }
 
+                        if ($run) {
                             $forks[] = $run();
-                        } catch (\Exception $e) {
-                            /**
-                             * Not caching exceptions, just launching processes async
-                             */
-                            @error_log('Process worker failed to run: ' . $e->getMessage());
                         }
+                    } catch (\Exception $e) {
+                        /**
+                         * Not caching exceptions, just launching processes async
+                         */
+                        @error_log('Process worker failed to run: ' . $e->getMessage());
+                    }
 
-                        $work->send((true === $processed));
+                    $work->send($processed);
 
-                        if (true !== $processed) {
-                            /**
-                             * Worker not reliable, quitting
-                             */
-                            throw new \RuntimeException('Worker not reliable, failed to process task: ' . $processed);
-                        }
+                    if (true !== $processed) {
+                        /**
+                         * Worker not reliable, quitting
+                         */
+                        throw new \RuntimeException('Worker not reliable, failed to process task: ' . $processed);
                     }
                 };
             } catch (\Exception $e) {

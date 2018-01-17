@@ -35,6 +35,12 @@ class Process extends AbstractMessage
     private $timeout;
     private $options;
 
+    /**
+     * Timestamp until has to be done, otherwise ignored
+     * @var int
+     */
+    private $until = 0;
+
     public function __construct($commandline, $cwd = null, array $env = null, $input = null, $timeout = 60, array $options = array()) {
         $this->commandline = $commandline;
         $this->cwd = $cwd;
@@ -42,6 +48,14 @@ class Process extends AbstractMessage
         $this->input = $input;
         $this->timeout = $timeout;
         $this->options = $options;
+    }
+
+    public function getDeadline() {
+        return $this->until;
+    }
+
+    public function setDeadline(int $timestamp) {
+        $this->until = $timestamp;
     }
 
     public function getCommandline() {
