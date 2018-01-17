@@ -71,9 +71,8 @@ final class AProcess extends AbstractWorker
                     }
 
                     try {
-                        $this->debug('job timeout=' . $message->getTimeout());
 
-                        if ($run && $deadline = $message->getDeadline()) {
+                        if ($run && $message && $deadline = $message->getDeadline()) {
                             if ($deadline < time()) {
                                 /**
                                  * Do not run any tasks beyond their deadline
