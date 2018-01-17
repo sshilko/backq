@@ -46,7 +46,9 @@ abstract class PlatformEndpoint extends Application
 
     public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
-        $queueSuffix = strtolower(end(explode('\\', get_called_class()))) . '_';
+        $className   = explode('\\', get_called_class());
+        $className   = end($className);
+        $queueSuffix = strtolower($className) . '_';
         $this->setQueueName($this->getQueueName() . $queueSuffix);
 
         parent::__construct($adapter);
