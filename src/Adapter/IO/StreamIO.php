@@ -35,13 +35,13 @@ class StreamIO extends AbstractIO
      * Attempt to connect N times before give up
      * @var int
      */
-    public $connAttempts        = 3;
+    public $connAttempts        = 2;
 
     /**
      * Sleep between connection attempts
      * @var int
      */
-    public $connRetryIntervalMs = 100;
+    public $connRetryIntervalMs = 50;
 
     private $sock       = null;
     private $persistent = null;
@@ -95,7 +95,7 @@ class StreamIO extends AbstractIO
                 usleep($this->connRetryIntervalMs * 1000);
             }
         }
-
+    
         if (!$this->sock) {
             throw new RuntimeException("Error Connecting to server($errno): $errstr ");
         }
@@ -143,7 +143,7 @@ class StreamIO extends AbstractIO
     {
         $info = stream_get_meta_data($this->sock);
 
-        if ($info['eof'] || feof($this->sock))  {
+        if ($info['eof'] || @feof($this->sock))  {
             throw new TimeoutException('Error reading data. Socket connection EOF', self::READ_EOF_CODE);
         }
 
@@ -153,11 +153,11 @@ class StreamIO extends AbstractIO
 
         $tries = self::FREAD_0_TRIES;
         $fread_result = '';
-        while (!feof($this->sock) && strlen($fread_result) < $n) {
+        while (!@feof($this->sock) && strlen($fread_result) < $n) {
             /**
              * Up to $n number of bytes read.
              */
-            $fdata = fread($this->sock, $n);
+            $fdata = @fread($this->sock, $n);
             if (false === $fdata) {
                 throw new RuntimeException("Failed to fread() from socket", self::READ_ERR_CODE);
             }
@@ -189,7 +189,7 @@ class StreamIO extends AbstractIO
         // get status of socket to determine whether or not it has timed out
         $info = stream_get_meta_data($this->sock);
 
-        if ($info['eof'] || feof($this->sock)) {
+        if ($info['eof'] || @feof($this->sock)) {
             throw new TimeoutException("Error sending data. Socket connection EOF");
         }
 
