@@ -191,7 +191,7 @@ class StreamIO extends AbstractIO
     public function write($data)
     {
         // get status of socket to determine whether or not it has timed out
-        $info = stream_get_meta_data($this->sock);
+        $info = @stream_get_meta_data($this->sock);
 
         if ($info['eof'] || @feof($this->sock)) {
             throw new TimeoutException("Error sending data. Socket connection EOF");
