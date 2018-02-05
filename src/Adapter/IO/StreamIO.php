@@ -225,6 +225,7 @@ class StreamIO extends AbstractIO
             for ($written = 0; $written < $len; true) {
 
                 $fwrite = fwrite($this->sock, substr($data, $written));
+                fflush($this->sock);
                 $written += intval($fwrite);
 
                 if ($fwrite === false || (feof($this->sock) && $written < $len)) {
