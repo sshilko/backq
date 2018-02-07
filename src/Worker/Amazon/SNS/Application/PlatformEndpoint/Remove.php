@@ -39,6 +39,8 @@ use \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RemoveMessageInterfac
 
 class Remove extends PlatformEndpoint
 {
+    public $workTimeout = 5;
+
     public function run()
     {
         $this->debug('started');
@@ -48,8 +50,7 @@ class Remove extends PlatformEndpoint
             try {
                 $this->debug('connected to queue');
 
-                $workTimeout = 5;
-                $work = $this->work($workTimeout);
+                $work = $this->work();
                 $this->debug('after init work generator');
 
                 /**
@@ -64,7 +65,7 @@ class Remove extends PlatformEndpoint
                 foreach ($work as $taskId => $payload) {
                     $this->debug('got some work');
 
-                    if (!$payload && $workTimeout > 0) {
+                    if (!$payload && $this->workTimeout > 0) {
                         /**
                          * Just empty loop, no work fetched
                          */

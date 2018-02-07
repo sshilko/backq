@@ -38,6 +38,8 @@ use \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\PublishMessageInterfa
 
 class Publish extends PlatformEndpoint
 {
+    public $workTimeout = 5;
+
     public function run()
     {
         $this->debug('Started');
@@ -48,8 +50,7 @@ class Publish extends PlatformEndpoint
             try {
                 $this->debug('Connected to queue');
 
-                $workTimeout = 5;
-                $work = $this->work($workTimeout);
+                $work = $this->work();
                 $this->debug('After init work generator');
 
                 /**
@@ -64,7 +65,7 @@ class Publish extends PlatformEndpoint
                 foreach ($work as $taskId => $payload) {
                     $this->debug('got some work: ' . ($payload ? 'yes' : 'no'));
 
-                    if (!$payload && $workTimeout > 0) {
+                    if (!$payload && $this->workTimeout > 0) {
                         /**
                          * Just empty loop, no work fetched
                          */

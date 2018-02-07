@@ -42,7 +42,7 @@ final class AProcess extends AbstractWorker
         if ($connected) {
             try {
                 $this->debug('connected');
-                $work = $this->work($this->workTimeout);
+                $work = $this->work();
                 $this->debug('after init work generator');
 
                 /**

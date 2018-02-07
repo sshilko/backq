@@ -121,8 +121,10 @@ class Client extends \Beanstalk\Client {
         if ($this->connected) {
             try {
                 $this->_write('quit');
+                $this->_io->close();
             } catch (\Exception $ex) {}
         }
+        $this->_io = null;
         $this->connected = false;
         return $this->connected;
     }
@@ -132,11 +134,7 @@ class Client extends \Beanstalk\Client {
             $message = 'No connecting found while writing data to socket.';
             throw new RuntimeException($message);
         }
-        try {
-            $this->_io->write($data . "\r\n");
-        } catch (\Exception $e) {
-            throw new $e;
-        }
+        $this->_io->write($data . "\r\n");
         return strlen($data);
     }
 

@@ -64,6 +64,13 @@ abstract class AbstractWorker
     protected $idleTimeout = 0;
 
     /**
+     * Work timeout value
+     *
+     * @var int
+     */
+    public $workTimeout = null;
+
+    /**
      * Specify worker queue to pick job from
      *
      * @return string
@@ -83,7 +90,6 @@ abstract class AbstractWorker
         $this->queueName = (string) $string;
     }
 
-
     abstract public function run();
 
     public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
@@ -98,6 +104,12 @@ abstract class AbstractWorker
      */
     protected function start()
     {
+        /**
+         * Tell adapter about our desire for work cycle duration, if any
+         * Some adapters require it before connecting
+         */
+        $this->adapter->setWorkTimeout($this->workTimeout);
+
         if (true === $this->adapter->connect()) {
             if ($this->adapter->bindRead($this->getQueueName())) {
                 $this->bind = true;
@@ -155,11 +167,13 @@ abstract class AbstractWorker
     /**
      * Process data,
      */
-    protected function work($timeout = null)
+    protected function work()
     {
         if (!$this->bind) {
             return;
         }
+
+        $timeout = $this->workTimeout;
 
         /**
          * Make sure that, if an timeout and idle timeout were set, the timeout is
@@ -185,7 +199,7 @@ abstract class AbstractWorker
                 break;
             }
 
-            $job = $this->adapter->pickTask($timeout);
+            $job = $this->adapter->pickTask();
 
             if (is_array($job)) {
                 $lastActive = time();

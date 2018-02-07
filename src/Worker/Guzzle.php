@@ -16,7 +16,7 @@ final class Guzzle extends AbstractWorker
                 $client  = new \GuzzleHttp\Client();
                 $this->debug('connected to queue');
 
-                $work = $this->work($this->workTimeout);
+                $work = $this->work();
                 $this->debug('after init work generator');
 
                 foreach ($work as $taskId => $payload) {

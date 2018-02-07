@@ -38,6 +38,8 @@ use \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RegisterMessageInterf
 
 class Register extends PlatformEndpoint
 {
+    public $workTimeout = 5;
+
     public function run()
     {
         $this->debug('Started');
@@ -47,8 +49,7 @@ class Register extends PlatformEndpoint
             try {
                 $this->debug('Connected to queue');
 
-                $workTimeout = 5;
-                $work = $this->work($workTimeout);
+                $work = $this->work();
                 $this->debug('After init work generator');
 
                 /**
@@ -63,7 +64,7 @@ class Register extends PlatformEndpoint
                 foreach ($work as $taskId => $payload) {
                     $this->debug('Got some work');
 
-                    if (!$payload && $workTimeout > 0) {
+                    if (!$payload && $this->workTimeout > 0) {
                         /**
                          * Just empty loop, no work fetched
                          */

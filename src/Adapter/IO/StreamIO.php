@@ -333,4 +333,12 @@ class StreamIO extends AbstractIO
         $except = null;
         return stream_select($read, $write, $except, $sec, $usec);
     }
+
+    public function isSocketReady() : bool {
+        $info = stream_get_meta_data($this->sock);
+        if ($info['eof'] || feof($this->sock) || $info['timed_out'])  {
+            return true;
+        }
+        return false;
+    }
 }
