@@ -39,8 +39,6 @@ class Beanstalk extends AbstractAdapter
     const ADAPTER_NAME = 'beanstalk';
 
     const PARAM_PRIORITY  = 'priority';
-    const PARAM_READYWAIT = 'readywait';
-    const PARAM_JOBTTR    = 'jobttr';
 
     const PRIORITY_DEFAULT = 1024;
 
@@ -261,7 +259,7 @@ class Beanstalk extends AbstractAdapter
 
                 $priority  = self::PRIORITY_DEFAULT;
                 $readywait = 0;
-                $jobttr    = 60;
+                $jobttr    = self::JOBTTR_DEFAULT;
 
                 if (isset($params[self::PARAM_PRIORITY])) {
                     $priority  = $params[self::PARAM_PRIORITY];

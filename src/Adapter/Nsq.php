@@ -41,6 +41,7 @@ class Nsq extends AbstractAdapter
     const PROTO_VERSION   = "  V2";
     const PROTO_IDENTIFY  = "IDENTIFY";
     const PROTO_PUBLISH   = "PUB %s";
+    const PROTO_PUBDELAY  = "DPUB %s %s";
     const PROTO_SUBSCRIBE = "SUB %s %s";
     const PROTO_READY     = "RDY %s";
     const PROTO_REQUEUE   = "REQ %s %s";
@@ -60,15 +61,13 @@ class Nsq extends AbstractAdapter
      * Reponse frame types defined in the protocol
      */
     const FRAME_TYPE_RESPONSE = 0;
-    const FRAME_TYPE_ERROR = 1;
-    const FRAME_TYPE_MESSAGE = 2;
+    const FRAME_TYPE_ERROR    = 1;
+    const FRAME_TYPE_MESSAGE  = 2;
 
     /**
      * Client UserAgent
      */
     const IDENTIFY_USER_AGENT = "BackQ\Nsq";
-
-    const BASE_RECONNECT_BACKOFF_SECONDS = 4;
 
     /** @var string */
     protected $host;
@@ -77,8 +76,8 @@ class Nsq extends AbstractAdapter
     protected $port;
 
     protected $config = [
-        "auth"    => "",
-        "timeout" => 2,
+        "auth" => "",
+        "connection_timeout" => 2,
         "stream_set_timeout" => 10,
         'host' => null,
         'port' => null,
@@ -96,7 +95,11 @@ class Nsq extends AbstractAdapter
          *
          * Any changes to heartbeat_interval_ms MUST be done set via setWorkTimeout(N) BEFORE connecting
          */
-        'heartbeat_interval_ms' => 5000];
+        'heartbeat_interval_ms' => 5000,
+        /**
+         * server-side message timeout in seconds for messages delivered to this client
+         */
+        'msg_timeout' => self::JOBTTR_DEFAULT];
 
     protected $authentication = false;
 
@@ -331,9 +334,34 @@ class Nsq extends AbstractAdapter
      */
     public function putTask($body, $params = array())
     {
+        /**
+         * @todo add support fot $params args
+         */
         if ($this->connected && self::STATE_BINDWRITE == $this->state) {
-            $this->writeCommandWithBody(sprintf(self::PROTO_PUBLISH, $this->stateData['queue']),
-                                        $body);
+
+            if (isset($params[self::PARAM_READYWAIT])) {
+                if ($params[self::PARAM_READYWAIT] > $this->config['msg_timeout']) {
+                    /**
+                     * Requested impossible TTR value
+                     */
+                    throw new RuntimeException('Desired ' . self::PARAM_READYWAIT .
+                                               ' param '  . $params[self::PARAM_READYWAIT] .
+                                               '> ' . $this->config['msg_timeout'] . ' msg_timeout');
+                }
+            }
+
+            if (isset($params[self::PARAM_READYWAIT])) {
+                /**
+                 * Delay ready state by N seconds
+                 * maximum value is limited to `nsqd --max-req-timeout` value
+                 */
+                $this->writeCommandWithBody(sprintf(self::PROTO_PUBDELAY, $this->stateData['queue'],
+                                                    $params[self::PARAM_READYWAIT] * 1000),
+                                            $body);
+            } else {
+                $this->writeCommandWithBody(sprintf(self::PROTO_PUBLISH, $this->stateData['queue']),
+                                            $body);
+            }
             $this->readSuccessResponse();
             return true;
         }
@@ -352,7 +380,7 @@ class Nsq extends AbstractAdapter
         try {
             $this->_io = new IO\StreamIO($this->config['host'],
                                          $this->config['port'],
-                                         $this->config['timeout'],
+                                         $this->config['connection_timeout'],
                                          $this->config['stream_set_timeout'],
                                          null,
                                          true,
@@ -377,10 +405,11 @@ class Nsq extends AbstractAdapter
             throw new RuntimeException('Incorrect protocol usage while ' . __FUNCTION__);
         }
 
-        $identify = ["client_id"  => $this->config['clientId'],
-                     "hostname"   => gethostname(),
-                     "user_agent" => self::IDENTIFY_USER_AGENT,
-                     "feature_negotiation" => true];
+        $identify = ["feature_negotiation" => true,
+                     "client_id"   => $this->config['clientId'],
+                     "hostname"    => gethostname(),
+                     "user_agent"  => self::IDENTIFY_USER_AGENT,
+                     'msg_timeout' => $this->config['msg_timeout'] * 1000];
 
         $identify["heartbeat_interval"] = $this->config['heartbeat_interval_ms'];
 
@@ -437,7 +466,7 @@ class Nsq extends AbstractAdapter
         }
 
         if ($frameType !== self::FRAME_TYPE_RESPONSE || $response !== self::RESPONSE_SUCCESS) {
-            throw new RuntimeException(sprintf("was expecting Success, got '%s' with data '%s'", $frameType, $response));
+            throw new RuntimeException(sprintf(__FUNCTION__ . " expecting Success, got '%s' with data '%s'", $frameType, $response));
         }
     }
 

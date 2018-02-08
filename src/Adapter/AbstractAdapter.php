@@ -28,6 +28,11 @@ namespace BackQ\Adapter;
 
 abstract class AbstractAdapter
 {
+    const PARAM_JOBTTR    = 'jobttr';
+    const PARAM_READYWAIT = 'readywait';
+
+    const JOBTTR_DEFAULT  = 60;
+
     protected $logger;
 
     /**
