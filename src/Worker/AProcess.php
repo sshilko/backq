@@ -32,7 +32,7 @@ use \Symfony\Component\Process\Process;
 final class AProcess extends AbstractWorker
 {
     protected $queueName = 'process';
-    public $workTimeout  = 4;
+    public $workTimeout  = 5;
 
     public function run()
     {
@@ -55,9 +55,9 @@ final class AProcess extends AbstractWorker
                      */
                     $processed = true;
 
-                    $this->debug('got some work');
-
                     if ($payload) {
+                        $this->debug('got some payload: ' . $payload);
+
                         $message = @unserialize($payload);
                         if (!($message instanceof \BackQ\Message\Process)) {
                             $run = false;
@@ -66,6 +66,8 @@ final class AProcess extends AbstractWorker
                             $run = true;
                         }
                     } else {
+                        $this->debug('empty loop due to empty payload');
+
                         $message   = null;
                         $run       = false;
                     }

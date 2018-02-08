@@ -26,7 +26,6 @@
 namespace BackQ\Adapter;
 
 use Datetime;
-use Exception;
 use RuntimeException;
 
 /**
@@ -39,22 +38,22 @@ class Nsq extends AbstractAdapter
     /**
      * Request messages
      */
-    const PROTOCOL_VERSION = "  V2";
-    const PROTOCOL_IDENTIFY = "IDENTIFY";
-    const PROTOCOL_PUBLISH = "PUB %s";
-    const PROTOCOL_SUBSCRIBE = "SUB %s %s";
-    const PROTOCOL_READY = "RDY %s";
-    const PROTOCOL_REQUEUE = "REQ %s %s";
-    const PROTOCOL_FINISH = "FIN %s";
-    const PROTOCOL_NOOP = "NOP";
-    const PROTOCOL_AUTH = "AUTH";
-    const PROTOCOL_CLOSE = "CLS";
+    const PROTO_VERSION   = "  V2";
+    const PROTO_IDENTIFY  = "IDENTIFY";
+    const PROTO_PUBLISH   = "PUB %s";
+    const PROTO_SUBSCRIBE = "SUB %s %s";
+    const PROTO_READY     = "RDY %s";
+    const PROTO_REQUEUE   = "REQ %s %s";
+    const PROTO_FINISH    = "FIN %s";
+    const PROTO_NOOP      = "NOP";
+    const PROTO_AUTH      = "AUTH";
+    const PROTO_CLOSE     = "CLS";
 
     /**
      * Responses expected from the server
      */
-    const RESPONSE_SUCCESS   = "OK";
     const RESPONSE_HEARTBEAT = "_heartbeat_";
+    const RESPONSE_SUCCESS   = "OK";
     const RESPONSE_CLOSED    = "CLOSE_WAIT";
 
     /**
@@ -89,7 +88,15 @@ class Nsq extends AbstractAdapter
          * @see http://nsq.io/clients/building_client_libraries.html
          */
         'persistent' => false,
-        'logger' => null];
+        'logger' => null,
+        /**
+         * DEFAULT Milliseconds between heartbeats
+         * Cannot SUB with heartbeats disabled (-1)
+         * This essentially sets the pickTask(TIMEOUT) value
+         *
+         * Any changes to heartbeat_interval_ms MUST be done set via setWorkTimeout(N) BEFORE connecting
+         */
+        'heartbeat_interval_ms' => 5000];
 
     protected $authentication = false;
 
@@ -116,16 +123,6 @@ class Nsq extends AbstractAdapter
         if (!empty($config)) {
             $this->config = array_merge($this->config, $config);
         }
-
-        /**
-         * DEFAULT Milliseconds between heartbeats
-         * Cannot SUB with heartbeats disabled (-1)
-         * This essentially sets the pickTask(TIMEOUT) value
-         *
-         * Intentionnaly NOT allowing setting configuration here,
-         * Any changes to this should be explicitly set via setWorkTimeout(N) before connecting
-         */
-        $this->config['heartbeat_interval_ms'] = 5000;
     }
 
     public function info($info) {
@@ -141,8 +138,6 @@ class Nsq extends AbstractAdapter
             $this->config['logger'] != $this &&
             method_exists($this->config['logger'], __FUNCTION__)) {
             $this->config['logger']->error($msg);
-        } else {
-            trigger_error($msg, E_USER_WARNING);
         }
     }
 
@@ -167,7 +162,7 @@ class Nsq extends AbstractAdapter
                      * When subscribed to receive new messages, nice way of closing the connection
                      * is "RDY 0" (pause messages) followed by "CLS" (cleanly close connection)
                      */
-                    $this->writeCommand(self::PROTOCOL_CLOSE);
+                    $this->writeCommand(self::PROTO_CLOSE);
                     $this->readSuccessResponse(self::RESPONSE_CLOSED);
                 }
                 $this->_io->close();
@@ -175,6 +170,8 @@ class Nsq extends AbstractAdapter
                 $this->error(__CLASS__ . ' ' . __FUNCTION__ . ': ' . $ex->getMessage());
             }
 
+            $this->state     = self::STATE_NOTHING;
+            $this->stateData = [];
             $this->connected = false;
             $this->_io       = null;
             return true;
@@ -201,7 +198,7 @@ class Nsq extends AbstractAdapter
     public function afterWorkFailed($workId)
     {
         if ($this->connected && self::STATE_BINDREAD == $this->state) {
-            $this->writeCommand(sprintf(self::PROTOCOL_REQUEUE, $workId, 0));
+            $this->writeCommand(sprintf(self::PROTO_REQUEUE, $workId, 0));
             return true;
         }
         return false;
@@ -215,7 +212,7 @@ class Nsq extends AbstractAdapter
     public function afterWorkSuccess($workId)
     {
         if ($this->connected && self::STATE_BINDREAD == $this->state) {
-            $this->writeCommand(sprintf(self::PROTOCOL_FINISH, $workId));
+            $this->writeCommand(sprintf(self::PROTO_FINISH, $workId));
             return true;
         }
         return false;
@@ -234,7 +231,7 @@ class Nsq extends AbstractAdapter
              * Assuming all connected clients are in a state where they are ready to receive messages,
              * each message will be delivered to a random client
              */
-            $this->writeCommand(sprintf(self::PROTOCOL_SUBSCRIBE, $queue, $queue));
+            $this->writeCommand(sprintf(self::PROTO_SUBSCRIBE, $queue, $queue));
             $this->readSuccessResponse();
 
             $this->state = self::STATE_BINDREAD;
@@ -299,9 +296,10 @@ class Nsq extends AbstractAdapter
 
             if ($frameType == self::RESPONSE_HEARTBEAT) {
                 /**
+                 * Manually handle heartbeats
                  * Hearbeats are breaks/timeouts in the pickTask cycle
                  */
-                $this->writeCommand(self::PROTOCOL_NOOP);
+                $this->writeCommand(self::PROTO_NOOP);
                 return false;
             } else {
 
@@ -313,14 +311,12 @@ class Nsq extends AbstractAdapter
 
                 $this->stateData['rdy'] = $this->stateData['rdy'] - 1;
 
-                $time = floor(unpack("J", substr($messageFrame, 0, 8))[1]/1000000000);
+                $message = substr($messageFrame, 26);
+                $msgId   = substr($messageFrame, 10, 16);
 
-                $result = ['message'  => substr($messageFrame, 26),
-                           'id'       => substr($messageFrame, 10, 16),
-                           'time'     => DateTime::createFromFormat("U", $time)->format('c'),
-                           'attempts' => unpack("n", substr($messageFrame, 8, 2))[1]
-                ];
-                return [$result['id'], $result];
+                $time = floor(unpack("J", substr($messageFrame, 0, 8))[1]/1000000000);
+                return [$msgId, $message, ['time' => DateTime::createFromFormat("U", $time)->format('c'),
+                                           'attempts' => unpack("n", substr($messageFrame, 8, 2))[1]]];
             }
         }
         return false;
@@ -336,7 +332,7 @@ class Nsq extends AbstractAdapter
     public function putTask($body, $params = array())
     {
         if ($this->connected && self::STATE_BINDWRITE == $this->state) {
-            $this->writeCommandWithBody(sprintf(self::PROTOCOL_PUBLISH, $this->stateData['queue']),
+            $this->writeCommandWithBody(sprintf(self::PROTO_PUBLISH, $this->stateData['queue']),
                                         $body);
             $this->readSuccessResponse();
             return true;
@@ -363,7 +359,7 @@ class Nsq extends AbstractAdapter
                                          $this->config['persistent']);
             $this->connected = true;
 
-            $this->write(self::PROTOCOL_VERSION);
+            $this->write(self::PROTO_VERSION);
             $this->writeIdentify();
 
         } catch (\Exception $ex) {
@@ -377,6 +373,10 @@ class Nsq extends AbstractAdapter
      */
     private function writeIdentify()
     {
+        if ($this->state != self::STATE_NOTHING) {
+            throw new RuntimeException('Incorrect protocol usage while ' . __FUNCTION__);
+        }
+
         $identify = ["client_id"  => $this->config['clientId'],
                      "hostname"   => gethostname(),
                      "user_agent" => self::IDENTIFY_USER_AGENT,
@@ -384,7 +384,7 @@ class Nsq extends AbstractAdapter
 
         $identify["heartbeat_interval"] = $this->config['heartbeat_interval_ms'];
 
-        $this->writeCommandWithBody(self::PROTOCOL_IDENTIFY,
+        $this->writeCommandWithBody(self::PROTO_IDENTIFY,
                                     json_encode($identify));
 
         list($frameType, $response) = $this->readFrame();
@@ -402,7 +402,7 @@ class Nsq extends AbstractAdapter
                 throw new RuntimeException("Authentication is required, but not provided in the config");
             }
 
-            $this->writeCommandWithBody(self::PROTOCOL_AUTH, $this->config['auth']);
+            $this->writeCommandWithBody(self::PROTO_AUTH, $this->config['auth']);
             $this->authentication = $this->readAuthenticationHeader();
         }
     }
@@ -412,9 +412,13 @@ class Nsq extends AbstractAdapter
      *
      * @param int number of messages to batch up and send to this client at once
      */
-    private function writeReady($numberOfMessages)
+    private function writeReady($numberOfMessages) : bool
     {
-        $this->writeCommand(sprintf(self::PROTOCOL_READY, $numberOfMessages));
+        if ($this->connected && $this->state == self::STATE_BINDREAD) {
+            $this->writeCommand(sprintf(self::PROTO_READY, $numberOfMessages));
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -488,10 +492,9 @@ class Nsq extends AbstractAdapter
     }
 
     /**
-     * read a single frame from the socket. will block until read.
-     * because most functions call this with an expected frametype, if we get a heartbeat instead, internally
-     * this function will discard the HEARTBEAT frame, and write a NOOP incase we've not spoken recently,
-     * then wait for the next frame again.
+     * @param bool $raw return raw frame whatever kind of frame it is
+     *
+     * @return array
      */
     private function readFrame($raw = false)
     {
@@ -515,7 +518,7 @@ class Nsq extends AbstractAdapter
                 if ($frameData != self::RESPONSE_HEARTBEAT) {
                     break;
                 } else {
-                    $this->writeCommand(self::PROTOCOL_NOOP);
+                    $this->writeCommand(self::PROTO_NOOP);
                 }
             }
         }
@@ -523,7 +526,7 @@ class Nsq extends AbstractAdapter
     }
 
     /**
-     * helper to read and unpack a 32bit binary INT from the socket
+     * read and unpack a 32bit binary INT
      */
     private function readInt()
     {
@@ -533,13 +536,14 @@ class Nsq extends AbstractAdapter
 
     /**
      * read from the socket a set size of data
-     * will throw an exception if the socket doesn't return the expceted length - all framed data should always
-     * return a fixed data size
      */
     private function read($size)
     {
         $this->info('--> reading ' . $size . ' bytes');
         $result = $this->_io->read($size);
+        if ($size != strlen($result)) {
+            throw new \RuntimeException('Failed to read ' . $size . ' bytes from IO');
+        }
         $this->info('<-- reading ' . $size . ' bytes');
         return $result;
     }

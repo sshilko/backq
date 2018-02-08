@@ -200,6 +200,9 @@ abstract class AbstractWorker
             }
 
             $job = $this->adapter->pickTask();
+            /**
+             * @todo $job[2] is optinal array of adapter specific results
+             */
 
             if (is_array($job)) {
                 $lastActive = time();

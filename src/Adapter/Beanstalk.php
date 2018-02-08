@@ -205,7 +205,7 @@ class Beanstalk extends AbstractAdapter
             try {
                 $result = $this->client->reserve($this->workTimeout);
                 if (is_array($result)) {
-                    return array($result['id'], $result['body']);
+                    return [$result['id'], $result['body'], []];
                 }
             } catch (Exception $e) {
                 $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
