@@ -1,5 +1,6 @@
 {
     "name": "viveme/backq",
+    "licence": "proprietary",
     "description": "Background push notifications processing with workers & publisher",
     "type": "library",
     "minimum-stability": "dev",

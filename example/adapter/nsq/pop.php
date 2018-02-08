@@ -22,7 +22,7 @@ class logz {
 $logger = new logz();
 
 $logger->info('Starting');
-$nsqsub = new \BackQ\Adapter\Nsq('127.0.0.1', 4150, ['debug' => true, 'logger' => $logger]);
+$nsqsub = new \BackQ\Adapter\Nsq('127.0.0.1', 4150, ['logger' => $logger]);
 $nsqsub->setWorkTimeout(5);
 if ($nsqsub->connect()) {
     $logger->info('Connected');

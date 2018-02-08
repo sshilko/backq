@@ -84,11 +84,20 @@ class Client extends \Beanstalk\Client {
         return $this->connected;
     }
 
+    /**
+     * @param null $timeout not specifying timeout may result in undetected connection issue and infinite waiting time
+     *
+     * @return array|false
+     */
     public function reserve($timeout = null) {
         if (isset($timeout)) {
             $this->_io->stream_set_timeout($timeout + self::IO_TIMEOUT);
             $this->_write(sprintf('reserve-with-timeout %d', $timeout));
         } else {
+            /**
+             * Dangerously long waiting time, also pretty optimistic to expect an answer w/o timeout,
+             * NOT RECOMMENDED use reserve w/o timeout
+             */
             $this->_io->stream_set_timeout(PHP_INT_MAX);
             $this->_write('reserve');
         }
@@ -109,10 +118,26 @@ class Client extends \Beanstalk\Client {
                     'id' => (integer) strtok(' '),
                     'body' => $this->_read((integer) strtok(' '))
                 ];
-            case 'DEADLINE_SOON':
+                break;
+            /**
+             * If a non-negative timeout was specified and the timeout exceeded before a job
+             * became available, or if the client's connection is half-closed, the server
+             * will respond with TIMED_OUT.
+             */
             case 'TIMED_OUT':
+                if (!isset($timeout)) {
+                    $this->_error(__FUNCTION__ . ' ' . $status);
+                }
+                /**
+                 * Expected behaviour,
+                 * we waited TIMEOUT period and no payload was received, basicly a HEARTBEAT
+                 */
+                return false;
+                break;
+
+            case 'DEADLINE_SOON':
             default:
-                $this->_error($status);
+                $this->_error(__FUNCTION__ . ' ' . $status);
                 return false;
         }
     }
