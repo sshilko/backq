@@ -345,9 +345,9 @@ class Nsq extends AbstractAdapter
                     /**
                      * Requested impossible TTR value
                      */
-                    throw new RuntimeException('Desired ' . self::PARAM_READYWAIT .
-                                               ' param '  . $params[self::PARAM_READYWAIT] .
-                                               '> ' . $this->config['msg_timeout'] . ' msg_timeout');
+                    //throw new RuntimeException('Desired ' . self::PARAM_READYWAIT .
+                    //                           ' param '  . $params[self::PARAM_READYWAIT] .
+                    //                           '> ' . $this->config['msg_timeout'] . ' msg_timeout');
                 }
             }
 
