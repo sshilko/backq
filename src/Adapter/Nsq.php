@@ -161,7 +161,7 @@ class Nsq extends AbstractAdapter
         if (true === $this->connected) {
             try {
                 if (self::STATE_BINDREAD == $this->state) {
-                    /**s
+                    /**
                      * When subscribed to receive new messages, nice way of closing the connection
                      * is "RDY 0" (pause messages) followed by "CLS" (cleanly close connection)
                      */
