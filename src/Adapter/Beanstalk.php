@@ -129,8 +129,13 @@ class Beanstalk extends AbstractAdapter
                         return $result['current-workers'];
                     }
                 }
-            } catch (RuntimeException $e) {}
+            } catch (RuntimeException $e) {
+                $this->error(__FUNCTION__ . ' ' . $e->getMessage());
+
+            }
         }
+
+        return null;
     }
 
     /**

@@ -194,4 +194,29 @@ class Client extends \Beanstalk\Client {
         }
         return $packet;
     }
+
+    /**
+     * Gives statistical information about the specified tube if it exists.
+     *
+     * @param string $tube Name of the tube.
+     * @return string|boolean `false` on error otherwise a string with a yaml formatted dictionary.
+     */
+    public function statsTube($tube) {
+        $cmd = sprintf('stats-tube %s', $tube);
+        $this->_write($cmd);
+        return $this->_statsRead($cmd);
+    }
+
+    protected function _statsRead($readWhat = '') {
+        $status = strtok($this->_read(), ' ');
+
+        switch ($status) {
+            case 'OK':
+                $data = $this->_read((integer) strtok(' '));
+                return $this->_decode($data);
+            default:
+                $this->_error(__FUNCTION__ . ' after ' . $readWhat . ' got ' . $status . ' expected OK');
+                return false;
+        }
+    }
 }
