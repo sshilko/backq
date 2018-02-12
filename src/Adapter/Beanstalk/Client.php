@@ -38,6 +38,15 @@ class Client extends \Beanstalk\Client {
 
     const IO_TIMEOUT = 2;
 
+    public function __destruct() {
+        if (!empty($this->_config)) {
+            if ($this->_config['persistent']) {
+                return true;
+            }
+        }
+        $this->disconnect();
+    }
+
     public function __construct(array $config = []) {
         $defaults = [
             'persistent' => true,
@@ -146,7 +155,7 @@ class Client extends \Beanstalk\Client {
         if ($this->connected) {
             try {
                 $this->_write('quit');
-                $this->_io->close();
+                //$this->_io->close();
             } catch (\Exception $ex) {}
         }
         $this->_io = null;

@@ -98,6 +98,7 @@ class Nsq extends AbstractAdapter
         'heartbeat_interval_ms' => 5000,
         /**
          * server-side message timeout in seconds for messages delivered to this client
+         * @see --max-req-timeout=48h0m1s
          */
         'msg_timeout' => self::JOBTTR_DEFAULT];
 
