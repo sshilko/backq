@@ -99,19 +99,31 @@ class Client extends \Beanstalk\Client {
      * @return array|false
      */
     public function reserve($timeout = null) {
+        /**
+         * Writing will throw Exception on timeout -->
+         */
         if (isset($timeout)) {
-            $this->_io->stream_set_timeout($timeout + self::IO_TIMEOUT);
+            $streamTimeout = $timeout + self::IO_TIMEOUT;
+            $this->_io->stream_set_timeout($streamTimeout);
             $this->_write(sprintf('reserve-with-timeout %d', $timeout));
         } else {
+            $streamTimeout = PHP_INT_MAX;
             /**
              * Dangerously long waiting time, also pretty optimistic to expect an answer w/o timeout,
              * NOT RECOMMENDED use reserve w/o timeout
              */
-            $this->_io->stream_set_timeout(PHP_INT_MAX);
+            $this->_io->stream_set_timeout($streamTimeout);
             $this->_write('reserve');
         }
+        /**
+         * Writing will throw Exception on timeout <--
+         */
 
-        $status = strtok($this->_read(), ' ');
+        /**
+         * Read mig
+         */
+        $readio = $this->_read();
+        $status = strtok($readio, ' ');
 
         /**
          * Read is blocking
@@ -135,7 +147,7 @@ class Client extends \Beanstalk\Client {
              */
             case 'TIMED_OUT':
                 if (!isset($timeout)) {
-                    $this->_error(__FUNCTION__ . ' ' . $status);
+                    $this->_error(__FUNCTION__ . " status = '" . $status . "', timeout=" . $streamTimeout);
                 }
                 /**
                  * Expected behaviour,
@@ -146,7 +158,7 @@ class Client extends \Beanstalk\Client {
 
             case 'DEADLINE_SOON':
             default:
-                $this->_error(__FUNCTION__ . ' ' . $status);
+                $this->_error(__FUNCTION__ . " status = '" . $status . "', timeout=" . $streamTimeout);
                 return false;
         }
     }
@@ -181,7 +193,15 @@ class Client extends \Beanstalk\Client {
         if ($length) {
             try {
                 $packet = $this->_io->stream_get_contents($length + 2);
-                $packet = rtrim($packet, "\r\n");
+                if (false === $packet) {
+                    /**
+                     * stream_get_contents returns false on failure
+                     */
+                    throw new RuntimeException('Failed to io.stream_get_contents on ' . __FUNCTION__);
+                }
+                if ($packet) {
+                    $packet = rtrim($packet, "\r\n");
+                }
             } catch (IO\Exception\TimeoutException $ex) {
                 if ($ex->getCode() == IO\StreamIO::READ_EOF_CODE) {
                     return false;
@@ -190,7 +210,16 @@ class Client extends \Beanstalk\Client {
                 }
             }
         } else {
+            /**
+             * The number of bytes to read from the handle
+             */
             $packet = $this->_io->stream_get_line(16384, "\r\n");
+            if (false === $packet) {
+                /**
+                 * stream_get_line can also return false on failure
+                 */
+                throw new RuntimeException('Failed to io.stream_get_line on ' . __FUNCTION__);
+            }
         }
         return $packet;
     }

@@ -294,6 +294,11 @@ class StreamIO extends AbstractIO
         if ($info['timed_out']) {
             throw new TimeoutException('Error reading data. Socket connection TIME OUT', self::READ_TIME_CODE);
         }
+        /**
+         * Reading ends when length bytes have been read,
+         * when the string specified by ending is found (which is not included in the return value),
+         * or on EOF (whichever comes first).
+         */
         $data = stream_get_line($this->sock, $length, $delimiter);
         return $data;
     }
