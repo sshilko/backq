@@ -31,7 +31,6 @@ use RuntimeException;
 /**
  * Class Nsq
  * @package BackQ\Adapter
- * @see scottaubrey/simplensqclient
  */
 class Nsq extends AbstractAdapter
 {
@@ -97,10 +96,23 @@ class Nsq extends AbstractAdapter
          */
         'heartbeat_interval_ms' => 5000,
         /**
+         * If the message handler requires more time than the configured message timeout,
+         * the TOUCH command can be used to reset the timer on the nsqd side.
+         * This can be done repeatedly until the message is either FIN or REQ,
+         * up to the sending nsqd’s configured `--max-req-timeout=48h0m1s`.
+         *
+         * Client libraries should never automatically TOUCH on behalf of the consumer.
          * server-side message timeout in seconds for messages delivered to this client
-         * @see --max-req-timeout=48h0m1s
+         *
+         * The sending nsqd expects to receive a reply within its configured message timeout
          */
-        'msg_timeout' => self::JOBTTR_DEFAULT];
+        'msg_timeout' => self::JOBTTR_DEFAULT,
+        /**
+         * Your server configured --max-req-timeout value, used for validation only,
+         * you can optionally provide the value to prevent attempt of request that will fail,
+         * can provide any big value (i.e. PHP_INT_MAX) or null to disable validation
+         */
+        'max_req_timeout' => null];
 
     protected $authentication = false;
 
@@ -340,18 +352,29 @@ class Nsq extends AbstractAdapter
          */
         if ($this->connected && self::STATE_BINDWRITE == $this->state) {
 
-            if (isset($params[self::PARAM_READYWAIT])) {
-                if ($params[self::PARAM_READYWAIT] > $this->config['msg_timeout']) {
+            if (isset($params[self::PARAM_JOBTTR])) {
+                if ($params[self::PARAM_JOBTTR] > $this->config['msg_timeout']) {
                     /**
-                     * Requested impossible TTR value
+                     * Too big TTR value for this worker
                      */
-                    //throw new RuntimeException('Desired ' . self::PARAM_READYWAIT .
-                    //                           ' param '  . $params[self::PARAM_READYWAIT] .
-                    //                           '> ' . $this->config['msg_timeout'] . ' msg_timeout');
+                    throw new RuntimeException('Desired ' . self::PARAM_JOBTTR .
+                                               ' param '  . $params[self::PARAM_JOBTTR] .
+                                               '> ' . $this->config['msg_timeout'] . ' msg_timeout, ' .
+                                               'NSQ expects answer within ' . $this->config['msg_timeout'] . ' seconds');
                 }
             }
 
             if (isset($params[self::PARAM_READYWAIT])) {
+                if ($this->config['max_req_timeout'] && ($params[self::PARAM_READYWAIT] > $this->config['max_req_timeout'])) {
+                    /**
+                     * Too big delay value for this server, value is configured on server side
+                     * Preemptively decline sending jobs that server will reject
+                     */
+                    throw new RuntimeException('Desired ' . self::PARAM_READYWAIT . ' of ' .
+                                               $params[self::PARAM_READYWAIT] . ' seconds is longer ' .
+                                               'than specified server configured --max_req_timeout '  .
+                                               'of ' . $this->config['max_req_timeout']);
+                }
                 /**
                  * Delay ready state by N seconds
                  * maximum value is limited to `nsqd --max-req-timeout` value
