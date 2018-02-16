@@ -126,6 +126,24 @@ class Client extends \Beanstalk\Client {
         $status = strtok($readio, ' ');
 
         /**
+         * Every subsequent call to strtok only needs the token to use,
+         * as it keeps track of where it is in the current string
+         * @see http://php.net/manual/en/function.strtok.php
+         */
+
+        /**
+         * is the job id -- an integer unique to this job in this instance of
+         * beanstalkd.
+         */
+        $jobid  = intval(strtok(' '));
+
+        /**
+         * is an integer indicating the size of the job body, not including
+         * the trailing "\r\n"
+         */
+        $bodyN  = intval(strtok(' '));
+
+        /**
          * Read is blocking
          *
          * we write and then we try to read from the stream until: TIMEOUT is reached OR payload received
@@ -136,8 +154,8 @@ class Client extends \Beanstalk\Client {
         switch ($status) {
             case 'RESERVED':
                 return [
-                    'id' => (integer) strtok(' '),
-                    'body' => $this->_read((integer) strtok(' '))
+                    'id'   => $jobid,
+                    'body' => $this->_read($bodyN)
                 ];
                 break;
             /**
@@ -192,6 +210,9 @@ class Client extends \Beanstalk\Client {
 
         if ($length) {
             try {
+                /**
+                 * +2 for trailing "\r\n"
+                 */
                 $packet = $this->_io->stream_get_contents($length + 2);
                 if (false === $packet) {
                     /**
@@ -213,7 +234,7 @@ class Client extends \Beanstalk\Client {
             /**
              * The number of bytes to read from the handle
              */
-            $packet = $this->_io->stream_get_line(16384, "\r\n");
+            $packet = $this->_io->stream_get_line(32768, "\r\n");
             if (false === $packet) {
                 /**
                  * stream_get_line can also return false on failure

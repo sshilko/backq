@@ -300,6 +300,9 @@ class StreamIO extends AbstractIO
          * or on EOF (whichever comes first).
          */
         $data = stream_get_line($this->sock, $length, $delimiter);
+        if (false === $data && feof($this->sock)) {
+            throw new TimeoutException('Failed stream_get_line. Socket EOF detected', self::READ_EOF_CODE);
+        }
         return $data;
     }
 
