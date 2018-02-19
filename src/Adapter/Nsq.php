@@ -63,6 +63,8 @@ class Nsq extends AbstractAdapter
     const FRAME_TYPE_ERROR    = 1;
     const FRAME_TYPE_MESSAGE  = 2;
 
+    const HEARTBEAT_TTR_RATION = 1.5;
+
     /**
      * Client UserAgent
      */
@@ -356,11 +358,27 @@ class Nsq extends AbstractAdapter
                 if ($params[self::PARAM_JOBTTR] > $this->config['msg_timeout']) {
                     /**
                      * Too big TTR value for this worker
+                     * The in-flight timeout expires and nsqd automatically re-queues the message.
+                     * @see http://nsq.io/clients/building_client_libraries.html
                      */
                     throw new RuntimeException('Desired ' . self::PARAM_JOBTTR .
                                                ' param '  . $params[self::PARAM_JOBTTR] .
                                                '> ' . $this->config['msg_timeout'] . ' msg_timeout, ' .
                                                'NSQ expects answer within ' . $this->config['msg_timeout'] . ' seconds');
+                }
+
+                /**
+                 * After 2 unanswered _heartbeat_ responses,
+                 * nsqd will timeout and forcefully close a client connection that it has not heard from
+                 * @see http://nsq.io/clients/building_client_libraries.html
+                 */
+                if ($this->config['heartbeat_interval_ms'] &&
+                    (round($params[self::PARAM_JOBTTR] * 1000 * self::HEARTBEAT_TTR_RATION) >= round($this->config['heartbeat_interval_ms']))) {
+                    throw new RuntimeException('Desired ' . self::PARAM_JOBTTR .
+                                               ' param '  . $params[self::PARAM_JOBTTR] .
+                                               '> ' . ($this->config['heartbeat_interval_ms'] / 1000) . ' (x' . self::HEARTBEAT_TTR_RATION . ' heartbeat), ' .
+                                               'NSQ expects answer within two hearbeats, but cannot guarantee that, ' .
+                                               'please configure your heartbeat_interval_ms to extend heartbeat intervals');
                 }
             }
 
