@@ -373,10 +373,10 @@ class Nsq extends AbstractAdapter
                  * @see http://nsq.io/clients/building_client_libraries.html
                  */
                 if ($this->config['heartbeat_interval_ms'] &&
-                    (round($params[self::PARAM_JOBTTR] * 1000 * self::HEARTBEAT_TTR_RATION) > round($this->config['heartbeat_interval_ms']))) {
+                    (round($params[self::PARAM_JOBTTR] * 1000) > round($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION))) {
                     throw new RuntimeException('Desired ' . self::PARAM_JOBTTR .
                                                ' param '  . $params[self::PARAM_JOBTTR] .
-                                               ' > ' . ($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION) . 'ms (x' . self::HEARTBEAT_TTR_RATION . ' heartbeat), ' .
+                                               's > ' . ($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION) . 'ms (x' . self::HEARTBEAT_TTR_RATION . ' heartbeat), ' .
                                                'NSQ expects answer within two hearbeats, but cannot guarantee that, ' .
                                                'please configure your heartbeat_interval_ms to extend heartbeat intervals');
                 }
