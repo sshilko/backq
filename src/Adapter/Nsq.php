@@ -229,11 +229,11 @@ class Nsq extends AbstractAdapter
      */
     public function afterWorkSuccess($workId)
     {
-        if ($this->connected && self::STATE_BINDREAD == $this->state) {
+        if ($workId && $this->connected && self::STATE_BINDREAD == $this->state) {
             $this->writeCommand(sprintf(self::PROTO_FINISH, $workId));
             return true;
         }
-        return false;
+        return ($workId) ? false : true;
     }
 
     /**
@@ -318,7 +318,7 @@ class Nsq extends AbstractAdapter
                  * Hearbeats are breaks/timeouts in the pickTask cycle
                  */
                 $this->writeCommand(self::PROTO_NOOP);
-                return false;
+                return ['', '', []];
             } else {
 
                 if ($frameType !== self::FRAME_TYPE_MESSAGE) {
