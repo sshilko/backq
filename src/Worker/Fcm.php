@@ -305,13 +305,11 @@ final class Fcm extends AbstractWorker
                     } catch (\Exception $e) {
                         error_log('Error while sending FCM: ' . $e->getMessage());
                     } finally {
+                        $this->postProcessing();
                         /**
                          * If using Beanstalk and not returned success after TTR time,
                          * the job considered failed and is put back into pool of "ready" jobs
                          */
-                        if (!empty($this->uninstalls) || !empty($this->updatedTokens)) {
-                            $this->onMessage($this->uninstalls, $this->updatedTokens);
-                        }
                         $work->send((true === $processed));
                     }
                 }
@@ -322,16 +320,17 @@ final class Fcm extends AbstractWorker
         $this->finish();
     }
 
-    protected function onMessage(array $uninstalls, array $updatedTokens) {
-        /**
-         * Process uninstalls and updated tokens
-         */
+    protected function postProcessing() {
         if ($this->onUninstall) {
-            $this->onUninstall($uninstalls);
+            if ($this->onUninstall($this->uninstalls)) {
+                $this->uninstalls = [];
+            }
         }
 
         if ($this->onUpdatedTokens) {
-            $this->onUpdatedTokens($updatedTokens);
+            if ($this->onUpdatedTokens($this->updatedTokens)) {
+                $this->updatedTokens = [];
+            }
         }
     }
 }
