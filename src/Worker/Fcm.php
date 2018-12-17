@@ -37,6 +37,33 @@ final class Fcm extends AbstractWorker
 
     public $workTimeout = 4;
 
+    /**
+     * List of no longer registered tokens
+     * @var array
+     */
+    protected $uninstalls    = [];
+
+    /**
+     * Hash of tokens that changed
+     * @var array
+     */
+    protected $updatedTokens = [];
+
+    /**
+     * @var callable
+     */
+    protected $onUninstall;
+
+    /**
+     * @var callable
+     */
+    protected $onUpdatedTokens;
+
+    public function setCallbacks(callable $onUninstall, callable $onUpdatedTokens) {
+        $this->onUninstall     = $onUninstall;
+        $this->onUpdatedTokens = $onUpdatedTokens;
+    }
+
     public function setPusher(\Zend_Mobile_Push_Gcm $pusher) {
         $this->pusher = $pusher;
     }
@@ -97,9 +124,6 @@ final class Fcm extends AbstractWorker
                             $processed = false;
                         }
 
-                        $updatedTokens = [];
-                        $uninstalls    = [];
-
                         switch ($status) {
                             /**
                              * JSON request is successful (HTTP status code 200)
@@ -127,7 +151,7 @@ final class Fcm extends AbstractWorker
                                                     /**
                                                      * replace the original ID with the new value (canonical ID) in your server database
                                                      */
-                                                    $updatedTokens[$stokens[$i]] = $br->registration_id;
+                                                    $this->updatedTokens[$stokens[$i]] = $br->registration_id;
                                                 } else {
                                                     /**
                                                      * all OK
@@ -219,7 +243,7 @@ final class Fcm extends AbstractWorker
                                                              * Make sure it matches the registration token the client app receives
                                                              * from registering with GCM. Do not truncate or add additional characters.
                                                              */
-                                                            $uninstalls[] = $stokens[$i];
+                                                            $this->uninstalls[] = $stokens[$i];
                                                             break;
 
                                                         case 'MissingRegistration':
@@ -236,7 +260,7 @@ final class Fcm extends AbstractWorker
                                                              * because the application was uninstalled from the device,
                                                              * or the client app isn't configured to receive messages
                                                              */
-                                                            $uninstalls[] = $stokens[$i];
+                                                            $this->uninstalls[] = $stokens[$i];
                                                             break;
 
                                                         default:
@@ -278,10 +302,6 @@ final class Fcm extends AbstractWorker
                                 error_log('Unexpected HTTP status code from FCM: ' . $status);
                                 break;
                         }
-                        /**
-                         * $updatedTokens is list of tokens that changed
-                         * $uninstalls    is list of no longer registered tokens
-                         */
                     } catch (\Exception $e) {
                         error_log('Error while sending FCM: ' . $e->getMessage());
                     } finally {
@@ -289,6 +309,9 @@ final class Fcm extends AbstractWorker
                          * If using Beanstalk and not returned success after TTR time,
                          * the job considered failed and is put back into pool of "ready" jobs
                          */
+                        if (!empty($this->uninstalls) || !empty($this->updatedTokens)) {
+                            $this->onMessage($this->uninstalls, $this->updatedTokens);
+                        }
                         $work->send((true === $processed));
                     }
                 }
@@ -297,5 +320,18 @@ final class Fcm extends AbstractWorker
             }
         }
         $this->finish();
+    }
+
+    protected function onMessage(array $uninstalls, array $updatedTokens) {
+        /**
+         * Process uninstalls and updated tokens
+         */
+        if ($this->onUninstall) {
+            $this->onUninstall($uninstalls);
+        }
+
+        if ($this->onUpdatedTokens) {
+            $this->onUpdatedTokens($updatedTokens);
+        }
     }
 }
