@@ -107,7 +107,8 @@ class Remove extends PlatformEndpoint
                              * can be done, mark as processed
                              */
                             if (in_array($e->getAwsErrorCode(), [SnsException::AUTHERROR,
-                                                                 SnsException::INVALID_PARAM])) {
+                                                                 SnsException::INVALID_PARAM,
+                                                                 SnsException::NOTFOUND])) {
                                 $work->send(true);
                                 continue;
                             }

@@ -112,13 +112,12 @@ class Publish extends PlatformEndpoint
                              * request is not valid, the operation can't be performed
                              * and the endpoint should be removed, send to the specific queue
                              */
-                            if (in_array($e->getAwsErrorCode(), [SnsException::INVALID_PARAM,
-                                                                 SnsException::ENDPOINT_DISABLED])) {
+                            if ($e->getAwsErrorCode()) {
                                 /**
                                  * Current job to be processed by current queue but
                                  * will send it to a queue to remove endpoints
                                  */
-                                $this->onFailure($message);
+                                $this->onFailure($message, $e->getAwsErrorCode());
                             }
 
                             /**
@@ -155,6 +154,9 @@ class Publish extends PlatformEndpoint
                                 $work->send(false);
                                 continue;
                             }
+                        } else {
+                            $this->debug('Hard error: ' . $e->getMessage());
+                            trigger_error(__CLASS__ . ' ' . $e->getMessage(), E_USER_WARNING);
                         }
                     } finally {
                         $work->send(true);
@@ -174,10 +176,11 @@ class Publish extends PlatformEndpoint
      * Handles a different flow when Publishing can't be completed
      *
      * @param \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message
+     * @param string $getAwsErrorCode
      *
      * @return null
      */
-    protected function onFailure(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message)
+    protected function onFailure(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message, string $getAwsErrorCode)
     {
         return null;
     }
