@@ -322,13 +322,13 @@ final class Fcm extends AbstractWorker
 
     protected function postProcessing() {
         if ($this->onUninstall && is_callable($this->onUninstall)) {
-            if ($this->onUninstall($this->uninstalls)) {
+            if (($this->onUninstall)($this->uninstalls)) {
                 $this->uninstalls = [];
             }
         }
 
         if ($this->onUpdatedTokens && is_callable($this->onUpdatedTokens)) {
-            if ($this->onUpdatedTokens($this->updatedTokens)) {
+            if (($this->onUpdatedTokens)($this->updatedTokens)) {
                 $this->updatedTokens = [];
             }
         }
