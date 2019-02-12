@@ -106,10 +106,6 @@ final class AProcess extends AbstractWorker
                                      */
                                                                                   $message->getTimeout(),
                                                                                   $message->getOptions());
-                                /**
-                                 * no win support here
-                                 */
-                                $process->setEnhanceWindowsCompatibility(false);
 
                                 /**
                                  * ultimately also disables callbacks
