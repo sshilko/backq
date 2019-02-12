@@ -33,7 +33,6 @@ class Process extends AbstractMessage
     private $env;
     private $input;
     private $timeout;
-    private $options;
 
     /**
      * Timestamp until has to be done, otherwise ignored
@@ -41,13 +40,12 @@ class Process extends AbstractMessage
      */
     private $until = 0;
 
-    public function __construct($commandline, $cwd = null, array $env = null, $input = null, $timeout = 60, array $options = array()) {
+    public function __construct($commandline, $cwd = null, array $env = null, $input = null, $timeout = 60) {
         $this->commandline = $commandline;
         $this->cwd = $cwd;
         $this->env = $env;
         $this->input = $input;
         $this->timeout = $timeout;
-        $this->options = $options;
     }
 
     public function getDeadline() {
@@ -76,10 +74,6 @@ class Process extends AbstractMessage
 
     public function getTimeout() {
         return $this->timeout;
-    }
-
-    public function getOptions() {
-        return $this->options;
     }
 
     public function getRecipientsNumber() {

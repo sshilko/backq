@@ -101,11 +101,10 @@ final class AProcess extends AbstractWorker
                                                                                   $message->getCwd(),
                                                                                   $message->getEnv(),
                                                                                   $message->getInput(),
-                                    /**
-                                     * timeout does not really work with async (start)
-                                     */
-                                                                                  $message->getTimeout(),
-                                                                                  $message->getOptions());
+                                                                                  /**
+                                                                                   * timeout does not really work with async (start)
+                                                                                   */
+                                                                                  $message->getTimeout());
 
                                 /**
                                  * ultimately also disables callbacks
