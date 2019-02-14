@@ -13,13 +13,13 @@
         "php": ">=7.0.2",
         "davidpersson/beanstalk": "^2.0",
         "symfony/process": "^4.2",
-        "duccio/apns-php": "=1.0.1"
+        "duccio/apns-php": "=1.0.1",
+        "illuminate/queue": "^5.7",
+        "illuminate/redis": "^5.7"
     },
     "suggest": {
-        "php": ">=7.0.12"
-    },
-    "conflict": {
-        "php": "5.5.23,5.5.24,5.6.7,5.6.8"
+        "php": ">=7.0.12",
+        "ext-redis"L "phpredis extension for Redis adapter"
     },
     "autoload": {
         "psr-4": { "BackQ\\": "src/" }

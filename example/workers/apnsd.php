@@ -8,6 +8,8 @@
  * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
  */
 
+include_once '../../vendor/autoload.php';
+
 $app = '-myapp1';
 $env = \ApnsPHP_Abstract::ENVIRONMENT_SANDBOX;
 $logFilePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR .  'backq.apns.' . $env . '.' . $app . '.log';
