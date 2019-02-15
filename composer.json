@@ -19,7 +19,7 @@
     },
     "suggest": {
         "php": ">=7.0.12",
-        "ext-redis"L "phpredis extension for Redis adapter"
+        "ext-redis": "phpredis extension for Redis adapter"
     },
     "autoload": {
         "psr-4": { "BackQ\\": "src/" }
