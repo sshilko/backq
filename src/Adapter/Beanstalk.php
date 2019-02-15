@@ -93,7 +93,11 @@ class Beanstalk extends AbstractAdapter
     }
 
     public function error($msg) {
-        error_log($msg);
+        if ($this->logger) {
+            $this->logger->error($msg);
+        } else {
+            error_log($msg);
+        }
     }
 
     /**

@@ -33,6 +33,9 @@ abstract class AbstractAdapter
 
     const JOBTTR_DEFAULT  = 60;
 
+    /**
+     * @var \Psr\Log\LoggerInterface
+     */
     protected $logger;
 
     /**
@@ -93,4 +96,7 @@ abstract class AbstractAdapter
      * @return null
      */
     abstract public function setWorkTimeout(int $seconds = null);
-}
+
+    public function setLogger(\Psr\Log\LoggerInterface $logger) : void {
+        $this->logger = $logger;
+    }}

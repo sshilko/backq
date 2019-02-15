@@ -87,12 +87,17 @@ class Redis extends AbstractAdapter
 
     private $state     = self::STATE_NOTHING;
 
-    private $blockFor = null;
-
     /**
-     * @var \Psr\Log\LoggerInterface
+     * Since Laravel 5.8 safe
+     * Using the "blocking pop" feature of the Redis queue driver is now safe.
+     * Previously, there was a small chance that a queued job could be lost if the Redis server
+     * or worker crashed at the same time the job was retrieved.
+     * In order to make blocking pops safe, a new Redis list with suffix :notify is created for each
+     * Laravel queue.
+     *
+     * @var int|null
      */
-    protected $logger;
+    private $blockFor = null;
 
     /**
      * This option specifies how many
@@ -113,10 +118,6 @@ class Redis extends AbstractAdapter
      * @see https://github.com/illuminate/queue/blob/11e280c0e2ac9f9bcfe2563461a05cdfefde9179/RedisQueue.php#L184
      */
     private $retryAfter = null;
-
-    public function setLogger(\Psr\Log\LoggerInterface $logger) {
-        $this->logger = $logger;
-    }
 
     public function __construct(string $host          = '127.0.0.1',
                                 int    $port          = 6379,
@@ -171,6 +172,8 @@ class Redis extends AbstractAdapter
          * Blocking pop is an experimental feature.
          * There is a small chance that a queued job could be lost if the Redis server or worker crashes
          * at the same time the job is retrieved.
+         *
+         * Declared Safe since Laravel 5.8
          */
         $this->blockFor = $seconds;
     }
@@ -271,12 +274,20 @@ class Redis extends AbstractAdapter
         if ($this->connected && ($this->state == self::STATE_BINDREAD ||
                                  $this->state == self::STATE_BINDWRITE)) {
 
+            if ($this->logger) {
+                $this->logger->debug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
+            }
+
             /** @var \Illuminate\Queue\Jobs\RedisJob $redisJob */
             if (isset($this->reservedJobs[$workId]) && $redisJob = $this->reservedJobs[$workId]) {
                 /**
                  * Delete reserved job from queue
                  */
                 if ($redisJob->getJobId() == $workId) {
+                    if ($this->logger) {
+                        $this->logger->debug(__FUNCTION__ . ' releasing back to queue / failed to process ' . $workId . ' job');
+                    }
+
                     $redisJob->release();
                     unset($this->reservedJobs[$workId]);
                 } else {
@@ -302,12 +313,20 @@ class Redis extends AbstractAdapter
         if ($this->connected && ($this->state == self::STATE_BINDREAD ||
                                  $this->state == self::STATE_BINDWRITE)) {
 
+            if ($this->logger) {
+                $this->logger->debug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
+            }
+
             /** @var \Illuminate\Queue\Jobs\RedisJob $redisJob */
             if (isset($this->reservedJobs[$workId]) && $redisJob = $this->reservedJobs[$workId]) {
                 /**
                  * Delete reserved job from queue
                  */
                 if ($redisJob->getJobId() == $workId) {
+                    if ($this->logger) {
+                        $this->logger->debug(__FUNCTION__ . ' releasing completed ' . $workId . ' job');
+                    }
+
                     $redisJob->delete();
                     unset($this->reservedJobs[$workId]);
                 } else {
@@ -453,14 +472,14 @@ class Redis extends AbstractAdapter
                      *       any task can be delayed by max SLEEP seconds instead of realtime
                      */
                     sleep(1);
-                    $redisJob = $redisQueue->pop();
+                    $redisJob = $redisQueue->pop($this->queueName);
                     $i--;
                     if ($this->logger) {
                         $this->logger->debug(__FUNCTION__ . ' slept for 1 second');
                     }
                 }
             } else {
-                $redisJob = $redisQueue->pop();
+                $redisJob = $redisQueue->pop($this->queueName);
             }
 
             /** @var \Illuminate\Queue\Jobs\RedisJob $redisJob */
@@ -517,6 +536,7 @@ class Redis extends AbstractAdapter
 
             /** @var \BackQ\Adapter\Redis\Queue $instance */
             $instance = $this->queue->getConnection(self::CONNECTION_NAME);
+            $jobName  = $this->queueName;
 
             /**
              * Can put real job objects, or just data, just data for now
@@ -524,13 +544,13 @@ class Redis extends AbstractAdapter
              */
             if (isset($params[self::PARAM_READYWAIT]) && $params[self::PARAM_READYWAIT] > 0) {
                 $delay = new \DateInterval('PT' . ((int) $params[self::PARAM_READYWAIT]) . 'S');
-                $taskId = $instance->later($delay, $this->queueName, $body);
+                $taskId = $instance->later($delay, $jobName, $body, $this->queueName);
                 if ($this->logger) {
                     $this->logger->debug(__FUNCTION__ . ' pushed delayed job (' . (int) $params[self::PARAM_READYWAIT] . ' seconds) ' . $taskId);
                 }
 
             } else {
-                $taskId = $instance->push($this->queueName, $body);
+                $taskId = $instance->push($jobName, $body, $this->queueName);
                 if ($this->logger) {
                     $this->logger->debug(__FUNCTION__ . ' pushed task without delay ' . $taskId);
                 }
