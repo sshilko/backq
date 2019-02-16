@@ -25,7 +25,7 @@ class Redis extends AbstractAdapter
      * Whether to emulate blockFor behaviour, if >0 the amount of seconds sleep between polls
      * if not emulated uses .blpop redis implementation, if emulated uses .pop and sleep loop
      */
-    private const BLOCKFOR_EMULATE = 1;
+    private const BLOCKFOR_EMULATE = 0;
 
     private $connected = false;
 
@@ -343,6 +343,10 @@ class Redis extends AbstractAdapter
             $this->logger->debug(__FUNCTION__);
         }
 
+        //$this->app->singleton('encrypter', function () {
+        //    return new \Illuminate\Encryption\Encrypter('383baa56ab');
+        //});
+
         $this->app->bind('redis', function() {
             return new \Illuminate\Redis\RedisManager($this->app,
                                                       self::REDIS_DRIVER,
@@ -542,13 +546,18 @@ class Redis extends AbstractAdapter
              * Can put real job objects, or just data, just data for now
              * @see \Illuminate\Queue\Jobs\Job
              */
+            //\Illuminate\Queue\SerializableClosure::removeSecurityProvider();
+            //\Illuminate\Queue\SerializableClosure::setSecretKey(self::ENCRYPTION_KEY);
+            //$dummyClosure = function() use ($body) { return $body; };
+            //$jobName = \Illuminate\Queue\SerializableClosure::from($dummyClosure);
+            //$jobName = \Illuminate\Queue\CallQueuedClosure::class;
+
             if (isset($params[self::PARAM_READYWAIT]) && $params[self::PARAM_READYWAIT] > 0) {
                 $delay = new \DateInterval('PT' . ((int) $params[self::PARAM_READYWAIT]) . 'S');
                 $taskId = $instance->later($delay, $jobName, $body, $this->queueName);
                 if ($this->logger) {
                     $this->logger->debug(__FUNCTION__ . ' pushed delayed job (' . (int) $params[self::PARAM_READYWAIT] . ' seconds) ' . $taskId);
                 }
-
             } else {
                 $taskId = $instance->push($jobName, $body, $this->queueName);
                 if ($this->logger) {
