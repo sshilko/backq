@@ -116,6 +116,8 @@ class Redis extends AbstractAdapter
      * after retryAfter seconds of being in pending queue
      * migration happens on each pickJob call
      * @see https://github.com/illuminate/queue/blob/11e280c0e2ac9f9bcfe2563461a05cdfefde9179/RedisQueue.php#L184
+     *
+     * This should be queue property and should be set per-queue
      */
     private $retryAfter = null;
 
@@ -135,7 +137,7 @@ class Redis extends AbstractAdapter
         $this->timeout = $timeout;
         $this->read_timeout  = $read_timeout;
         $this->auth_password = $auth_password;
-        $this->persistent = $persistent;
+        $this->persistent    = $persistent;
         $this->persistent_id = $persistent_id;
 
         $this->app  = new Redis\App();
@@ -161,6 +163,15 @@ class Redis extends AbstractAdapter
                 }
             };
         });
+    }
+
+    /**
+     * Enables retrying failed (have been reserved for >= $seconds) jobs
+     *
+     * @param int $seconds
+     */
+    public function retryJobAfter(int $seconds) {
+        $this->retryAfter = $seconds;
     }
 
     public function setWorkTimeout(int $seconds = null) {
@@ -376,7 +387,7 @@ class Redis extends AbstractAdapter
         $queue->addConnection(['driver'     => self::REDIS_DRIVER_OWN,
                                'connection' => 'default',
                                'block_for'  => (self::BLOCKFOR_EMULATE > 0 ? null : $this->blockFor),
-                               'retry_after'=> $this->retryAfter,
+                               'retry_after'=> ($this->retryAfter ? $this->retryAfter : null),
                                'queue'      => $this->queueName],
                               self::CONNECTION_NAME);
         $this->queue = $queue;
@@ -551,6 +562,15 @@ class Redis extends AbstractAdapter
             //$dummyClosure = function() use ($body) { return $body; };
             //$jobName = \Illuminate\Queue\SerializableClosure::from($dummyClosure);
             //$jobName = \Illuminate\Queue\CallQueuedClosure::class;
+
+            if (isset($params[self::PARAM_JOBTTR]) && $params[self::PARAM_JOBTTR] > 0) {
+                /**
+                 * TTR is only used on picking in Redis adapter,
+                 * migrate() that moves rotten reserved or delayed jobs only happen on pop/pick
+                 * NOT in put
+                 * Ignoring TTR
+                 */
+            }
 
             if (isset($params[self::PARAM_READYWAIT]) && $params[self::PARAM_READYWAIT] > 0) {
                 $delay = new \DateInterval('PT' . ((int) $params[self::PARAM_READYWAIT]) . 'S');

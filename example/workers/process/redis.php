@@ -19,6 +19,12 @@ $adapter = new \BackQ\Adapter\Redis;
  */
 $logger = new \Symfony\Component\Console\Logger\ConsoleLogger(new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG));
 $adapter->setLogger($logger);
+/**
+ * This value is queue dependent and should equal >= max expected job time
+ * In case worker dies, job will stay in "reserved" state until get's retried (if enabled via retryJobAfter())
+ * if not enabled, failed jobs then never be retried - stuck forever in reserved
+ */
+$adapter->retryJobAfter(30);
 
 $worker = new \BackQ\Worker\AProcess($adapter);
 $worker->setIdleTimeout(15);
