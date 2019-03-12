@@ -576,14 +576,19 @@ class Redis extends AbstractAdapter
                 $delay = new \DateInterval('PT' . ((int) $params[self::PARAM_READYWAIT]) . 'S');
                 $taskId = $instance->later($delay, $jobName, $body, $this->queueName);
                 if ($this->logger) {
-                    $this->logger->debug(__FUNCTION__ . ' pushed delayed job (' . (int) $params[self::PARAM_READYWAIT] . ' seconds) ' . $taskId);
+                    $this->logger->debug(__FUNCTION__ . ' ' . (($taskId) ? 'pushed' : 'failed push') . ' delayed job (' . (int) $params[self::PARAM_READYWAIT] . ' seconds) ' . $taskId);
                 }
             } else {
                 $taskId = $instance->push($jobName, $body, $this->queueName);
                 if ($this->logger) {
-                    $this->logger->debug(__FUNCTION__ . ' pushed task without delay ' . $taskId);
+                    $this->logger->debug(__FUNCTION__ . ' ' . (($taskId) ? 'pushed' : 'failed push') . ' task without delay ' . $taskId);
                 }
             }
+
+            if (!is_numeric($taskId)) {
+                return false;
+            }
+
             return $taskId;
         }
         return false;
