@@ -25,7 +25,7 @@ class Redis extends AbstractAdapter
      * Whether to emulate blockFor behaviour, if >0 the amount of seconds sleep between polls
      * if not emulated uses .blpop redis implementation, if emulated uses .pop and sleep loop
      */
-    private const BLOCKFOR_EMULATE = 0;
+    public const BLOCKFOR_EMULATE = 0;
 
     private $connected = false;
 
@@ -386,7 +386,7 @@ class Redis extends AbstractAdapter
 
         $queue->addConnection(['driver'     => self::REDIS_DRIVER_OWN,
                                'connection' => 'default',
-                               'block_for'  => (self::BLOCKFOR_EMULATE > 0 ? null : $this->blockFor),
+                               'block_for'  => (static::BLOCKFOR_EMULATE > 0 ? null : $this->blockFor),
                                'retry_after'=> ($this->retryAfter ? $this->retryAfter : null),
                                'queue'      => $this->queueName],
                               self::CONNECTION_NAME);
@@ -461,7 +461,7 @@ class Redis extends AbstractAdapter
             /** @var \BackQ\Adapter\Redis\Queue $redisQueue */
             $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
             if ($this->blockFor) {
-                if (!self::BLOCKFOR_EMULATE) {
+                if (!static::BLOCKFOR_EMULATE) {
                     $redisQueue->setBlockFor($this->blockFor);
                 }
             }
@@ -471,11 +471,11 @@ class Redis extends AbstractAdapter
             if ($this->logger) {
                 $this->logger->debug(__FUNCTION__ . ' blocking for ' . (int) $this->blockFor . ' seconds until get a job');
             }
-            if (self::BLOCKFOR_EMULATE) {
+            if (static::BLOCKFOR_EMULATE) {
                 /**
                  * Pop immediatelly
                  */
-                $redisJob = $redisQueue->pop();
+                $redisJob = $redisQueue->pop($this->queueName);
 
                 /**
                  * Sleep loop and pop if didnt get anything
