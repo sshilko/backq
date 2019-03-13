@@ -285,7 +285,7 @@ class Beanstalk extends AbstractAdapter
                 $result = $this->client->put($priority, $readywait, $jobttr, $body);
 
                 if (false != $result) {
-                    return $result;
+                    return (string) $result;
                 }
             } catch (Exception $e) {
                 $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());

@@ -537,8 +537,7 @@ class Redis extends AbstractAdapter
      * Put task into queue
      *
      * @param  string $data The job body.
-     * @return integer|boolean `false` on error otherwise an integer indicating
-     *         the job id.
+     * @return string|false job-id on success
      */
     public function putTask($body, $params = array())
     {
@@ -563,14 +562,14 @@ class Redis extends AbstractAdapter
             //$jobName = \Illuminate\Queue\SerializableClosure::from($dummyClosure);
             //$jobName = \Illuminate\Queue\CallQueuedClosure::class;
 
-            if (isset($params[self::PARAM_JOBTTR]) && $params[self::PARAM_JOBTTR] > 0) {
+            //if (isset($params[self::PARAM_JOBTTR]) && $params[self::PARAM_JOBTTR] > 0) {
                 /**
                  * TTR is only used on picking in Redis adapter,
                  * migrate() that moves rotten reserved or delayed jobs only happen on pop/pick
                  * NOT in put
                  * Ignoring TTR
                  */
-            }
+            //}
 
             if (isset($params[self::PARAM_READYWAIT]) && $params[self::PARAM_READYWAIT] > 0) {
                 $delay = new \DateInterval('PT' . ((int) $params[self::PARAM_READYWAIT]) . 'S');
@@ -585,7 +584,7 @@ class Redis extends AbstractAdapter
                 }
             }
 
-            if (!is_numeric($taskId)) {
+            if (null === $taskId) {
                 return false;
             }
 

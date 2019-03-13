@@ -344,8 +344,7 @@ class Nsq extends AbstractAdapter
      * Put task into queue
      *
      * @param  string $data The job body.
-     * @return integer|boolean `false` on error otherwise an integer indicating
-     *         the job id.
+     * @return bool
      */
     public function putTask($body, $params = array())
     {

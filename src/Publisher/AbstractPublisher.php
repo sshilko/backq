@@ -129,7 +129,7 @@ abstract class AbstractPublisher
      * @param mixed $serializable job payload
      * @param array $params adapter specific params
      *
-     * @return integer|bool
+     * @return string|false
      */
     public function publish($serializable, $params = array())
     {
