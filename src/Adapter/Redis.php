@@ -53,7 +53,7 @@ class Redis extends AbstractAdapter
     /**
      * @var int
      */
-    private $database_id;
+    private $database_id = 0;
 
     /**
      * @var \Illuminate\Queue\Capsule\Manager
@@ -139,6 +139,7 @@ class Redis extends AbstractAdapter
         $this->auth_password = $auth_password;
         $this->persistent    = $persistent;
         $this->persistent_id = $persistent_id;
+        $this->database_id   = $database_id;
 
         $this->app  = new Redis\App();
 
