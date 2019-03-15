@@ -40,7 +40,15 @@ class Process extends AbstractMessage
      */
     private $until = 0;
 
-    public function __construct($commandline, $cwd = null, array $env = null, $input = null, $timeout = 60) {
+    /**
+     * Process constructor.
+     * @param array $commandline
+     * @param string|null $cwd
+     * @param array|null $env
+     * @param null $input
+     * @param float $timeout
+     */
+    public function __construct($commandline, string $cwd = null, array $env = null, $input = null, ?float $timeout = 60) {
         $this->commandline = $commandline;
         $this->cwd = $cwd;
         $this->env = $env;

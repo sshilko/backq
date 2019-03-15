@@ -29,6 +29,9 @@ namespace BackQ\Worker;
 use \RuntimeException;
 use \Symfony\Component\Process\Process;
 
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Process\Exception\ProcessSignaledException;
+
 final class AProcess extends AbstractWorker
 {
     protected $queueName = 'process';
@@ -97,22 +100,45 @@ final class AProcess extends AbstractWorker
                              */
                             $run = function() use ($message) {
                                 $this->debug('launching ' . $message->getCommandline());
-                                $process = new \Symfony\Component\Process\Process($message->getCommandline(),
-                                                                                  $message->getCwd(),
-                                                                                  $message->getEnv(),
-                                                                                  $message->getInput(),
-                                                                                  /**
-                                                                                   * timeout does not really work with async (start)
-                                                                                   */
-                                                                                  $message->getTimeout());
+                                $cmd = $message->getCommandline();
+                                $timeout = $message->getTimeout() ?? 60;
+
+                                if (!is_array($cmd) && is_string($cmd)) {
+                                    /**
+                                     * @todo remove - deprecated since symfony 4
+                                     * @deprecated
+                                     */
+                                    $process = Process::fromShellCommandline($cmd,
+                                                                             $message->getCwd(),
+                                                                             $message->getEnv(),
+                                                                             $message->getInput(),
+                                                                             /**
+                                                                              * timeout does not really work with async (start)
+                                                                              */
+                                                                             $timeout);
+                                } else {
+                                    /**
+                                     * Using array of arguments is the recommended way to define commands.
+                                     * This saves you from any escaping and allows sending signals seamlessly
+                                     * (e.g. to stop processes before completion.):
+                                     */
+                                    $process = new Process($message->getCommandline(),
+                                                           $message->getCwd(),
+                                                           $message->getEnv(),
+                                                           $message->getInput(),
+                                                           /**
+                                                            * timeout does not really work with async (start)
+                                                            */
+                                                           $timeout);
+                                }
 
                                 /**
                                  * ultimately also disables callbacks
                                  */
-                                $process->disableOutput();
+                                //$process->disableOutput();
 
                                 /**
-                                 * Execute call
+                                 * Execute call, starts process in the background
                                  * proc_open($commandline, $descriptors, $this->processPipes->pipes, $this->cwd, $this->env, $this->options);
                                  *
                                  * @throws RuntimeException When process can't be launched
@@ -128,6 +154,7 @@ final class AProcess extends AbstractWorker
                          * doing this before pushing new fork in the pool
                          */
                         if (!empty($forks)) {
+                            /** @var Process $f */
                             foreach ($forks as $f) {
                                 try {
                                     /**
@@ -140,8 +167,27 @@ final class AProcess extends AbstractWorker
                                          * If its still running, check the timeouts
                                          */
                                         $f->checkTimeout();
+                                        usleep(200000);
+                                    } else {
+                                        /**
+                                         * Only first call of this function return real value, next calls return -1
+                                         */
+                                        $ec = $f->getExitCode();
+                                        if ($ec > 0) {
+                                            trigger_error($f->getCommandLine() . ' [' . $f->getErrorOutput() . '] ' . ' existed with error code ' . $ec, E_USER_WARNING);
+                                            $f->clearOutput();
+                                            $f->clearErrorOutput();
+                                            $ec = null;
+                                        }
                                     }
-                                } catch (ProcessTimedOutException $e) {}
+
+                                } catch (ProcessTimedOutException $e) {
+
+                                } catch (ProcessSignaledException $e) {
+                                        /**
+                                         * Child process has been terminated by an uncaught signal.
+                                         */
+                                }
                             }
                         }
 
@@ -184,7 +230,12 @@ final class AProcess extends AbstractWorker
                      * @see http://symfony.com/doc/current/components/process.html
                      */
                     $f->checkTimeout();
-                    $f->stop(1, SIGINT);
+                    usleep(100000);
+
+                    $f->clearOutput();
+                    $f->clearErrorOutput();
+
+                    $f->stop(2, SIGINT);
                     if ($f->isRunning()) {
                         $f->signal(SIGKILL);
                     }
