@@ -242,7 +242,12 @@ class Redis extends AbstractAdapter
                     }
                 }
             } catch (\Exception $ex) {
-                $this->error(__CLASS__ . ' ' . __FUNCTION__ . ': ' . $ex->getMessage());
+                $errmsg = __CLASS__ . ' ' . __FUNCTION__ . ': ' . $ex->getMessage();
+                if ($this->logger) {
+                    $this->logger->error($errmsg);
+                } else {
+                    trigger_error($errmsg, E_USER_WARNING);
+                }
             }
 
             $this->state     = self::STATE_NOTHING;
