@@ -228,6 +228,10 @@ abstract class AbstractWorker
                 if (!$timeout) {
                     throw new Exception('Worker failed to fetch new job');
                 } else {
+                    /**
+                     * Two yield's are not mistake
+                     */
+                    yield;
                     yield;
                 }
             }
