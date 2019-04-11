@@ -146,7 +146,7 @@ final class Fcm extends AbstractWorker
                                             /**
                                              * @see https://developers.google.com/cloud-messaging/http-server-ref#table5
                                              */
-                                            if ($br->message_id) {
+                                            if (!empty($br->message_id)) {
                                                 if ($br->registration_id) {
                                                     /**
                                                      * replace the original ID with the new value (canonical ID) in your server database
