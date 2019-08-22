@@ -27,7 +27,7 @@ class Serialized extends AbstractMessage
     public function __construct(AbstractMessage $message, AbstractPublisher $publisher, array $publishOptions = [])
     {
         $this->message        = serialize($message);
-        $this->publisher      = $publisher->getShortName();
+        $this->publisher      = get_class($publisher);
         $this->publishOptions = $publishOptions;
     }
 
@@ -36,11 +36,13 @@ class Serialized extends AbstractMessage
      *
      * @return AbstractPublisher
      */
-    public function getPublisher(): AbstractPublisher
+    public function getPublisher(): ?AbstractPublisher
     {
-        /**
-         * @todo reinitialize publisher
-         */
+        $class = $this->publisher;
+        if (@class_exists($class) && @method_exists($class, 'getInstance')) {
+            return $class::getInstance();
+        }
+        return null;
     }
 
     /**
