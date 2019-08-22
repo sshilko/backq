@@ -192,7 +192,7 @@ final class Apnsd extends AbstractWorker
                     $message   = @unserialize($payload);
                     $processed = true;
 
-                    if (!($message instanceof \ApnsPHP_Message) || !$message->getRecipientsNumber()) {
+                    if (!($message instanceof \ApnsPHP_Message)) {
                         /**
                          * Nothing to do + report as a success
                          */

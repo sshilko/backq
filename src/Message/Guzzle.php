@@ -28,10 +28,6 @@ class Guzzle extends AbstractMessage
         }
     }
 
-    public function getRecipientsNumber() {
-        return 1;
-    }
-
     public function getRequest() : \GuzzleHttp\Psr7\Request {
         return \GuzzleHttp\Psr7\parse_request($this->request);
     }

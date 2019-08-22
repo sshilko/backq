@@ -1,13 +1,12 @@
 <?php
-namespace BackQ\Message\WriteOnly;
 
-use BackQ\Message\AbstractMessage;
+namespace BackQ\Message;
 
 /**
- * Class Scheduled
- * @package BackQ\Message\WriteOnly
+ * Class DynamoSQS
+ * @package BackQ\Message
  */
-class Scheduled extends AbstractMessage
+class DynamoSQS extends AbstractMessage
 {
     /**
      * @var AbstractMessage
@@ -32,13 +31,5 @@ class Scheduled extends AbstractMessage
     public function getNextPublisher()
     {
         return $this->nextPublisher;
-    }
-
-    /**
-     * @return int
-     */
-    public function getRecipientsNumber()
-    {
-        return 1;
     }
 }
