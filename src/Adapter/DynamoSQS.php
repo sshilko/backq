@@ -13,21 +13,21 @@ use Aws\Exception\AwsException;
  *
  * DynamoDB -> TTL Expire -> DynamoDB Streams -> AWS Lambda -> SQS
  *
- * Class DynamoSQS
+ * Class DynamoSQSSlow
  * @package BackQ\Adapter
  */
 class DynamoSQS extends AbstractAdapter
 {
-    protected const API_VERSION = '2012-08-10';
+    protected const API_VERSION  = '2012-08-10';
+
+    /**
+     * Some identifier whatever it is
+     */
+    public const PARAM_MESSAGE_ID = 'msgid';
 
     /**
      * Controls how many times and how often the job can be retried on failures
      */
-    public const PARAM_RETRYTYPE          = 'retrytype';
-
-    public const RETRYTYPE_FAST_UPTO1HR   = QueueTableRow::RETRYTYPE_FAST_UPTO1HR;
-    public const RETRYTYPE_SLOW_UPTO12HRS = QueueTableRow::RETRYTYPE_SLOW_UPTO12HRS;
-    public const RETRYTYPE_DEFAULT        = QueueTableRow::RETRYTYPE_FAST_UPTO1HR;
 
     /**
      * @var ?DynamoDbClient
@@ -176,12 +176,12 @@ class DynamoSQS extends AbstractAdapter
          */
         $result = null;
         try {
-            $result = $sqs->receiveMessage(['AttributeNames' => ['All'],
-                'MaxNumberOfMessages' => 1,
-                'MessageAttributeNames' => ['All'],
-                'QueueUrl' => $this->sqsQueueURL,
-                'WaitTimeSeconds' => (int)$this->workTimeout,
-                'VisibilityTimeout' => $this->calculateVisibilityTimeout()]);
+            $result = $sqs->receiveMessage(['AttributeNames'        => ['All'],
+                                            'MaxNumberOfMessages'   => 1,
+                                            'MessageAttributeNames' => ['All'],
+                                            'QueueUrl'          => $this->sqsQueueURL,
+                                            'WaitTimeSeconds'   => (int)$this->workTimeout,
+                                            'VisibilityTimeout' => $this->calculateVisibilityTimeout()]);
         }  catch (AwsException $e) {
             if ($this->logger) {
                 $this->logger->error($e->getMessage());
@@ -212,12 +212,12 @@ class DynamoSQS extends AbstractAdapter
             $readyTime += $params[self::PARAM_READYWAIT];
         }
 
-        $retry = self::RETRYTYPE_DEFAULT;
-        if (isset($params[self::PARAM_RETRYTYPE])) {
-            $retry = $params[self::PARAM_RETRYTYPE];
+        $msgid = crc32(getmypid() . gethostname());
+        if (isset($params[self::PARAM_MESSAGE_ID])) {
+            $msgid = $params[self::PARAM_MESSAGE_ID];
         }
 
-        $item = new QueueTableRow($retry, $body, $readyTime);
+        $item = new QueueTableRow($body, $readyTime, $msgid);
         try {
             $response = $this->dynamoDBClient->putItem(['Item' => $item->toArray(),
                                                         'TableName' => $this->dynamoDbTableName]);

@@ -46,6 +46,11 @@ abstract class AbstractPublisher
         $this->adapter = $adapter;
     }
 
+    public function getShortName(): string
+    {
+        return (new \ReflectionClass($this))->getShortName();
+    }
+
     /**
      * Specify worker queue to push job to
      *
