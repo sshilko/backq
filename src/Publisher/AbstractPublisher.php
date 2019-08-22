@@ -39,12 +39,12 @@ abstract class AbstractPublisher
 
     protected $queueName;
 
-   #protected static $instances = null;
-
-    protected function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
+    protected function __construct()
     {
-        $this->adapter = $adapter;
+        $this->adapter = $this->setupAdapter();
     }
+
+    abstract protected function setupAdapter(): \Backq\Adapter\AbstractAdapter;
 
     /**
      * Specify worker queue to push job to
@@ -71,17 +71,10 @@ abstract class AbstractPublisher
      *
      * @return AbstractPublisher
      */
-    public static function getInstance(\BackQ\Adapter\AbstractAdapter $adapter)
+    public static function getInstance()
     {
         $class = get_called_class();
-        return new $class($adapter);
-
-        #$cname = get_class($adapter);
-        #if (null === self::$instances || (is_array(self::$instances) && !isset(self::$instances[$cname]))) {
-        #    $class = get_called_class();
-        #    self::$instances[$cname] = new $class($adapter);
-        #}
-        #return self::$instances[$cname];
+        return new $class();
     }
 
     /**

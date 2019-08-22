@@ -34,7 +34,7 @@ namespace BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Publisher\AbstractPublisher;
 
-final class Register extends AbstractPublisher
+abstract class Register extends AbstractPublisher
 {
     /**
      * The queue will be used to create AWS platform endpoints

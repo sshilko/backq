@@ -40,6 +40,7 @@ class Serialized extends AbstractMessage
     {
         $class = $this->publisher;
         if (@class_exists($class) && @method_exists($class, 'getInstance')) {
+            /** @var $class \Backq\Publisher\AbstractPublisher */
             return $class::getInstance();
         }
         return null;

@@ -34,7 +34,7 @@ namespace BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Publisher\AbstractPublisher;
 
-final class Publish extends AbstractPublisher
+abstract class Publish extends AbstractPublisher
 {
     /**
      * The queue will be used to publish to Aws endpoints

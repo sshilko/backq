@@ -9,6 +9,17 @@
  */
 include_once '../../vendor/autoload.php';
 
+final class MyApnsdPublisher extends \BackQ\Publisher\Apnsd
+{
+    public const PARAM_JOBTTR    = \BackQ\Adapter\Beanstalk::PARAM_JOBTTR;
+    public const PARAM_READYWAIT = \BackQ\Adapter\Beanstalk::PARAM_READYWAIT;
+
+    protected function setupAdapter(): \Backq\Adapter\AbstractAdapter
+    {
+        return new \BackQ\Adapter\Beanstalk;
+    }
+}
+
 $iostokn = '1e82db91c7ceddd72bf33d74ae052ac9c84a065b35148ac401388843106a7485';
 $message = new ApnsPHP_Message($iostokn);
 $message->setCustomIdentifier("Message-Badge-3");
@@ -22,15 +33,15 @@ $message->setExpiry(30);
 $app       = '-myapp1';
 $messagesQ = array($app => array($message));
 
-$publisher = \BackQ\Publisher\Apnsd::getInstance(new \BackQ\Adapter\Beanstalk);
+$publisher = MyApnsdPublisher::getInstance();
 $queueName = $publisher->getQueueName();
 
 /**
  * Give 4 seconds to dispatch the message (time to run)
  * Delay each job by 1 second
  */
-$params = array(\BackQ\Adapter\Beanstalk::PARAM_JOBTTR => 4,
-                \BackQ\Adapter\Beanstalk::PARAM_READYWAIT => 1);
+$params = array(MyApnsdPublisher::PARAM_JOBTTR => 4,
+                MyApnsdPublisher::PARAM_READYWAIT => 1);
 
 foreach ($messagesQ as $app => $messages) {
     /**
