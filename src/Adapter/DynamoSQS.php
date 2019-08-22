@@ -1,9 +1,11 @@
 <?php
 namespace BackQ\Adapter;
 
+use Aws\Sqs\SqsClient;
 use BackQ\Adapter\Amazon\DynamoDb\DynamoDbClient;
 use BackQ\Adapter\Amazon\DynamoDb\Client\Exception\DynamoDbException;
 use BackQ\Adapter\Amazon\DynamoDb\QueueTableRow;
+use Aws\Exception\AwsException;
 
 /**
  * Adapter uses DynamoDB for writing tasks
@@ -14,7 +16,7 @@ use BackQ\Adapter\Amazon\DynamoDb\QueueTableRow;
  * Class DynamoSQS
  * @package BackQ\Adapter
  */
-abstract class DynamoSQS extends AbstractAdapter
+class DynamoSQS extends AbstractAdapter
 {
     protected const API_VERSION = '2012-08-10';
 
@@ -33,14 +35,19 @@ abstract class DynamoSQS extends AbstractAdapter
     protected $dynamoDBClient;
 
     /**
-     * @var
+     * @var ?SqsClient
      */
     protected $sqsClient;
 
     /**
      * @var ?string
      */
-    protected $tableName;
+    protected $dynamoDbTableName;
+
+    /**
+     * @var ?string
+     */
+    protected $sqsQueueURL;
 
     /**
      * AWS DynamoDB API Key
@@ -61,18 +68,27 @@ abstract class DynamoSQS extends AbstractAdapter
     protected $apiRegion = '';
 
     /**
-     * Timeout for receiveMessage from SQS command (Long pooling)
-     *
-     * @var null|int
+     * AWS Account ID
+     * @var string
      */
-    private $workTimeout = null;
+    protected $apiAccountId = '';
 
+    /**
+     * Timeout for receiveMessage from SQS command (Long polling)
+     *
+     * @var int
+     */
+    private $workTimeout = 5;
 
-    public function __construct(string $apiKey, string $apiSecret, string $apiRegion)
+    public function __construct(string $apiAccountId,
+                                string $apiKey,
+                                string $apiSecret,
+                                string $apiRegion)
     {
-        $this->apiKey    = $apiKey;
-        $this->apiSecret = $apiSecret;
-        $this->apiRegion = $apiRegion;
+        $this->apiKey       = $apiKey;
+        $this->apiSecret    = $apiSecret;
+        $this->apiRegion    = $apiRegion;
+        $this->apiAccountId = $apiAccountId;
     }
 
     /**
@@ -86,6 +102,7 @@ abstract class DynamoSQS extends AbstractAdapter
                                     'secret' => $this->apiSecret]];
 
         $this->dynamoDBClient = new DynamoDbClient($arguments);
+        $this->sqsClient      = new SqsClient($arguments);
         return true;
     }
 
@@ -94,8 +111,10 @@ abstract class DynamoSQS extends AbstractAdapter
      */
     public function disconnect()
     {
-        $this->dynamoDBClient = null;
-        $this->tableName      = null;
+        $this->dynamoDBClient    = null;
+        $this->dynamoDbTableName = null;
+        $this->sqsClient         = null;
+        $this->sqsQueueURL       = null;
         return true;
     }
 
@@ -105,18 +124,39 @@ abstract class DynamoSQS extends AbstractAdapter
      */
     public function bindRead($queue)
     {
-        $this->tableName = $queue;
+        $this->sqsQueueURL = $this->generateSqsEndpointUrl($queue);
         return true;
     }
 
     /**
+     * Expected SQS Queue URL
+     *
+     * https://sqs.REGION.amazonaws.com/XXXXXXXX/QUEUENAME
+     *
      * @param string $queue
+     * @return string
+     */
+    private function generateSqsEndpointUrl(string $queue): string
+    {
+        return 'https://sqs.' . $this->apiRegion . ' . amazonaws.com/' . $this->apiAccountId . '/' . $queue;
+    }
+
+    /**
+     * @param string $sqsURL
      * @return bool
      */
     public function bindWrite($queue)
     {
-        $this->tableName = $queue;
+        $this->dynamoDbTableName = $queue;
         return true;
+    }
+
+    private function calculateVisibilityTimeout(): int
+    {
+        /**
+         * How much time we estimate it takes to process the picked results
+         */
+        return max($this->workTimeout * 4, 10);
     }
 
     public function pickTask()
@@ -125,10 +165,35 @@ abstract class DynamoSQS extends AbstractAdapter
             $this->logger->debug(__FUNCTION__);
         }
 
+        /** @var SqsClient $sqs */
+        $sqs = $this->sqsClient;
+        if (!$sqs) {
+            return false;
+        }
+
         /**
-         * Todo implement picking from SQS
+         * @see https://docs.aws.amazon.com/aws-sdk-php/v2/api/class-Aws.Sqs.SqsClient.html#_receiveMessage
          */
-        sleep(1);
+        $result = null;
+        try {
+            $result = $sqs->receiveMessage(['AttributeNames' => ['All'],
+                'MaxNumberOfMessages' => 1,
+                'MessageAttributeNames' => ['All'],
+                'QueueUrl' => $this->sqsQueueURL,
+                'WaitTimeSeconds' => (int)$this->workTimeout,
+                'VisibilityTimeout' => $this->calculateVisibilityTimeout()]);
+        }  catch (AwsException $e) {
+            if ($this->logger) {
+                $this->logger->error($e->getMessage());
+            }
+        }
+
+        if ($result && count($result->get('Messages')) > 0) {
+            $messagePayload = ($result->get('Messages')[0]);
+            $messageId      = $messagePayload['ReceiptHandle'];
+            return [$messageId, $messagePayload];
+        }
+
         return false;
     }
 
@@ -155,7 +220,7 @@ abstract class DynamoSQS extends AbstractAdapter
         $item = new QueueTableRow($retry, $body, $readyTime);
         try {
             $response = $this->dynamoDBClient->putItem(['Item' => $item->toArray(),
-                'TableName' => $this->tableName]);
+                                                        'TableName' => $this->dynamoDbTableName]);
             if ($response &&
                 isset($response['@metadata']['statusCode']) &&
                 $response['@metadata']['statusCode'] == 200) {
@@ -185,9 +250,18 @@ abstract class DynamoSQS extends AbstractAdapter
      */
     public function afterWorkSuccess($workId)
     {
-        /**
-         * SQS remove from queue
-         */
+        if ($this->sqsClient) {
+            /** @var SqsClient $sqs */
+            $sqs = $this->sqsClient;
+            try {
+                $sqs->deleteMessage(['QueueUrl' => $this->sqsQueueURL, 'ReceiptHandle' => $workId]);
+                return true;
+            }  catch (AwsException $e) {
+                if ($this->logger) {
+                    $this->logger->error($e->getMessage());
+                }
+            }
+        }
         return true;
     }
 
@@ -198,6 +272,10 @@ abstract class DynamoSQS extends AbstractAdapter
      */
     public function afterWorkFailed($workId)
     {
+        /**
+         * Could call SQS ChangeMessageVisibility but why bother, the message will come back after
+         * visibility timeout expires (reserved time to process job)
+         */
         return true;
     }
 
