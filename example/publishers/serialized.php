@@ -24,7 +24,6 @@ final class MySerializedPublisher extends \BackQ\Publisher\Serialized
     {
         $logger = new \Symfony\Component\Console\Logger\ConsoleLogger(new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG));
         //$adapter = new \BackQ\Adapter\DynamoSQS(1, 'apiKey1', 'secretKey1', 'us-east-1');
-        //$adapter->setPickBatchSize(1);
         $adapter = new \BackQ\Adapter\Beanstalk;
         $adapter->setLogger($logger);
 

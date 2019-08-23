@@ -116,10 +116,13 @@ class DynamoSQS extends AbstractAdapter
      *
      * @param int $pickN
      */
-    public function setPickBatchSize(int $pickN)
-    {
-        $this->maxNumberOfMessages = $pickN;
-    }
+//    public function setPickBatchSize(int $pickN)
+//    {
+//        if ($pickN != 1) {
+//            throw new \InvalidArgumentException('Please ensure support in worker first');
+//        }
+//        $this->maxNumberOfMessages = $pickN;
+//    }
 
     /**
      * @return bool
