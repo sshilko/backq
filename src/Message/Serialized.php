@@ -39,7 +39,14 @@ class Serialized extends AbstractMessage
      */
     public function getPublisher(): ?AbstractPublisher
     {
-        return $this->publisher;
+        if ($this->publisher instanceof AbstractPublisher) {
+            /**
+             * If publisher is unknown, it will be unserialized as
+             * __PHP_Incomplete_Class_Name
+             */
+            return $this->publisher;
+        }
+        return null;
     }
 
     /**

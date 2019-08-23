@@ -70,6 +70,10 @@ abstract class AbstractWorker
      */
     public $workTimeout = null;
 
+    public function setWorkTimeout(?int $timeout = null) {
+        $this->workTimeout = $timeout;
+    }
+
     /**
      * Specify worker queue to pick job from
      *

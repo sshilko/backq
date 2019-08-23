@@ -1,6 +1,9 @@
 <?php
 namespace BackQ\Worker;
 
+use BackQ\Message\AbstractMessage;
+use BackQ\Publisher\AbstractPublisher;
+
 final class Serialized extends AbstractWorker
 {
     /**
@@ -11,7 +14,7 @@ final class Serialized extends AbstractWorker
     /**
      * @var int
      */
-    public $workTimeout = 2;
+    public $workTimeout = 5;
 
     /**
      * Declare Logger
@@ -54,8 +57,6 @@ final class Serialized extends AbstractWorker
                     $message   = @unserialize($payload);
                     $processed = true;
 
-                    print_r($message);
-
                     if (!($message instanceof \BackQ\Message\Serialized)) {
                         $work->send(true);
                         if ($this->logger) {
@@ -63,9 +64,36 @@ final class Serialized extends AbstractWorker
                         }
                         continue;
                     }
+                    $originalPublisher = $message->getPublisher();
+                    $originalMessage   = $message->getMessage();
+                    $originalPubOpts   = $message->getPublishOptions();
+
+                    if ($originalPublisher && $originalMessage) {
+                        $processed = false;
+                        try {
+                            if ($this->dispatchOriginalMessage($originalPublisher,
+                                                               $originalMessage,
+                                                               $originalPubOpts)) {
+                                $processed = true;
+                            }
+                        } catch (\Exception $ex) {
+                            if ($this->logger) {
+                                $this->logger->error($ex->getMessage());
+                            }
+                        }
+                    } else {
+                        if ($this->logger) {
+                            if (!$originalMessage) {
+                                $this->logger->error('Missing original message');
+                            }
+                            if (!$originalPublisher) {
+                                $this->logger->error('Missing original publisher');
+                            }
+                        }
+
+                    }
 
                     $work->send($processed);
-
                 };
             } catch (\Exception $e) {
                 if ($this->logger) {
@@ -74,5 +102,21 @@ final class Serialized extends AbstractWorker
             }
         }
         $this->finish();
+    }
+
+    /**
+     * @param AbstractPublisher $publisher
+     * @param AbstractMessage $message
+     * @param array $publishOptions
+     * @return string|null
+     */
+    private function dispatchOriginalMessage(AbstractPublisher $publisher,
+                                             AbstractMessage $message,
+                                             array $publishOptions = []): ?string
+    {
+        if ($publisher->start()) {
+            return (string) $publisher->publish($message, $publishOptions);
+        }
+        return null;
     }
 }
