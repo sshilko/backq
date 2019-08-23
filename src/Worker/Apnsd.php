@@ -177,6 +177,7 @@ final class Apnsd extends AbstractWorker
                         /**
                          * Just empty loop, no work fetched
                          */
+                        $work->send(true);
                         continue;
                     }
 

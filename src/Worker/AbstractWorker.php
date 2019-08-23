@@ -225,6 +225,9 @@ abstract class AbstractWorker
                 }
 
             } else {
+                /**
+                 * Job is a lie
+                 */
                 if (!$timeout) {
                     throw new Exception('Worker failed to fetch new job');
                 } else {
@@ -316,7 +319,7 @@ abstract class AbstractWorker
     /**
      * Quit after processing X amount of pushes
      *
-     * @param $int
+     * @param int $int
      */
     public function setRestartThreshold(int $int)
     {
@@ -326,7 +329,7 @@ abstract class AbstractWorker
     /**
      * Quit after reaching idle timeout
      *
-     * @param $int
+     * @param int $int
      */
     public function setIdleTimeout(int $int)
     {
