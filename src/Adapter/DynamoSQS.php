@@ -22,6 +22,12 @@ class DynamoSQS extends AbstractAdapter
     protected const API_VERSION_SQS       = '2012-11-05';
 
     /**
+     * Average expected delay from DynamoDB streams to expire items whose TTL was reached
+     * (12 minutes)
+     */
+    protected const ESTIMATED_DYNAMODB_DELAY = 720;
+
+    /**
      * Some identifier whatever it is
      */
     public const PARAM_MESSAGE_ID = 'msgid';
@@ -156,7 +162,7 @@ class DynamoSQS extends AbstractAdapter
      */
     private function generateSqsEndpointUrl(string $queue): string
     {
-        return 'https://sqs.' . $this->apiRegion . ' . amazonaws.com/' . $this->apiAccountId . '/' . $queue;
+        return 'https://sqs.' . $this->apiRegion . '.amazonaws.com/' . $this->apiAccountId . '/' . $queue;
     }
 
     /**
@@ -175,6 +181,23 @@ class DynamoSQS extends AbstractAdapter
          * How much time we estimate it takes to process the picked results
          */
         return max($this->workTimeout * 4, 10);
+    }
+
+    /**
+     * Calculate a TTL value based on the average delay from 'expired' DynamoDB Stream items
+     *
+     * @param int $expectedTTL
+     *
+     * @return int
+     */
+    private function getEstimatedTTL(int $expectedTTL): int
+    {
+        $estimatedTTL = $expectedTTL;
+        if ($expectedTTL >= self::ESTIMATED_DYNAMODB_DELAY) {
+            $estimatedTTL -= self::ESTIMATED_DYNAMODB_DELAY;
+        }
+
+        return $estimatedTTL;
     }
 
     public function pickTask()
@@ -227,7 +250,7 @@ class DynamoSQS extends AbstractAdapter
 
         $readyTime = time();
         if (isset($params[self::PARAM_READYWAIT])) {
-            $readyTime += $params[self::PARAM_READYWAIT];
+            $readyTime += $this->getEstimatedTTL($params[self::PARAM_READYWAIT]);
         }
 
         $msgid = crc32(getmypid() . gethostname());
