@@ -35,11 +35,27 @@ namespace BackQ\Publisher;
 abstract class AbstractPublisher
 {
     private $adapter;
-    private $bind;
 
+    protected $bind;
     protected $queueName;
 
     protected function __construct()
+    {
+        $this->adapter = $this->setupAdapter();
+    }
+
+    public function __sleep()
+    {
+        if ($this->adapter) {
+            $this->adapter->disconnect();
+        }
+
+        $vars = array_keys(get_object_vars($this));
+        unset($vars[array_search('adapter', $vars, true)]);
+        return array_values($vars);
+    }
+
+    public function __wakeup()
     {
         $this->adapter = $this->setupAdapter();
     }

@@ -1,6 +1,7 @@
 <?php
 
 namespace BackQ\Message;
+
 use BackQ\Publisher\AbstractPublisher;
 
 /**
@@ -10,12 +11,12 @@ use BackQ\Publisher\AbstractPublisher;
 class Serialized extends AbstractMessage
 {
     /**
-     * @var string
+     * @var ?AbstractMessage
      */
     protected $message;
 
     /**
-     * @var string
+     * @var ?AbstractPublisher
      */
     protected $publisher;
 
@@ -26,8 +27,8 @@ class Serialized extends AbstractMessage
 
     public function __construct(AbstractMessage $message, AbstractPublisher $publisher, array $publishOptions = [])
     {
-        $this->message        = serialize($message);
-        $this->publisher      = get_class($publisher);
+        $this->message        = $message;
+        $this->publisher      = $publisher;
         $this->publishOptions = $publishOptions;
     }
 
@@ -38,12 +39,7 @@ class Serialized extends AbstractMessage
      */
     public function getPublisher(): ?AbstractPublisher
     {
-        $class = $this->publisher;
-        if (@class_exists($class) && @method_exists($class, 'getInstance')) {
-            /** @var $class \Backq\Publisher\AbstractPublisher */
-            return $class::getInstance();
-        }
-        return null;
+        return $this->publisher;
     }
 
     /**
@@ -61,9 +57,9 @@ class Serialized extends AbstractMessage
      *
      * @return AbstractMessage
      */
-    public function getMessage(): AbstractMessage
+    public function getMessage(): ?AbstractMessage
     {
-        return unserialize($this->message);
+        return $this->message;
     }
 
 }

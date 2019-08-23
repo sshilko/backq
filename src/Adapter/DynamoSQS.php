@@ -18,7 +18,8 @@ use Aws\Exception\AwsException;
  */
 class DynamoSQS extends AbstractAdapter
 {
-    protected const API_VERSION  = '2012-08-10';
+    protected const API_VERSION_DYNAMODB  = '2012-08-10';
+    protected const API_VERSION_SQS       = '2012-11-05';
 
     /**
      * Some identifier whatever it is
@@ -80,6 +81,8 @@ class DynamoSQS extends AbstractAdapter
      */
     private $workTimeout = 5;
 
+    private $maxNumberOfMessages = 1;
+
     public function __construct(string $apiAccountId,
                                 string $apiKey,
                                 string $apiSecret,
@@ -96,14 +99,26 @@ class DynamoSQS extends AbstractAdapter
      */
     public function connect()
     {
-        $arguments = ['version' => static::API_VERSION,
+        $arguments = ['version' => static::API_VERSION_DYNAMODB,
                        'region' => $this->apiRegion,
                   'credentials' => ['key'    => $this->apiKey,
                                     'secret' => $this->apiSecret]];
 
         $this->dynamoDBClient = new DynamoDbClient($arguments);
+
+        $arguments['version'] = static::API_VERSION_SQS;
         $this->sqsClient      = new SqsClient($arguments);
         return true;
+    }
+
+    /**
+     * How max items to pick with each pick cycle
+     *
+     * @param int $pickN
+     */
+    public function setPickBatchSize(int $pickN)
+    {
+        $this->maxNumberOfMessages = $pickN;
     }
 
     /**
@@ -177,10 +192,10 @@ class DynamoSQS extends AbstractAdapter
         $result = null;
         try {
             $result = $sqs->receiveMessage(['AttributeNames'        => ['All'],
-                                            'MaxNumberOfMessages'   => 1,
+                                            'MaxNumberOfMessages'   => $this->maxNumberOfMessages,
                                             'MessageAttributeNames' => ['All'],
                                             'QueueUrl'          => $this->sqsQueueURL,
-                                            'WaitTimeSeconds'   => (int)$this->workTimeout,
+                                            'WaitTimeSeconds'   => (int) $this->workTimeout,
                                             'VisibilityTimeout' => $this->calculateVisibilityTimeout()]);
         }  catch (AwsException $e) {
             if ($this->logger) {
@@ -233,10 +248,14 @@ class DynamoSQS extends AbstractAdapter
             }
         } catch (\Exception $e) {
             if (is_subclass_of(DynamoDbException::class, get_class($e))) {
-                /** @var $e DynamoDbException */
-                $this->logger->error(__FUNCTION__ . ' service failed: ' . $e->getAwsErrorCode() . $e->getMessage());
+                if ($this->logger) {
+                    /** @var $e DynamoDbException */
+                    $this->logger->error(__FUNCTION__ . ' service failed: ' . $e->getAwsErrorCode() . $e->getMessage());
+                }
             } else {
-                $this->logger->error(__FUNCTION__ . ' failed: ' . $e->getMessage());
+                if ($this->logger) {
+                    $this->logger->error(__FUNCTION__ . ' failed: ' . $e->getMessage());
+                }
             }
         }
 
