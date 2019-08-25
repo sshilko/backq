@@ -229,7 +229,7 @@ class DynamoSQS extends AbstractAdapter
             }
         }
 
-        if ($result && count($result->get('Messages')) > 0) {
+        if ($result && $result->hasKey('Messages') && count($result->get('Messages')) > 0) {
             $messagePayload = ($result->get('Messages')[0]);
             $messageId      = $messagePayload['ReceiptHandle'];
             return [$messageId, $messagePayload];
