@@ -202,7 +202,7 @@ class DynamoSQS extends AbstractAdapter
             $estimatedTTL -= self::DYNAMODB_ESTIMATED_DELAY;
         }
 
-        if ($estimatedTTL <= (self::DYNAMODB_MAXIMUM_PROCESSABLE_YEARS * 360 * 86400)) {
+        if ($estimatedTTL <= -(self::DYNAMODB_MAXIMUM_PROCESSABLE_YEARS * 360 * 86400)) {
             throw new \InvalidArgumentException('Cannot process item with TTL: ' . $estimatedTTL);
         }
         return $estimatedTTL;
@@ -239,8 +239,18 @@ class DynamoSQS extends AbstractAdapter
 
         if ($result && $result->hasKey('Messages') && count($result->get('Messages')) > 0) {
             $messagePayload = ($result->get('Messages')[0]);
-            $messageId      = $messagePayload['ReceiptHandle'];
-            return [$messageId, $messagePayload];
+
+            $messageBody = json_decode($messagePayload['Body'], true);
+            $item        = QueueTableRow::fromArray($messageBody);
+            if (!$item) {
+                if ($this->logger) {
+                    $this->logger->error('Invalid received message body');
+                }
+                return false;
+            }
+
+            $messageId = $messagePayload['ReceiptHandle'];
+            return [$messageId, $item->getPayload()];
         }
 
         return false;
