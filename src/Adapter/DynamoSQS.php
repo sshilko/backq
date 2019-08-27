@@ -25,7 +25,12 @@ class DynamoSQS extends AbstractAdapter
      * Average expected delay from DynamoDB streams to expire items whose TTL was reached
      * (12 minutes)
      */
-    protected const ESTIMATED_DYNAMODB_DELAY = 720;
+    protected const DYNAMODB_ESTIMATED_DELAY = 720;
+
+    /**
+     * DynamoDB won't process items with a TTL older than 5 years
+     */
+    protected const DYNAMODB_MAXIMUM_PROCESSABLE_YEARS = 5;
 
     /**
      * Some identifier whatever it is
@@ -193,10 +198,13 @@ class DynamoSQS extends AbstractAdapter
     private function getEstimatedTTL(int $expectedTTL): int
     {
         $estimatedTTL = $expectedTTL;
-        if ($expectedTTL >= self::ESTIMATED_DYNAMODB_DELAY) {
-            $estimatedTTL -= self::ESTIMATED_DYNAMODB_DELAY;
+        if ($expectedTTL >= self::DYNAMODB_ESTIMATED_DELAY) {
+            $estimatedTTL -= self::DYNAMODB_ESTIMATED_DELAY;
         }
 
+        if ($estimatedTTL <= (self::DYNAMODB_MAXIMUM_PROCESSABLE_YEARS * 360 * 86400)) {
+            throw new \InvalidArgumentException('Cannot process item with TTL: ' . $estimatedTTL);
+        }
         return $estimatedTTL;
     }
 
