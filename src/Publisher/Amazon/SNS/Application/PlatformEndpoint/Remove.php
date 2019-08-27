@@ -34,7 +34,7 @@ namespace BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Publisher\AbstractPublisher;
 
-final class Remove extends AbstractPublisher
+abstract class Remove extends AbstractPublisher
 {
     /**
      * The queue will be used to delete remote endpoints that are disabled/inactive

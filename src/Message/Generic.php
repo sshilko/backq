@@ -45,8 +45,4 @@ class Generic extends AbstractMessage implements \Serializable
     public function getData() {
         return $this->data;
     }
-
-    public function getRecipientsNumber() {
-        return 1;
-    }
 }

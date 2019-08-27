@@ -12,11 +12,22 @@ include_once '../../vendor/autoload.php';
 
 $command = 'echo $( date +%s ) >> /tmp/test';
 
-$publisher = \BackQ\Publisher\Process::getInstance(new \BackQ\Adapter\Beanstalk);
+final class MyProcessPublisher extends \BackQ\Publisher\Process
+{
+    public const PARAM_JOBTTR    = \BackQ\Adapter\Beanstalk::PARAM_JOBTTR;
+    public const PARAM_READYWAIT = \BackQ\Adapter\Beanstalk::PARAM_READYWAIT;
+
+    protected function setupAdapter(): \Backq\Adapter\AbstractAdapter
+    {
+        return new \BackQ\Adapter\Beanstalk;
+    }
+}
+
+$publisher = MyProcessPublisher::getInstance();
 if ($publisher->start() && $publisher->hasWorkers()) {
     $message = new \BackQ\Message\Process($command);
-    $result  = $publisher->publish($message, array(\BackQ\Adapter\Beanstalk::PARAM_JOBTTR    => 5,
-                                                   \BackQ\Adapter\Beanstalk::PARAM_READYWAIT => 1));
+    $result  = $publisher->publish($message, [MyProcessPublisher::PARAM_JOBTTR    => 5,
+                                              MyProcessPublisher::PARAM_READYWAIT => 1]);
     if ($result > 0) {
         /**
          * Success

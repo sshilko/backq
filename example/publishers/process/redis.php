@@ -14,6 +14,16 @@ $command = 'echo $( date +%s ) >> /tmp/test';
 
 $adapter = new \BackQ\Adapter\Redis;
 
+final class MyProcessPublisher extends \BackQ\Publisher\Process
+{
+    public const PARAM_READYWAIT = \BackQ\Adapter\Redis::PARAM_READYWAIT;
+
+    protected function setupAdapter(): \Backq\Adapter\AbstractAdapter
+    {
+        return new \BackQ\Adapter\Redis;
+    }
+}
+
 /**
  * Optional adapter logger
  */
@@ -23,9 +33,7 @@ $adapter->setLogger($logger);
 $publisher = \BackQ\Publisher\Process::getInstance($adapter);
 if ($publisher->start() && $publisher->hasWorkers()) {
     $message = new \BackQ\Message\Process($command);
-    $result  = $publisher->publish($message, [\BackQ\Adapter\Redis::PARAM_READYWAIT => random_int(0, 2),
-                                             // \BackQ\Adapter\Redis::PARAM_JOBTTR => 5
-                                             ]);
+    $result  = $publisher->publish($message, [MyProcessPublisher::PARAM_READYWAIT => random_int(0, 2)]);
     if ($result > 0) {
         /**
          * Success

@@ -83,8 +83,4 @@ class Process extends AbstractMessage
     public function getTimeout() {
         return $this->timeout;
     }
-
-    public function getRecipientsNumber() {
-        return 1;
-    }
 }
