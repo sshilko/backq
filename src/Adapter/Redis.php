@@ -195,77 +195,55 @@ class Redis extends AbstractAdapter
      */
     public function disconnect()
     {
-        if ($this->logger) {
-            $this->logger->debug('Disconnecting');
-        }
+        $this->logDebug('Disconnecting');
         if (true === $this->connected) {
-            if ($this->logger) {
-                $this->logger->debug('Disconnecting, previously connected');
-            }
+            $this->logDebug('Disconnecting, previously connected');
+
             try {
                 if (self::STATE_BINDREAD == $this->state || self::STATE_BINDWRITE == $this->state) {
-                    if ($this->logger) {
-                        $this->logger->debug('Disconnecting, state detected');
-                    }
+                    $this->logDebug('Disconnecting, state detected');
+
                     /** @var \BackQ\Adapter\Redis\Queue $redisQueue */
                     if ($this->queue && $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME)) {
                         /** @var \Illuminate\Redis\RedisManager $manager */
                         $manager = $redisQueue->getRedis();
                         if ($manager->isConnected()) {
-                            if ($this->logger) {
-                                $this->logger->debug('Disconnecting, state detected, queue is connected');
-                            }
-                            if ($this->logger) {
-                                $this->logger->debug('Disconnecting, state ' . count($this->reservedJobs) . ' jobs reserved and not finalized');
-                            }
+                            $this->logDebug('Disconnecting, state detected, queue is connected');
+                            $this->logDebug('Disconnecting, state ' . count($this->reservedJobs) . ' jobs reserved and not finalized');
 
                             /** @var \Illuminate\Queue\Jobs\RedisJob $redisJob */
                             foreach ($this->reservedJobs as $redisJob) {
                                 /**
                                  * Send any unsent jobs back to queue, unclean shutdown
                                  */
-                                if ($this->logger) {
-                                    $this->logger->debug('Disconnecting, releasing reserved job ' . $redisJob->getJobId());
-                                }
+                                $this->logDebug('Disconnecting, releasing reserved job ' . $redisJob->getJobId());
                                 $redisJob->release();
                             }
                             $this->reservedJobs = [];
 
-                            if ($this->logger) {
-                                $this->logger->debug('Disconnecting, state detected, disconnecting queue manager');
-                            }
+                            $this->logDebug('Disconnecting, state detected, disconnecting queue manager');
                             $manager->disconnect();
                         } else {
-                            if ($this->logger) {
-                                $this->logger->debug('Disconnecting, state detected, queue is not connected');
-                            }
+                            $this->logDebug('Disconnecting, state detected, queue is not connected');
                         }
                     }
                 }
             } catch (\Exception $ex) {
                 $errmsg = __CLASS__ . ' ' . __FUNCTION__ . ': ' . $ex->getMessage();
-                if ($this->logger) {
-                    $this->logger->error($errmsg);
-                } else {
-                    trigger_error($errmsg, E_USER_WARNING);
-                }
+                $this->logError($errmsg);
             }
 
             $this->state     = self::STATE_NOTHING;
             $this->stateData = [];
             $this->connected = false;
-            if ($this->logger) {
-                $this->logger->debug('Disconnecting, successful');
-            }
+            $this->logDebug('Disconnecting, successful');
+
             return true;
         } else {
-            if ($this->logger) {
-                $this->logger->debug('Disconnecting, previously not connected');
-            }
+            $this->logDebug('Disconnecting, previously not connected');
         }
-        if ($this->logger) {
-            $this->logger->debug('Disconnecting, failed');
-        }
+
+        $this->logDebug('Disconnecting, failed');
         return false;
     }
 
@@ -284,16 +262,12 @@ class Redis extends AbstractAdapter
      */
     public function afterWorkFailed($workId)
     {
-        if ($this->logger) {
-            $this->logger->debug(__FUNCTION__);
-        }
+        $this->logDebug(__FUNCTION__);
 
         if ($this->connected && ($this->state == self::STATE_BINDREAD ||
                                  $this->state == self::STATE_BINDWRITE)) {
 
-            if ($this->logger) {
-                $this->logger->debug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
-            }
+            $this->logDebug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
 
             /** @var \Illuminate\Queue\Jobs\RedisJob $redisJob */
             if (isset($this->reservedJobs[$workId]) && $redisJob = $this->reservedJobs[$workId]) {
@@ -301,9 +275,7 @@ class Redis extends AbstractAdapter
                  * Delete reserved job from queue
                  */
                 if ($redisJob->getJobId() == $workId) {
-                    if ($this->logger) {
-                        $this->logger->debug(__FUNCTION__ . ' releasing back to queue / failed to process ' . $workId . ' job');
-                    }
+                    $this->logDebug(__FUNCTION__ . ' releasing back to queue / failed to process ' . $workId . ' job');
 
                     $redisJob->release();
                     unset($this->reservedJobs[$workId]);
@@ -323,16 +295,12 @@ class Redis extends AbstractAdapter
      */
     public function afterWorkSuccess($workId)
     {
-        if ($this->logger) {
-            $this->logger->debug(__FUNCTION__);
-        }
+        $this->logDebug(__FUNCTION__);
 
         if ($this->connected && ($this->state == self::STATE_BINDREAD ||
                                  $this->state == self::STATE_BINDWRITE)) {
 
-            if ($this->logger) {
-                $this->logger->debug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
-            }
+            $this->logDebug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
 
             /** @var \Illuminate\Queue\Jobs\RedisJob $redisJob */
             if (isset($this->reservedJobs[$workId]) && $redisJob = $this->reservedJobs[$workId]) {
@@ -340,9 +308,7 @@ class Redis extends AbstractAdapter
                  * Delete reserved job from queue
                  */
                 if ($redisJob->getJobId() == $workId) {
-                    if ($this->logger) {
-                        $this->logger->debug(__FUNCTION__ . ' releasing completed ' . $workId . ' job');
-                    }
+                    $this->logDebug(__FUNCTION__ . ' releasing completed ' . $workId . ' job');
 
                     $redisJob->delete();
                     unset($this->reservedJobs[$workId]);
@@ -355,10 +321,9 @@ class Redis extends AbstractAdapter
         return false;
     }
 
-    private function _connect() {
-        if ($this->logger) {
-            $this->logger->debug(__FUNCTION__);
-        }
+    private function _connect()
+    {
+        $this->logDebug(__FUNCTION__);
 
         //$this->app->singleton('encrypter', function () {
         //    return new \Illuminate\Encryption\Encrypter('383baa56ab');
@@ -453,9 +418,7 @@ class Redis extends AbstractAdapter
         /**
          * @todo deny picking task if already picked ?
          */
-        if ($this->logger) {
-            $this->logger->debug(__FUNCTION__);
-        }
+        $this->logDebug(__FUNCTION__);
 
         if ($timeout) {
             $this->blockFor = $timeout;
@@ -474,9 +437,7 @@ class Redis extends AbstractAdapter
 
             $redisJob = null;
 
-            if ($this->logger) {
-                $this->logger->debug(__FUNCTION__ . ' blocking for ' . (int) $this->blockFor . ' seconds until get a job');
-            }
+            $this->logDebug(__FUNCTION__ . ' blocking for ' . (int) $this->blockFor . ' seconds until get a job');
             if (static::BLOCKFOR_EMULATE) {
                 /**
                  * Pop immediatelly
@@ -495,9 +456,8 @@ class Redis extends AbstractAdapter
                     sleep(1);
                     $redisJob = $redisQueue->pop($this->queueName);
                     $i--;
-                    if ($this->logger) {
-                        $this->logger->debug(__FUNCTION__ . ' slept for 1 second');
-                    }
+
+                    $this->logDebug(__FUNCTION__ . ' slept for 1 second');
                 }
             } else {
                 $redisJob = $redisQueue->pop($this->queueName);
@@ -505,9 +465,7 @@ class Redis extends AbstractAdapter
 
             /** @var \Illuminate\Queue\Jobs\RedisJob $redisJob */
             if ($redisJob) {
-                if ($this->logger) {
-                    $this->logger->debug(__FUNCTION__ . ' reserved a job ' . $redisJob->getJobId());
-                }
+                $this->logDebug(__FUNCTION__ . ' reserved a job ' . $redisJob->getJobId());
 
                 if (isset($this->reservedJobs[$redisJob->getJobId()])) {
                     $redisJob->release();
@@ -531,9 +489,7 @@ class Redis extends AbstractAdapter
                 return [$redisJob->getJobId(),
                         $redisJob->payload()['data']];
             } else {
-                if ($this->logger) {
-                    $this->logger->debug(__FUNCTION__ . ' not reserved a job, nothing in queue');
-                }
+                $this->logDebug(__FUNCTION__ . ' not reserved a job, nothing in queue');
             }
         }
         return false;
@@ -547,9 +503,7 @@ class Redis extends AbstractAdapter
      */
     public function putTask($body, $params = array())
     {
-        if ($this->logger) {
-            $this->logger->debug(__FUNCTION__);
-        }
+        $this->logDebug(__FUNCTION__);
 
         if ($this->connected && (self::STATE_BINDREAD == $this->state ||
                                  self::STATE_BINDWRITE == $this->state)) {
@@ -580,14 +534,11 @@ class Redis extends AbstractAdapter
             if (isset($params[self::PARAM_READYWAIT]) && $params[self::PARAM_READYWAIT] > 0) {
                 $delay = new \DateInterval('PT' . ((int) $params[self::PARAM_READYWAIT]) . 'S');
                 $taskId = $instance->later($delay, $jobName, $body, $this->queueName);
-                if ($this->logger) {
-                    $this->logger->debug(__FUNCTION__ . ' ' . (($taskId) ? 'pushed' : 'failed push') . ' delayed job (' . (int) $params[self::PARAM_READYWAIT] . ' seconds) ' . $taskId);
-                }
+
+                $this->logDebug(__FUNCTION__ . ' ' . (($taskId) ? 'pushed' : 'failed push') . ' delayed job (' . (int) $params[self::PARAM_READYWAIT] . ' seconds) ' . $taskId);
             } else {
                 $taskId = $instance->push($jobName, $body, $this->queueName);
-                if ($this->logger) {
-                    $this->logger->debug(__FUNCTION__ . ' ' . (($taskId) ? 'pushed' : 'failed push') . ' task without delay ' . $taskId);
-                }
+                $this->logDebug(__FUNCTION__ . ' ' . (($taskId) ? 'pushed' : 'failed push') . ' task without delay ' . $taskId);
             }
 
             if (null === $taskId) {
@@ -604,9 +555,7 @@ class Redis extends AbstractAdapter
      */
     public function connect()
     {
-        if ($this->logger) {
-            $this->logger->debug(__FUNCTION__);
-        }
+        $this->logDebug(__FUNCTION__);
 
         if ($this->connected) {
             $this->disconnect();

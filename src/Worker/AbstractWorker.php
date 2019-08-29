@@ -70,8 +70,27 @@ abstract class AbstractWorker
      */
     public $workTimeout = null;
 
-    public function setWorkTimeout(?int $timeout = null) {
+    /**
+     * @var \Psr\Log\LoggerInterface
+     */
+    protected $logger;
+
+    /**
+     * @param int|null $timeout
+     */
+    public function setWorkTimeout(?int $timeout = null)
+    {
         $this->workTimeout = $timeout;
+    }
+
+    /**
+     * Declare logger
+     *
+     * @param \Psr\Log\LoggerInterface $log
+     */
+    public function setLogger(\Psr\Log\LoggerInterface $log)
+    {
+        $this->logger = $log;
     }
 
     /**
@@ -338,5 +357,35 @@ abstract class AbstractWorker
     public function setIdleTimeout(int $int)
     {
         $this->idleTimeout = (int) $int;
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logInfo(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->info($message);
+        }
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logDebug(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->debug($message);
+        }
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logError(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->error($message);
+        }
     }
 }

@@ -97,6 +97,43 @@ abstract class AbstractAdapter
      */
     abstract public function setWorkTimeout(int $seconds = null);
 
-    public function setLogger(\Psr\Log\LoggerInterface $logger) : void {
+    /**
+     * @param \Psr\Log\LoggerInterface $logger
+     */
+    public function setLogger(\Psr\Log\LoggerInterface $logger): void
+    {
         $this->logger = $logger;
-    }}
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logInfo(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->info($message);
+        }
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logDebug(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->debug($message);
+        }
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logError(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->error($message);
+        } else {
+            trigger_error($message, E_USER_WARNING);
+        }
+    }
+}

@@ -30,7 +30,6 @@ use RuntimeException;
 
 final class Apnsd extends AbstractWorker
 {
-    private $logger;
     private $pem;
     private $caCert;
     private $environment;
@@ -87,14 +86,6 @@ final class Apnsd extends AbstractWorker
     const SENDSPEED_TIMEOUT_DONTCARE    = 50000;   //0.05sec
 
     public $readWriteTimeout = 10;
-
-    /**
-     * Declare Logger
-     */
-    public function setLogger(\ApnsPHP_Log_Interface $log)
-    {
-        $this->logger = $log;
-    }
 
     /**
      * Declare CA Authority certificate
