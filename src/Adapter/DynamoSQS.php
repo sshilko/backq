@@ -279,9 +279,7 @@ class DynamoSQS extends AbstractAdapter
                 return true;
             }
         } catch (\Aws\DynamoDb\Exception\DynamoDbException $e) {
-            $this->logError(__FUNCTION__ . ' service failed: ' . $e->getAwsErrorCode() . $e->getMessage());
-        } catch (\Exception $e) {
-            $this->logError(__FUNCTION__ . ' failed: ' . $e->getMessage());
+            $this->logError(__FUNCTION__ . ' service failed: ' . $e->getMessage());
         }
 
         return false;

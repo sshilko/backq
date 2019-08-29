@@ -26,10 +26,9 @@
 
 namespace BackQ\Worker;
 
-use RuntimeException;
-
 final class Apnsd extends AbstractWorker
 {
+    private $pushLogger;
     private $pem;
     private $caCert;
     private $environment;
@@ -88,6 +87,14 @@ final class Apnsd extends AbstractWorker
     public $readWriteTimeout = 10;
 
     /**
+     * Declare Logger
+     */
+    public function setPushLogger(\ApnsPHP_Log_Interface $log)
+    {
+        $this->pushLogger = $log;
+    }
+
+    /**
      * Declare CA Authority certificate
      */
     public function setRootCertificationAuthority($caCert)
@@ -120,8 +127,8 @@ final class Apnsd extends AbstractWorker
             try {
                 $this->debug('connected to queue');
                 $push = new \BackQ\Adapter\ApnsdPush($this->environment, $this->pem);
-                if ($this->logger) {
-                    $push->setLogger($this->logger);
+                if ($this->pushLogger) {
+                    $push->setLogger($this->pushLogger);
                 }
                 $push->setRootCertificationAuthority($this->caCert);
 
