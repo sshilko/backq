@@ -31,22 +31,22 @@ final class MySerializedPublisher extends \BackQ\Publisher\Serialized
     }
 }
 
-$publisher1      = MyProcessPublisher::getInstance();
-$message1        = new \BackQ\Message\Process('echo $( date +%s ) >> /tmp/test');
-$publishOptions1 = [MyProcessPublisher::PARAM_JOBTTR    => 5,
-                    MyProcessPublisher::PARAM_READYWAIT => 1];
+$processPublisher      = MyProcessPublisher::getInstance();
+$processMessage        = new \BackQ\Message\Process('echo $( date +%s ) >> /tmp/test');
+$processPublishOptions = [MyProcessPublisher::PARAM_JOBTTR    => 5,
+                          MyProcessPublisher::PARAM_READYWAIT => 1];
 
 
-$publisher2      = MySerializedPublisher::getInstance();
-$message2        = new \BackQ\Message\Serialized($message1, $publisher1, $publishOptions1);
-$publishOptions2 = [//MySerializedPublisher::PARAM_MESSAGE_ID => $publisher1->getQueueName(),
-                    MySerializedPublisher::PARAM_READYWAIT  => 1];
+$publisher      = MySerializedPublisher::getInstance();
+$message        = new \BackQ\Message\Serialized($processMessage, $processPublisher, $processPublishOptions);
+$publishOptions = [//MySerializedPublisher::PARAM_MESSAGE_ID => $publisher1->getQueueName(),
+                   MySerializedPublisher::PARAM_READYWAIT  => 1];
 
-$message3 = serialize($message2);
-$message4 = unserialize($message3);
+$serializedMessage = serialize($message);
+$originalMessage   = unserialize($serializedMessage);
 
 $response = null;
-if ($publisher2->start()) {
-    $response = $publisher2->publish($message4, $publishOptions2);
+if ($publisher->start()) {
+    $response = $publisher->publish($originalMessage, $publishOptions);
     var_dump($response);
 }

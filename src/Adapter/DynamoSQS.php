@@ -2,8 +2,7 @@
 namespace BackQ\Adapter;
 
 use Aws\Sqs\SqsClient;
-use BackQ\Adapter\Amazon\DynamoDb\DynamoDbClient;
-use BackQ\Adapter\Amazon\DynamoDb\Client\Exception\DynamoDbException;
+use Aws\DynamoDb\DynamoDbClient;
 use BackQ\Adapter\Amazon\DynamoDb\QueueTableRow;
 use Aws\Exception\AwsException;
 
@@ -110,10 +109,10 @@ class DynamoSQS extends AbstractAdapter
      */
     public function connect()
     {
-        $arguments = ['version' => static::API_VERSION_DYNAMODB,
-                       'region' => $this->apiRegion,
-                  'credentials' => ['key'    => $this->apiKey,
-                                    'secret' => $this->apiSecret]];
+        $arguments = ['version'     => static::API_VERSION_DYNAMODB,
+                      'region'      => $this->apiRegion,
+                      'credentials' => ['key'    => $this->apiKey,
+                                        'secret' => $this->apiSecret]];
 
         $this->dynamoDBClient = new DynamoDbClient($arguments);
 
@@ -121,19 +120,6 @@ class DynamoSQS extends AbstractAdapter
         $this->sqsClient      = new SqsClient($arguments);
         return true;
     }
-
-    /**
-     * How max items to pick with each pick cycle
-     *
-     * @param int $pickN
-     */
-//    public function setPickBatchSize(int $pickN)
-//    {
-//        if ($pickN != 1) {
-//            throw new \InvalidArgumentException('Please ensure support in worker first');
-//        }
-//        $this->maxNumberOfMessages = $pickN;
-//    }
 
     /**
      * @return bool
@@ -207,9 +193,7 @@ class DynamoSQS extends AbstractAdapter
 
     public function pickTask()
     {
-        if ($this->logger) {
-            $this->logger->debug(__FUNCTION__);
-        }
+        $this->logDebug(__FUNCTION__);
 
         /** @var SqsClient $sqs */
         $sqs = $this->sqsClient;
@@ -229,9 +213,7 @@ class DynamoSQS extends AbstractAdapter
                                             'WaitTimeSeconds'   => (int) $this->workTimeout,
                                             'VisibilityTimeout' => $this->calculateVisibilityTimeout()]);
         }  catch (AwsException $e) {
-            if ($this->logger) {
-                $this->logger->error($e->getMessage());
-            }
+            $this->logError($e->getMessage());
         }
 
         if ($result && $result->hasKey('Messages') && count($result->get('Messages')) > 0) {
@@ -244,11 +226,11 @@ class DynamoSQS extends AbstractAdapter
 
                 if ($item) {
                     $itemPayload = $item->getPayload();
-                } elseif ($this->logger) {
-                    $this->logger->error(__FUNCTION__ . ' Invalid received message body');
+                } else {
+                    $this->logError(__FUNCTION__ . ' Invalid received message body');
                 }
-            } elseif ($this->logger) {
-                $this->logger->error(__FUNCTION__ . ' Unexpected data format on message body');
+            } else {
+                $this->logError(__FUNCTION__ . ' Unexpected data format on message body');
             }
 
             $messageId = $messagePayload['ReceiptHandle'];
@@ -260,9 +242,7 @@ class DynamoSQS extends AbstractAdapter
 
     public function putTask($body, $params = [])
     {
-        if ($this->logger) {
-            $this->logger->debug(__FUNCTION__);
-        }
+        $this->logDebug(__FUNCTION__);
 
         if (!$this->dynamoDBClient) {
             return false;
@@ -288,29 +268,18 @@ class DynamoSQS extends AbstractAdapter
 
         $item = new QueueTableRow($body, $readyTime, $msgid);
         try {
-            $response = $this->dynamoDBClient->putItem(['Item' => $item->toArray(),
+            $response = $this->dynamoDBClient->putItem(['Item'      => $item->toArray(),
                                                         'TableName' => $this->dynamoDbTableName]);
             if ($response &&
                 isset($response['@metadata']['statusCode']) &&
                 $response['@metadata']['statusCode'] == 200) {
 
-                if ($this->logger) {
-                    $this->logger->debug(__FUNCTION__ . ' success');
-                }
+                $this->logDebug(__FUNCTION__ . ' success');
 
                 return true;
             }
-        } catch (\Exception $e) {
-            if (is_subclass_of(DynamoDbException::class, get_class($e))) {
-                if ($this->logger) {
-                    /** @var $e DynamoDbException */
-                    $this->logger->error(__FUNCTION__ . ' service failed: ' . $e->getAwsErrorCode() . $e->getMessage());
-                }
-            } else {
-                if ($this->logger) {
-                    $this->logger->error(__FUNCTION__ . ' failed: ' . $e->getMessage());
-                }
-            }
+        } catch (\Aws\DynamoDb\Exception\DynamoDbException $e) {
+            $this->logError(__FUNCTION__ . ' service failed: ' . $e->getMessage());
         }
 
         return false;
@@ -330,9 +299,7 @@ class DynamoSQS extends AbstractAdapter
                 $sqs->deleteMessage(['QueueUrl' => $this->sqsQueueURL, 'ReceiptHandle' => $workId]);
                 return true;
             }  catch (AwsException $e) {
-                if ($this->logger) {
-                    $this->logger->error($e->getMessage());
-                }
+                $this->logError($e->getMessage());
             }
         }
         return true;
@@ -382,7 +349,8 @@ class DynamoSQS extends AbstractAdapter
      * @param null|int $seconds
      * @return null
      */
-    public function setWorkTimeout(int $seconds = null) {
+    public function setWorkTimeout(int $seconds = null)
+    {
         $this->workTimeout = $seconds;
         return null;
     }

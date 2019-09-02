@@ -4,47 +4,28 @@ namespace BackQ\Worker;
 use BackQ\Message\AbstractMessage;
 use BackQ\Publisher\AbstractPublisher;
 
-final class Serialized extends AbstractWorker
+class Serialized extends AbstractWorker
 {
-    /**
-     * @var \Psr\Log\LoggerInterface
-     */
-    private $logger;
-
     /**
      * @var int
      */
     public $workTimeout = 5;
 
-    /**
-     * Declare Logger
-     */
-    public function setLogger(\Psr\Log\LoggerInterface $log)
-    {
-        $this->logger = $log;
-    }
-
     public function run()
     {
         $connected = $this->start();
-        if ($this->logger) {
-            $this->logger->info('started');
-        }
+        $this->logInfo('started');
+
         $push = null;
         if ($connected) {
             try {
-                if ($this->logger) {
-                    $this->logger->info('before init work generator');
-                }
+                $this->logInfo('before init work generator');
+
                 $work = $this->work();
-                if ($this->logger) {
-                    $this->logger->info('after init work generator');
-                }
+                $this->logInfo('after init work generator');
 
                 foreach ($work as $taskId => $payload) {
-                    if ($this->logger) {
-                        $this->logger->info(time() . ' got some work: ' . ($payload ? 'yes' : 'no'));
-                    }
+                    $this->logInfo(time() . ' got some work: ' . ($payload ? 'yes' : 'no'));
 
                     if (!$payload && $this->workTimeout > 0) {
                         /**
@@ -59,9 +40,7 @@ final class Serialized extends AbstractWorker
 
                     if (!($message instanceof \BackQ\Message\Serialized)) {
                         $work->send(true);
-                        if ($this->logger) {
-                            $this->logger->error('Worker does not support payload of: ' . gettype($message));
-                        }
+                        $this->logError('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
                     $originalPublisher = $message->getPublisher();
@@ -77,28 +56,21 @@ final class Serialized extends AbstractWorker
                                 $processed = true;
                             }
                         } catch (\Exception $ex) {
-                            if ($this->logger) {
-                                $this->logger->error($ex->getMessage());
-                            }
+                            $this->logError($ex->getMessage());
                         }
                     } else {
-                        if ($this->logger) {
-                            if (!$originalMessage) {
-                                $this->logger->error('Missing original message');
-                            }
-                            if (!$originalPublisher) {
-                                $this->logger->error('Missing original publisher');
-                            }
+                        if (!$originalMessage) {
+                            $this->logError('Missing original message');
                         }
-
+                        if (!$originalPublisher) {
+                            $this->logError('Missing original publisher');
+                        }
                     }
 
                     $work->send($processed);
                 };
             } catch (\Exception $e) {
-                if ($this->logger) {
-                    $this->logger->error($e->getMessage());
-                }
+                $this->logError($e->getMessage());
             }
         }
         $this->finish();
