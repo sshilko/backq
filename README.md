@@ -27,7 +27,9 @@ composer require viveme/backq:^2.0
 * [DynamoDB](https://aws.amazon.com/dynamodb/) [SQS](https://aws.amazon.com/sqs/) [Lambda](https://aws.amazon.com/lambda/) for DynamoSQS adapter
 
 #### Licence
-Proprietary
+MIT
+
+Copyright 2019 Sergei Shilko
 
 #### API / Basic Usage / APNS push notifications
 

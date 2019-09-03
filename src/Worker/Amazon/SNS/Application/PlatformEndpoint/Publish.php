@@ -42,16 +42,16 @@ class Publish extends PlatformEndpoint
 
     public function run()
     {
-        $this->debug('Started');
+        $this->logDebug('Started');
         $connected = $this->start();
 
         if ($connected) {
 
             try {
-                $this->debug('Connected to queue');
+                $this->logDebug('Connected to queue');
 
                 $work = $this->work();
-                $this->debug('After init work generator');
+                $this->logDebug('After init work generator');
 
                 /**
                  * Keep an array with taskId and the number of times it was
@@ -63,7 +63,7 @@ class Publish extends PlatformEndpoint
                  * Attempt sending all messages in the queue
                  */
                 foreach ($work as $taskId => $payload) {
-                    $this->debug('got some work: ' . ($payload ? 'yes' : 'no'));
+                    $this->logDebug('got some work: ' . ($payload ? 'yes' : 'no'));
 
                     if (!$payload && $this->workTimeout > 0) {
                         /**
@@ -75,7 +75,7 @@ class Publish extends PlatformEndpoint
                     $message = @unserialize($payload);
                     if (!($message instanceof PublishMessageInterface)) {
                         $work->send(true);
-                        $this->debug('Worker does not support payload of: ' . gettype($message));
+                        $this->logDebug('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
 
@@ -95,7 +95,7 @@ class Publish extends PlatformEndpoint
 
                         $this->snsClient->publish($payload);
 
-                        $this->debug('SNS Client delivered message to endpoint');
+                        $this->logDebug('SNS Client delivered message to endpoint');
                     } catch (\Exception $e) {
 
                         if (is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
@@ -105,7 +105,7 @@ class Publish extends PlatformEndpoint
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_Publish.html#API_Publish_Errors
                              * @var $e SnsException
                              */
-                            $this->debug('Could not publish to endpoint with error ' . $e->getAwsErrorCode());
+                            $this->logDebug('Could not publish to endpoint with error ' . $e->getAwsErrorCode());
 
                             /**
                              * When an endpoint was marked as disabled or the
@@ -133,7 +133,7 @@ class Publish extends PlatformEndpoint
                                 if (isset($reprocessedTasks[$taskId])) {
 
                                     if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
-                                        $this->debug('Retried re-processing the same job too many times');
+                                        $this->logDebug('Retried re-processing the same job too many times');
                                         unset($reprocessedTasks[$taskId]);
 
                                         /**
@@ -155,7 +155,7 @@ class Publish extends PlatformEndpoint
                                 continue;
                             }
                         } else {
-                            $this->debug('Hard error: ' . $e->getMessage());
+                            $this->logDebug('Hard error: ' . $e->getMessage());
                             trigger_error(__CLASS__ . ' ' . $e->getMessage(), E_USER_WARNING);
                         }
                     } finally {
@@ -166,7 +166,7 @@ class Publish extends PlatformEndpoint
                 @error_log('[' . date('Y-m-d H:i:s') . '] SNS worker exception: ' . $e->getMessage());
             }
         } else {
-            $this->debug('Unable to connect');
+            $this->logDebug('Unable to connect');
         }
 
         $this->finish();

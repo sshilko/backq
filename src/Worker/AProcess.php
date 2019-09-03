@@ -40,13 +40,13 @@ final class AProcess extends AbstractWorker
     public function run()
     {
         $connected = $this->start();
-        $this->debug('started');
+        $this->logDebug('started');
         $forks = array();
         if ($connected) {
             try {
-                $this->debug('connected');
+                $this->logDebug('connected');
                 $work = $this->work();
-                $this->debug('after init work generator');
+                $this->logDebug('after init work generator');
 
                 /**
                  * Until next job maximum 1 zombie process might be hanging,
@@ -59,7 +59,7 @@ final class AProcess extends AbstractWorker
                     $processed = true;
 
                     if ($payload) {
-                        $this->debug('got some payload: ' . $payload);
+                        $this->logDebug('got some payload: ' . $payload);
 
                         $message = @unserialize($payload);
                         if (!($message instanceof \BackQ\Message\Process)) {
@@ -69,7 +69,7 @@ final class AProcess extends AbstractWorker
                             $run = true;
                         }
                     } else {
-                        $this->debug('empty loop due to empty payload');
+                        $this->logDebug('empty loop due to empty payload');
 
                         $message   = null;
                         $run       = false;
@@ -99,7 +99,7 @@ final class AProcess extends AbstractWorker
                              * @tip use PHP_BINARY for php path
                              */
                             $run = function() use ($message) {
-                                $this->debug('launching ' . $message->getCommandline());
+                                $this->logDebug('launching ' . $message->getCommandline());
                                 $cmd = $message->getCommandline();
                                 $timeout = $message->getTimeout() ?? 60;
 

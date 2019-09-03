@@ -42,15 +42,15 @@ class Register extends PlatformEndpoint
 
     public function run()
     {
-        $this->debug('Started');
+        $this->logDebug('Started');
         $connected = $this->start();
         if ($connected) {
 
             try {
-                $this->debug('Connected to queue');
+                $this->logDebug('Connected to queue');
 
                 $work = $this->work();
-                $this->debug('After init work generator');
+                $this->logDebug('After init work generator');
 
                 /**
                  * Keep an array with taskId and the number of times it was
@@ -62,7 +62,7 @@ class Register extends PlatformEndpoint
                  * Now attempt to register all devices
                  */
                 foreach ($work as $taskId => $payload) {
-                    $this->debug('Got some work');
+                    $this->logDebug('Got some work');
 
                     if (!$payload && $this->workTimeout > 0) {
                         /**
@@ -75,7 +75,7 @@ class Register extends PlatformEndpoint
 
                     if (!($message instanceof RegisterMessageInterface)) {
                         $work->send(true);
-                        $this->debug('Worker does not support payload of: ' . gettype($message));
+                        $this->logDebug('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
 
@@ -115,7 +115,7 @@ class Register extends PlatformEndpoint
                                  */
                                 if (isset($reprocessedTasks[$taskId])) {
                                     if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
-                                        $this->debug('Retried re-processing the same job too many times');
+                                        $this->logDebug('Retried re-processing the same job too many times');
                                         unset($reprocessedTasks[$taskId]);
 
                                         /**
@@ -146,7 +146,7 @@ class Register extends PlatformEndpoint
                             $work->send(false);
                             break;
                         }
-                        $this->debug('Endpoint registered successfully on Service provider and backend');
+                        $this->logDebug('Endpoint registered successfully on Service provider and backend');
                     } else {
                         $processed = false;
                     }

@@ -38,7 +38,6 @@ abstract class AbstractWorker
 {
     private $adapter;
     private $bind;
-    private $doDebug;
 
     /**
      * Whether syscalls should be delayed
@@ -86,9 +85,9 @@ abstract class AbstractWorker
     /**
      * Declare logger
      *
-     * @param \Psr\Log\LoggerInterface $log
+     * @param null|\Psr\Log\LoggerInterface $log
      */
-    public function setLogger(\Psr\Log\LoggerInterface $log)
+    public function setLogger(?\Psr\Log\LoggerInterface $log)
     {
         $this->logger = $log;
     }
@@ -118,6 +117,8 @@ abstract class AbstractWorker
     public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
         $this->adapter = $adapter;
+        $output        = new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_NORMAL);
+        $this->setLogger(new \Symfony\Component\Console\Logger\ConsoleLogger($output));
     }
 
     /**
@@ -266,14 +267,14 @@ abstract class AbstractWorker
              * Break infinite loop when a limit condition is reached
              */
             if ($this->idleTimeout > 0 && (time() - $lastActive) > ($this->idleTimeout - $timeout)) {
-                $this->debug('Idle timeout reached, returning job, quitting');
+                $this->logDebug('Idle timeout reached, returning job, quitting');
                 if ($this->onIdleTimeout()) {
                     break;
                 }
             }
 
             if ($this->restartThreshold > 0 && ++$jobsdone > ($this->restartThreshold - 1)) {
-                $this->debug('Restart threshold reached, returning job, quitting');
+                $this->logDebug('Restart threshold reached, returning job, quitting');
                 if ($this->onRestartThreshold()) {
                     break;
                 }
@@ -322,21 +323,6 @@ abstract class AbstractWorker
             return true;
         }
         return false;
-    }
-
-    public function toggleDebug($flag)
-    {
-        $this->doDebug = $flag;
-    }
-
-    /**
-     * Process debug logging if needed
-     */
-    protected function debug($log)
-    {
-        if ($this->doDebug) {
-            echo $log . "\n";
-        }
     }
 
     /**

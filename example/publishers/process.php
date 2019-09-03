@@ -24,11 +24,13 @@ final class MyProcessPublisher extends \BackQ\Publisher\Process
 }
 
 $publisher = MyProcessPublisher::getInstance();
-if ($publisher->start() && $publisher->hasWorkers()) {
+if ($publisher->start() //&& $publisher->hasWorkers()
+   ) {
     $message = new \BackQ\Message\Process($command);
     $result  = $publisher->publish($message, [MyProcessPublisher::PARAM_JOBTTR    => 5,
                                               MyProcessPublisher::PARAM_READYWAIT => 1]);
     if ($result > 0) {
+        echo "Published `" . $message->getCommandline() . '`` as ID=' . $result . "\n";
         /**
          * Success
          */

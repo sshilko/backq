@@ -2,10 +2,10 @@
 /**
  * Worker
  *
- * Send APNS (Apple Push Notifications)
+ * Send APNS (Apple Push Notifications) from the queue
  * Launches a worker that listens for jobs on queue="apnsd-myapp1"
  * 
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2019 Sergei Shilko <contact@sshilko.com>
  */
 
 include_once '../../vendor/autoload.php';
@@ -18,7 +18,11 @@ $pem = 'myapp_apns_certificate.pem';
 $ca  = 'entrust_2048_ca.cer';
 
 $worker = new \BackQ\Worker\Apnsd(new \BackQ\Adapter\Beanstalk);
-$worker->setLogger(new \BackQ\Logger($logFilePath));
+
+$logger = new \Symfony\Component\Console\Logger\ConsoleLogger(new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG));
+$worker->setLogger($logger);
+
+$worker->setPushLogger(new \BackQ\Logger($logFilePath));
 $worker->setRootCertificationAuthority($ca);
 $worker->setCertificate($pem);
 $worker->setEnvironment($env);

@@ -1,15 +1,13 @@
 <?php
 /**
- * Publisher
+ * APNS Publisher
  *
  * Queues APNS (Apple Push Notifications)
- * Publishes a jobs to queue="apnsd-myapp1"
- * 
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2019 Sergei Shilko <contact@sshilko.com>
  */
 include_once '../../vendor/autoload.php';
 
-final class MyApnsdPublisher extends \BackQ\Publisher\Apnsd
+class MyApnsdPublisher extends \BackQ\Publisher\Apnsd
 {
     public const PARAM_JOBTTR    = \BackQ\Adapter\Beanstalk::PARAM_JOBTTR;
     public const PARAM_READYWAIT = \BackQ\Adapter\Beanstalk::PARAM_READYWAIT;
@@ -31,7 +29,7 @@ $message->setCustomProperty('acme3', array('bing', 'bong'));
 $message->setExpiry(30);
 
 $app       = '-myapp1';
-$messagesQ = array($app => array($message));
+$messagesQ = [$app => [$message]];
 
 $publisher = MyApnsdPublisher::getInstance();
 $queueName = $publisher->getQueueName();
@@ -44,18 +42,23 @@ $params = array(MyApnsdPublisher::PARAM_JOBTTR => 4,
                 MyApnsdPublisher::PARAM_READYWAIT => 1);
 
 foreach ($messagesQ as $app => $messages) {
+    echo 'Publishing message: ' . $message->getText() . "\n";
     /**
      * Cant just switch to different queue, have to make a new instance
      */
     $publisher->setQueueName($queueName . $app);
     $unpublished = $messages;
 
-    if ($publisher->start() && $publisher->hasWorkers()) {
+    if ($publisher->start() //&& $publisher->hasWorkers()
+       ) {
+        echo 'Connected and maybe has workers' . "\n";
         /**
          * Send into queue
          */
-        for ($i = 0; $i < count($messages); $i++) {
+        $countMessages = count($messages);
+        for ($i = 0; $i < $countMessages; $i++) {
             $result = $publisher->publish($messages[$i], $params);
+            echo "Published into queue as id=" . $result . "\n";
             if ($result > 0) {
                 unset($unpublished[$i]);
             } else {

@@ -43,15 +43,15 @@ class Remove extends PlatformEndpoint
 
     public function run()
     {
-        $this->debug('started');
+        $this->logDebug('started');
         $connected = $this->start();
         if ($connected)  {
             $client = null;
             try {
-                $this->debug('connected to queue');
+                $this->logDebug('connected to queue');
 
                 $work = $this->work();
-                $this->debug('after init work generator');
+                $this->logDebug('after init work generator');
 
                 /**
                  * Keep an array with taskId and the number of times it was
@@ -63,7 +63,7 @@ class Remove extends PlatformEndpoint
                  * Process all messages that were published pointing to a disabled or non existing endpoint
                  */
                 foreach ($work as $taskId => $payload) {
-                    $this->debug('got some work');
+                    $this->logDebug('got some work');
 
                     if (!$payload && $this->workTimeout > 0) {
                         /**
@@ -76,7 +76,7 @@ class Remove extends PlatformEndpoint
 
                     if (!($message instanceof RemoveMessageInterface)) {
                         $work->send(true);
-                        $this->debug('Worker does not support payload of: ' . gettype($message));
+                        $this->logDebug('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
 
@@ -100,7 +100,7 @@ class Remove extends PlatformEndpoint
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html#API_DeleteEndpoint_Errors
                              * @var $e SnsException
                              */
-                            $this->debug('Could not delete endpoint with error: ' . $e->getAwsErrorCode());
+                            $this->logDebug('Could not delete endpoint with error: ' . $e->getAwsErrorCode());
 
                             /**
                              * With issues regarding Authorization or parameters, nothing
@@ -126,7 +126,7 @@ class Remove extends PlatformEndpoint
                                 if (isset($reprocessedTasks[$taskId])) {
 
                                     if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
-                                        $this->debug('Retried re-processing the same job too many times');
+                                        $this->logDebug('Retried re-processing the same job too many times');
                                         unset($reprocessedTasks[$taskId]);
 
                                         $work->send(true);
@@ -147,7 +147,7 @@ class Remove extends PlatformEndpoint
                      * Proceed un-registering the device and endpoint (managed by the token provider)
                      * Retry sending the job to the queue on error/problems deleting
                      */
-                    $this->debug('Deleting device with Arn ' . $message->getEndpointArn());
+                    $this->logDebug('Deleting device with Arn ' . $message->getEndpointArn());
                     $delSuccess = $this->onSuccess($message);
 
                     if (!$delSuccess) {
@@ -157,7 +157,7 @@ class Remove extends PlatformEndpoint
                         $work->send(false);
                         continue;
                     } else {
-                        $this->debug('Endpoint/Device successfully deleted on Service provider and backend');
+                        $this->logDebug('Endpoint/Device successfully deleted on Service provider and backend');
                         $work->send(true);
                     }
                 }

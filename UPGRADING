@@ -44,6 +44,11 @@ in SQS queue (DynamoDB->DynamoDB Stream->Lambda->SQS) where they are picked up b
 `Nsq` adapter is no longer maintaned as it's performance is too low. The benefit it has is built-in dashboard
 and status of queues. You can continue using it as is.
 
+`toggleDebug()` is removed on workers, they now use standard PSR logger, by default with NORMAL verbose level and
+output to console
+
+`debug()` is removed on workers, replaced with `logDebug()`
+
 ========================================
 4. Performance Improvements
 ========================================
