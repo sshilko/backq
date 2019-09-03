@@ -4,10 +4,6 @@ namespace BackQ\Message;
 
 use BackQ\Publisher\AbstractPublisher;
 
-/**
- * Class DynamoSQSSlow
- * @package BackQ\Message
- */
 class Serialized extends AbstractMessage
 {
     /**

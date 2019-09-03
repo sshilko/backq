@@ -1,13 +1,13 @@
 {
     "name": "viveme/backq",
     "licence": "proprietary",
-    "description": "Background push notifications processing with workers & publisher",
+    "description": "Background jobs processing with queue, workers & publishers",
     "type": "library",
     "minimum-stability": "dev",
     "support": {
         "issues": "https://github.com/viveme/backq/issues"
     },
-    "keywords": ["queue", "worker", "apns", "push", "ios", "apple", "notification", "send", "background", "process", "async"],
+    "keywords": ["queue", "worker", "apns", "push", "ios", "fcm", "apple", "guzzle", "process", "notification", "sqs", "dynamodb", "send", "background", "async"],
     "homepage": "https://github.com/viveme/backq",
     "require": {
         "php": "^7.1",

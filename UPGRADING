@@ -1,0 +1,86 @@
+-------------------------------------------------------------------------------
+2.0.0
+
+1. Backward Incompatible Changes
+2. New Features
+3. Deprecated Functionality
+4. Performance Improvements
+
+========================================
+1. Backward Incompatible Changes
+========================================
+
+- Publisher:
+  - All the `Publisher`'s are now `abstract` classes
+  - `__construct` no longer accepts adapter, define `setupAdapter` instead
+  - `setupAdapter` is new method that set-up's the adapter instead of constructor
+  - `__wakeup` and `__sleep` are now defined on `AbstractPublisher` for serialization
+
+========================================
+2. New Features
+========================================
+
+Will now keep track of changes in UPGRADING document.
+
+New `Serialized` idea is a worker/queue/publisher that wrap messages from other publishers, currently
+this is used to reliably delay long tasts (i.e. something to be scheduled in two weeks), and is used together
+with new `DynamoSQS` adapter that saves jobs to AWS DynamoDB and once jobs are ready (TTL triggers) they end up
+in SQS queue (DynamoDB->DynamoDB Stream->Lambda->SQS) where they are picked up by worker.
+`DynamoSQS` uses DynamoDB for saving and SQS for picking jobs.
+
+- Publisher:
+  - New `Serialized` publisher
+- Workers:
+  - New `Serialized` worker
+- Message
+  - New `Serialized` message
+- Adapter
+  - New `DynamoSQS` adapter
+
+========================================
+3. Deprecated Functionality
+========================================
+
+`Nsq` adapter is no longer maintaned as it's performance is too low. The benefit it has is built-in dashboard
+and status of queues. You can continue using it as is.
+
+========================================
+4. Performance Improvements
+========================================
+
+Refactored internal worker generator loop for handling of empty loops, this affects the APNS worker directly
+and possibly others.
+Recommended PHP version 7.2 or 7.3.
+
+-------------------------------------------------------------------------------
+1.9
+
+1. New Features
+2. Deprecated Functionality
+3. Performance Improvements
+
+========================================
+1. New Features
+========================================
+Summarizing all changes between 1.3 and 1.9.
+1.9.13 is last stable and recommended release in version 1.
+
+- Adapter
+  - New `NSQ` adapter for nsq.io server (distributed, scalable, has built-in ui)
+  - New `Redis` adapter based on illuminate/redis and illuminate/queue
+
+========================================
+2. Deprecated Functionality
+========================================
+
+`GCM` worker, adapter and message are removed in favor of `Fcm`.
+
+========================================
+3. Performance Improvements
+========================================
+
+Many bugfixes and improvements, please use latest 1.9 release.
+New logger api.
+
+
+
