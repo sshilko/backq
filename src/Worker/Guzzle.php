@@ -32,6 +32,10 @@ final class Guzzle extends AbstractWorker
                     $this->logDebug('got some work: ' . ($payload ? 'yes' : 'no'));
 
                     if (!$payload && $this->workTimeout > 0) {
+                        /**
+                         * Just empty loop, no work fetched
+                         */
+                        $work->send(true);
                         continue;
                     }
 
@@ -46,6 +50,20 @@ final class Guzzle extends AbstractWorker
                         $this->logDebug('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
+
+                    if (!$message->isReady()) {
+                        /**
+                         * Message should not be processed now
+                         */
+                        $work->send(false);
+                        continue;
+                    }
+
+                    if ($message->isExpired()) {
+                        $work->send(true);
+                        continue;
+                    }
+
                     try {
                         $me = $this;
 

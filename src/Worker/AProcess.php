@@ -71,6 +71,19 @@ final class AProcess extends AbstractWorker
                         }
 
                         if ($run) {
+                            if (!$message->isReady()) {
+                                /**
+                                 * Message should not be processed yet
+                                 */
+                                $work->send(false);
+                                continue;
+                            }
+
+                            if ($message->isExpired()) {
+                                $work->send(true);
+                                continue;
+                            }
+
                             /**
                              * Enclosure in anonymous function
                              *
@@ -194,7 +207,7 @@ final class AProcess extends AbstractWorker
                          */
                         throw new \RuntimeException('Worker not reliable, failed to process task: ' . $processed);
                     }
-                };
+                }
             } catch (\Exception $e) {
                 @error_log('Process worker exception: ' . $e->getMessage());
             }

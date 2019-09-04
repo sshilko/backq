@@ -10,7 +10,21 @@
 
 namespace BackQ\Message;
 
-abstract class AbstractMessage
+abstract class AbstractMessage implements ConsumeInterface
 {
+    /**
+     * @return bool
+     */
+    public function isReady(): bool
+    {
+        return true;
+    }
 
+    /**
+     * @return bool
+     */
+    public function isExpired(): bool
+    {
+        return false;
+    }
 }
