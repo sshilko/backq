@@ -252,7 +252,20 @@ class Redis extends AbstractAdapter
      */
     public function ping($reconnect = true)
     {
-        return true;
+        if ($this->connected && $this->queue) {
+            /** @var \BackQ\Adapter\Redis\Queue $redisQueue */
+            $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
+            /** @var \Predis\ClientInterface $redis */
+            $redis = $redisQueue->getRedis();
+            $pong  = $redis->ping();
+
+            if (true === $pong || '+PONG' === $pong) {
+                $this->logDebug(__FUNCTION__. ' successful');
+                return true;
+            }
+        }
+        $this->logDebug(__FUNCTION__. ' failed');
+        return false;
     }
 
     /**

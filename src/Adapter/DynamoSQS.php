@@ -36,6 +36,8 @@ class DynamoSQS extends AbstractAdapter
      */
     public const PARAM_MESSAGE_ID = 'msgid';
 
+    protected const TIMEOUT_VISIBILITY_MIN = 10;
+
     /**
      * Controls how many times and how often the job can be retried on failures
      */
@@ -171,7 +173,7 @@ class DynamoSQS extends AbstractAdapter
         /**
          * How much time we estimate it takes to process the picked results
          */
-        return max($this->workTimeout * 4, 10);
+        return max($this->workTimeout * 4, self::TIMEOUT_VISIBILITY_MIN);
     }
 
     /**

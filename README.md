@@ -31,7 +31,7 @@ Copyright 2019 Sergei Shilko
 
 #### Features
 
-You are able to use any adapter with any publisher/worker i.e.
+Workers compatibility with adapters
 
 | Adapter / Worker  |[FCM](https://firebase.google.com/docs/cloud-messaging)|[APNS](https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW9)|[Process](http://symfony.com/doc/current/components/process.html)|[Guzzle](https://www.php-fig.org/psr/psr-7/)|Serialized|
 |----|---|---|---|---|---|
@@ -40,15 +40,21 @@ You are able to use any adapter with any publisher/worker i.e.
 | [NSQ](https://nsq.io/)          | +  | +  | +  | +  | ?  |
 | [DynamoSQS](https://aws.amazon.com/)    | +  | +  | +  | +  | +  |
 
-Adapters typically support
-* setRestartThreshold (after how many processed jobs the worker will terminate)
-* setIdleTimeout (after how many seconds idling the worker will terminate)
-* Delaying job execution (in seconds)
-* Beanstalkd supports [TTR](https://github.com/beanstalkd/beanstalkd/wiki/FAQ)
+Adapter implemented features
 
-Better adapter documentation/interfaces coming soon. `@todo`
+| Adapter / Feature  | ping  | hasWorkers  | setWorkTimeout |
+|---|---|---|---|
+| [Beanstalkd](https://beanstalkd.github.io/)  | + | +  | + 
+| [Redis](https://redis.io) | + | - | + 
+| [NSQ](https://nsq.io/) | + |  - | * 
+| [DynamoSQS](https://aws.amazon.com/) | - | - | + 
 
-See `example` folder for up to date examples
+Worker available features
+
+- `setRestartThreshold` (limit max number of jobs cycles, then terminate)
+- `setIdleTimeout` (limit max idle time, then terminating)
+
+See `/example/` folder for up to date examples
 
 #### Version 1 detailed review
 

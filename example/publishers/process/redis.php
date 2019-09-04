@@ -19,7 +19,7 @@ final class MyProcessPublisher extends \BackQ\Publisher\Process
         $output = new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG);
         $logger = new \Symfony\Component\Console\Logger\ConsoleLogger($output);
 
-        $adapter = new \BackQ\Adapter\Redis;
+        $adapter = new \BackQ\Adapter\Redis('127.0.0.1', 6379);
         $adapter->setLogger($logger);
 
         return $adapter;

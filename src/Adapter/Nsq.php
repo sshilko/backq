@@ -164,7 +164,7 @@ class Nsq extends AbstractAdapter
             /**
              * 1000ms is minimum hearbeat
              */
-            $this->config['heartbeat_interval_ms'] = intval($seconds * 1000);
+            $this->config['heartbeat_interval_ms'] = (int) ($seconds * 1000);
         }
     }
 
