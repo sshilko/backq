@@ -348,6 +348,15 @@ abstract class AbstractWorker
 
     /**
      * @param string $message
+     * @deprecated
+     */
+    public function debug(string $message)
+    {
+        $this->logDebug($message);
+    }
+
+    /**
+     * @param string $message
      */
     public function logDebug(string $message)
     {
