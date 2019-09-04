@@ -24,11 +24,6 @@ composer require viveme/backq:^2.0
 * [NSQ](https://nsq.io) 
 * [DynamoDB](https://aws.amazon.com/dynamodb/) [SQS](https://aws.amazon.com/sqs/) [Lambda](https://aws.amazon.com/lambda/) for DynamoSQS adapter
 
-#### Licence
-MIT
-
-Copyright 2019 Sergei Shilko
-
 #### Features
 
 Workers compatibility with adapters
@@ -63,4 +58,10 @@ See [/example](https://github.com/viveme/backq/tree/master/example) folder for u
 #### Old version 1 detailed review
 
 [Blog post about sending Apple push notifications](http://moar.sshilko.com/2014/09/09/APNS-Workers/) 
+
+#### Licence
+MIT
+
+Copyright 2013-2019 Sergei Shilko
+
 

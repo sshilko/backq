@@ -201,6 +201,7 @@ abstract class AbstractWorker
                 break;
             }
 
+            $this->logDebug('Picking task');
             $job = $this->adapter->pickTask();
             /**
              * @todo $job[2] is optinal array of adapter specific results
@@ -217,8 +218,10 @@ abstract class AbstractWorker
 
                 $ack = false;
                 if ($response === false) {
+                    $this->logDebug('Calling afterWorkFailed, worker reported failure');
                     $ack = $this->adapter->afterWorkFailed($job[0]);
                 } else {
+                    $this->logDebug('Calling afterWorkSuccess, worker reported success');
                     $ack = $this->adapter->afterWorkSuccess($job[0]);
                 }
 
@@ -236,8 +239,8 @@ abstract class AbstractWorker
                     /**
                      * Two yield's are not mistake
                      */
-                    yield;
-                    yield;
+                    yield null;
+                    yield null;
                 }
             }
 
@@ -247,14 +250,20 @@ abstract class AbstractWorker
             if ($this->idleTimeout > 0 && (time() - $lastActive) > ($this->idleTimeout - $timeout)) {
                 $this->logDebug('Idle timeout reached, returning job, quitting');
                 if ($this->onIdleTimeout()) {
+                    $this->logDebug('onIdleTimeout true');
                     break;
+                } else {
+                    $this->logDebug('onIdleTimeout false');
                 }
             }
 
             if ($this->restartThreshold > 0 && ++$jobsdone > ($this->restartThreshold - 1)) {
                 $this->logDebug('Restart threshold reached, returning job, quitting');
                 if ($this->onRestartThreshold()) {
+                    $this->logDebug('onRestartThreshold true');
                     break;
+                } else {
+                    $this->logDebug('onRestartThreshold false');
                 }
             }
         }
@@ -285,6 +294,7 @@ abstract class AbstractWorker
                 /**
                  * Received request to stop/terminate process
                  */
+                $this->logDebug('termination requested');
                 return true;
             }
         }
@@ -296,8 +306,11 @@ abstract class AbstractWorker
      */
     protected function finish()
     {
+        $this->logDebug('finish() called');
         if ($this->bind) {
+            $this->logDebug('disconnecting binded adapter');
             $this->adapter->disconnect();
+            $this->logDebug('disconnected binded adapter');
             return true;
         }
         return false;

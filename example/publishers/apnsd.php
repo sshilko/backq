@@ -45,8 +45,8 @@ $queueName = $publisher->getQueueName();
  * Give 4 seconds to dispatch the message (time to run)
  * Delay each job by 1 second
  */
-$params = array(MyApnsdPublisher::PARAM_JOBTTR => 4,
-                MyApnsdPublisher::PARAM_READYWAIT => 1);
+$params = [MyApnsdPublisher::PARAM_JOBTTR    => 4,
+           MyApnsdPublisher::PARAM_READYWAIT => 1];
 
 foreach ($messagesQ as $app => $messages) {
     echo 'Publishing message: ' . $message->getText() . "\n";
@@ -65,11 +65,11 @@ foreach ($messagesQ as $app => $messages) {
         $countMessages = count($messages);
         for ($i = 0; $i < $countMessages; $i++) {
             $result = $publisher->publish($messages[$i], $params);
-            echo "Published into queue as id=" . $result . "\n";
+            echo 'Published into queue as id=' . $result . "\n";
             if ($result > 0) {
                 unset($unpublished[$i]);
             } else {
-                @error_log('Failed to publish apns asynchronously via apnsd');
+                echo 'Failed to publish apns asynchronously via apnsd';
             }
         }
     }

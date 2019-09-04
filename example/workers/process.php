@@ -17,5 +17,12 @@ include_once '../../vendor/autoload.php';
  * Launches a worker that listens for jobs on default queue="process"
  */
 
+$output  = new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG);
+$logger  = new \Symfony\Component\Console\Logger\ConsoleLogger($output);
+
 $worker = new \BackQ\Worker\AProcess(new \BackQ\Adapter\Beanstalk);
+$worker->setLogger($logger);
+$worker->setWorkTimeout(1);
+$worker->setIdleTimeout(12);
+$worker->setQueueName('abc');
 $worker->run();

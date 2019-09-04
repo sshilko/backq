@@ -53,7 +53,7 @@ final class AProcess extends AbstractWorker
                             $run = true;
                         }
                     } else {
-                        $this->logDebug('empty loop due to empty payload');
+                        $this->logDebug('empty loop due to empty payload: ' . var_export($payload, true));
 
                         $message   = null;
                         $run       = false;
@@ -185,6 +185,7 @@ final class AProcess extends AbstractWorker
                         @error_log('Process worker failed to run: ' . $e->getMessage());
                     }
 
+                    $this->logDebug('reporting work as processed: ' . var_export($processed, true));
                     $work->send($processed);
 
                     if (true !== $processed) {

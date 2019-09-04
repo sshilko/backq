@@ -23,37 +23,26 @@ include_once('../../../src/Adapter/IO/Exception/RuntimeException.php');
 
 $queue = 'hello-world';
 
-class logz {
-    function error($msg) {
-        echo "\n" . date('c') . " ERROR: " . $msg;
-    }
-    function info($msg) {
-        echo "\n" . date('c') . " INFO: " . $msg;
-    }
-}
-$logger = new logz();
-
-$logger->info('Starting');
-$nsqpub = new \BackQ\Adapter\Nsq('127.0.0.1', 4150, ['logger' => $logger]);
+$nsqpub = new \BackQ\Adapter\Nsq('127.0.0.1', 4150, ['persistent' => false]);
 $nsqpub->setWorkTimeout(5);
 if ($nsqpub->connect()) {
-    $logger->info('Connected');
+    $nsqpub->logInfo('Connected');
     if ($nsqpub->bindWrite($queue)) {
-        $logger->info('Ready to publish');
+        $nsqpub->logInfo('Ready to publish');
         $i = 100;
         while ($i > 0) {
             $randomMessage = 'Payload body of message ' . time();
             if ($nsqpub->putTask($randomMessage)) {
-                $logger->info('Pushed message');
+                $nsqpub->logInfo('Pushed message');
             } else {
-                $logger->error('Failed pushing message message');
+                $nsqpub->logError('Failed pushing message message');
             }
             $i--;
             sleep(1);
         }
     }
 }
-$logger->info('All done');
+$nsqpub->logInfo('All done');
 $nsqpub->disconnect();
-$logger->info('Disconnected');
+$nsqpub->logInfo('Disconnected');
 

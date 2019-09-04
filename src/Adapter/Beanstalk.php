@@ -76,12 +76,13 @@ class Beanstalk extends AbstractAdapter
         return null;
     }
 
+    /**
+     * This overrides the original Beanstalkd logger
+     * @see \Beanstalk\Client._error()
+     * @param $msg
+     */
     public function error($msg) {
-        if ($this->logger) {
-            $this->logger->error($msg);
-        } else {
-            error_log($msg);
-        }
+        $this->logError($msg);
     }
 
     /**
@@ -159,7 +160,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -178,7 +179,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -199,7 +200,7 @@ class Beanstalk extends AbstractAdapter
                     return [$result['id'], $result['body'], []];
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -218,7 +219,7 @@ class Beanstalk extends AbstractAdapter
         if ($this->connected) {
             try {
                 $result = array();
-                for ($i=0; $i<$max; $i++) {
+                for ($i = 0; $i < $max; $i++) {
                     /**
                      * Pick a task or return immediattely if no (more) tasks available
                      */
@@ -232,7 +233,7 @@ class Beanstalk extends AbstractAdapter
                 return $result;
 
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -272,7 +273,7 @@ class Beanstalk extends AbstractAdapter
                     return (string) $result;
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -294,7 +295,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -313,7 +314,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -332,10 +333,9 @@ class Beanstalk extends AbstractAdapter
                 $this->connected = false;
                 return true;
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
     }
-
 }

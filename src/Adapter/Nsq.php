@@ -73,7 +73,6 @@ class Nsq extends AbstractAdapter
          * @see http://nsq.io/clients/building_client_libraries.html
          */
         'persistent' => false,
-        'logger' => null,
         /**
          * DEFAULT Milliseconds between heartbeats
          * Cannot SUB with heartbeats disabled (-1)
@@ -128,20 +127,20 @@ class Nsq extends AbstractAdapter
         }
     }
 
+    /**
+     * @param $info
+     * @deprecated
+     */
     public function info($info) {
-        if ($this->config['logger']          &&
-            $this->config['logger'] != $this &&
-            method_exists($this->config['logger'], __FUNCTION__)) {
-            $this->config['logger']->info($info);
-        }
+        $this->logInfo($info);
     }
 
+    /**
+     * @param $msg
+     * @deprecated
+     */
     public function error($msg) {
-        if ($this->config['logger']          &&
-            $this->config['logger'] != $this &&
-            method_exists($this->config['logger'], __FUNCTION__)) {
-            $this->config['logger']->error($msg);
-        }
+        $this->logError($msg);
     }
 
     public function setWorkTimeout(int $seconds = null) {
@@ -170,7 +169,7 @@ class Nsq extends AbstractAdapter
                 }
                 $this->_io->close();
             } catch (\Exception $ex) {
-                $this->error(__CLASS__ . ' ' . __FUNCTION__ . ': ' . $ex->getMessage());
+                $this->logError(__CLASS__ . ' ' . __FUNCTION__ . ': ' . $ex->getMessage());
             }
 
             $this->state     = self::STATE_NOTHING;
@@ -269,7 +268,7 @@ class Nsq extends AbstractAdapter
      */
     public function hasWorkers($queue = false)
     {
-        $this->info(__CLASS__ . '.' . __FUNCTION__ . ' not supported');
+        $this->logInfo(__CLASS__ . '.' . __FUNCTION__ . ' not supported');
         return true;
     }
 
@@ -282,7 +281,7 @@ class Nsq extends AbstractAdapter
     public function pickTask($timeout = null)
     {
         if ($timeout) {
-            $this->info(__CLASS__ . '.' . __FUNCTION__ . ' arguments deprecated');
+            $this->logInfo(__CLASS__ . '.' . __FUNCTION__ . ' arguments deprecated');
             $timeout = null;
         }
 
@@ -417,7 +416,7 @@ class Nsq extends AbstractAdapter
             $this->writeIdentify();
 
         } catch (\Exception $ex) {
-            $this->error($ex->getCode() . ': ' . $ex->getMessage());
+            $this->logError($ex->getCode() . ': ' . $ex->getMessage());
         }
         return $this->connected;
     }
@@ -542,7 +541,7 @@ class Nsq extends AbstractAdapter
      */
     private function write($buffer)
     {
-        $this->info('--> writing ' . trim($buffer));
+        $this->logInfo('--> writing ' . trim($buffer));
         $this->_io->write($buffer);
     }
 
@@ -565,7 +564,7 @@ class Nsq extends AbstractAdapter
 
             $frameData = $this->read($frameSize - 4);
 
-            $this->info("received frameType=" . $frameType);
+            $this->logInfo("received frameType=" . $frameType);
             if ($raw) {
                 break;
 
@@ -594,12 +593,12 @@ class Nsq extends AbstractAdapter
      */
     private function read($size)
     {
-        $this->info('--> reading ' . $size . ' bytes');
+        $this->logInfo('--> reading ' . $size . ' bytes');
         $result = $this->_io->read($size);
         if ($size != strlen($result)) {
             throw new \RuntimeException('Failed to read ' . $size . ' bytes from IO');
         }
-        $this->info('<-- reading ' . $size . ' bytes');
+        $this->logInfo('<-- reading ' . $size . ' bytes');
         return $result;
     }
 }
