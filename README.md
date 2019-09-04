@@ -54,9 +54,13 @@ Worker available features
 - `setRestartThreshold` (limit max number of jobs cycles, then terminate)
 - `setIdleTimeout` (limit max idle time, then terminating)
 
-See `/example/` folder for up to date examples
+TLDR
 
-#### Version 1 detailed review
+![Backq](https://github.com/viveme/backq/raw/master/example/example.jpg "Background tasks with workers and publishers via queues")
+
+See [/example](https://github.com/viveme/backq/tree/master/example) folder for usage examples
+
+#### Old version 1 detailed review
 
 [Blog post about sending Apple push notifications](http://moar.sshilko.com/2014/09/09/APNS-Workers/) 
 
