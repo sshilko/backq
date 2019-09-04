@@ -66,7 +66,7 @@ foreach ($messagesQ as $app => $messages) {
         for ($i = 0; $i < $countMessages; $i++) {
             $result = $publisher->publish($messages[$i], $params);
             echo 'Published into queue as id=' . $result . "\n";
-            if ($result > 0) {
+            if ($result) {
                 unset($unpublished[$i]);
             } else {
                 echo 'Failed to publish apns asynchronously via apnsd';

@@ -530,6 +530,7 @@ class Redis extends AbstractAdapter
         if ($this->connected && (self::STATE_BINDREAD == $this->state ||
                                  self::STATE_BINDWRITE == $this->state)) {
 
+            $this->logDebug(__FUNCTION__ . ' is connected and ready to: ' . ((self::STATE_BINDREAD == $this->state) ? 'read' : 'write'));
             /** @var \BackQ\Adapter\Redis\Queue $instance */
             $instance = $this->queue->getConnection(self::CONNECTION_NAME);
             $jobName  = $this->queueName;
@@ -564,11 +565,14 @@ class Redis extends AbstractAdapter
             }
 
             if (null === $taskId) {
+                $this->logDebug(__FUNCTION__ . ' return false');
                 return false;
             }
 
+            $this->logDebug(__FUNCTION__ . ' return ' . var_export($taskId, true));
             return $taskId;
         }
+        $this->logDebug(__FUNCTION__ . ' return false');
         return false;
     }
 

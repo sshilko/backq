@@ -21,12 +21,11 @@ final class MyProcessPublisher extends \BackQ\Publisher\Process
 {
     protected $queueName = 'abc';
 
-    public const PARAM_JOBTTR    = \BackQ\Adapter\Beanstalk::PARAM_JOBTTR;
-    public const PARAM_READYWAIT = \BackQ\Adapter\Beanstalk::PARAM_READYWAIT;
-
     protected function setupAdapter(): \Backq\Adapter\AbstractAdapter
     {
-        $adapter = new \BackQ\Adapter\Beanstalk;
+        $adapters = [new \BackQ\Adapter\Redis(), new \BackQ\Adapter\Beanstalk()];
+        $adapter  = $adapters[array_rand($adapters)];
+        echo 'Using ' . get_class($adapter) . ' adapter' . "\n";
 
         $output  = new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG);
         $logger  = new \Symfony\Component\Console\Logger\ConsoleLogger($output);
@@ -39,12 +38,13 @@ final class MyProcessPublisher extends \BackQ\Publisher\Process
 
 $publisher = MyProcessPublisher::getInstance();
 if ($publisher->start()) {
-    for ($i = 0; $i < 10; $i++) {
+    for ($i = 0; $i < 5; $i++) {
         $message = new \BackQ\Message\Process('echo ' . time() . '; echo $( date +%s ) >> /tmp/test');
-        $result = $publisher->publish($message, [MyProcessPublisher::PARAM_JOBTTR    => 5,
-                                                 MyProcessPublisher::PARAM_READYWAIT => 0]);
-        if ($result > 0) {
+        $result = $publisher->publish($message);
+        if ($result) {
             echo 'Published `' . $message->getCommandline() . '`` as ID=' . $result . ", check /tmp/test\n";
+        } else {
+            echo 'Failed to publish' . "\n";
         }
         sleep(1);
     }

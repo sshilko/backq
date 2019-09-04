@@ -38,7 +38,7 @@ if ($publisher->start() //&& $publisher->hasWorkers()
    ) {
     $message = new \BackQ\Message\Process('echo $( date +%s ) >> /tmp/test');
     $result  = $publisher->publish($message, [MyProcessPublisher::PARAM_READYWAIT => random_int(0, 2)]);
-    if ($result > 0) {
+    if ($result) {
         /**
          * Success
          */

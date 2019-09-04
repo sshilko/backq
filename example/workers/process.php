@@ -20,9 +20,13 @@ include_once '../../vendor/autoload.php';
 $output  = new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG);
 $logger  = new \Symfony\Component\Console\Logger\ConsoleLogger($output);
 
-$worker = new \BackQ\Worker\AProcess(new \BackQ\Adapter\Beanstalk);
+$adapters = [new \BackQ\Adapter\Redis(), new \BackQ\Adapter\Beanstalk()];
+$adapter  = $adapters[array_rand($adapters)];
+echo 'Using ' . get_class($adapter) . ' adapter' . "\n";
+
+$worker = new \BackQ\Worker\AProcess($adapter);
 $worker->setLogger($logger);
-$worker->setWorkTimeout(1);
+$worker->setWorkTimeout(5);
 $worker->setIdleTimeout(12);
 $worker->setQueueName('abc');
 $worker->run();
