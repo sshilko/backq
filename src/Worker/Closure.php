@@ -1,6 +1,8 @@
 <?php
 namespace BackQ\Worker;
 
+use BackQ\Worker\Closure\RecoverableException;
+
 class Closure extends AbstractWorker
 {
     /**
@@ -16,7 +18,7 @@ class Closure extends AbstractWorker
     public function run()
     {
         $connected = $this->start();
-        $this->debug('started');
+        $this->logDebug('started');
 
         if ($connected) {
             try {
@@ -54,6 +56,13 @@ class Closure extends AbstractWorker
 
                     try {
                         $message->execute();
+                    } catch (RecoverableException $e) {
+                        /**
+                         * The closure execution failed but can be retried
+                         */
+                        $this->logError('Failed executing closure ' . $e->getMessage());
+                        $work->send(false);
+                        continue;
                     } catch (\Throwable $e) {
                         $this->logError('Error executing closure ' . $e->getMessage());
                     }
