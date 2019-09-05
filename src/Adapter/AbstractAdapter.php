@@ -18,6 +18,12 @@ abstract class AbstractAdapter
     const JOBTTR_DEFAULT  = 60;
 
     /**
+     * Whether logError should always call trigger_error
+     * @var bool
+     */
+    protected $triggerErrorOnError = true;
+
+    /**
      * @var \Psr\Log\LoggerInterface
      */
     protected $logger;
@@ -90,6 +96,14 @@ abstract class AbstractAdapter
     }
 
     /**
+     * @param bool $triggerError
+     */
+    public function setTriggerErrorOnError(bool $triggerError)
+    {
+        $this->triggerErrorOnError = $triggerError;
+    }
+
+    /**
      * @param string $message
      */
     public function logInfo(string $message)
@@ -116,7 +130,9 @@ abstract class AbstractAdapter
     {
         if ($this->logger) {
             $this->logger->error($message);
-        } else {
+        }
+
+        if ($this->triggerErrorOnError) {
             trigger_error($message, E_USER_WARNING);
         }
     }
