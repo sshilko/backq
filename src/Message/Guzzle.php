@@ -23,7 +23,8 @@ class Guzzle extends AbstractMessage
      * @param \GuzzleHttp\Psr7\Request|null $request
      * @param string|null                   $rawRequest
      */
-    public function __construct($request = null, string $rawRequest = null) {
+    public function __construct($request = null, string $rawRequest = null)
+    {
         if ($request) {
             if ($request->getUri()->getScheme() === 'https') {
                 $request->withRequestTarget('absolute-form');
@@ -37,7 +38,11 @@ class Guzzle extends AbstractMessage
         }
     }
 
-    public function getRequest() : \GuzzleHttp\Psr7\Request {
+    /**
+     * @return \GuzzleHttp\Psr7\Request
+     */
+    public function getRequest(): \GuzzleHttp\Psr7\Request
+    {
         return \GuzzleHttp\Psr7\parse_request($this->request);
     }
 }

@@ -25,7 +25,6 @@ class Serialized extends AbstractWorker
         $connected = $this->start();
         $this->logInfo('started');
 
-        $push = null;
         if ($connected) {
             try {
                 $this->logInfo('before init work generator');
@@ -52,11 +51,26 @@ class Serialized extends AbstractWorker
                         $this->logError('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
+
                     $originalPublisher = $message->getPublisher();
                     $originalMessage   = $message->getMessage();
                     $originalPubOpts   = $message->getPublishOptions();
 
                     if ($originalPublisher && $originalMessage) {
+                        if (!$message->isReady()) {
+                            /**
+                             * Message should not be processed now
+                             */
+                            $work->send(false);
+                            continue;
+                        }
+
+                        if ($message->isExpired()) {
+                            $work->send(true);
+                            $this->logDebug('Discarding serialized message as already expired');
+                            continue;
+                        }
+
                         $processed = false;
                         try {
                             if ($this->dispatchOriginalMessage($originalPublisher,
@@ -77,7 +91,7 @@ class Serialized extends AbstractWorker
                     }
 
                     $work->send($processed);
-                };
+                }
             } catch (\Exception $e) {
                 $this->logError($e->getMessage());
             }
