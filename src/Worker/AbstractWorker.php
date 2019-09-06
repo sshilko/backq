@@ -24,6 +24,12 @@ abstract class AbstractWorker
     protected $manualDelaySignal  = false;
     protected $delaySignalPending = 0;
 
+    /**
+     * Whether logError should always call trigger_error
+     * @var bool
+     */
+    protected $triggerErrorOnError = true;
+
     protected $queueName;
 
     /**
@@ -337,6 +343,14 @@ abstract class AbstractWorker
     }
 
     /**
+     * @param bool $triggerError
+     */
+    public function setTriggerErrorOnError(bool $triggerError)
+    {
+        $this->triggerErrorOnError = $triggerError;
+    }
+
+    /**
      * @param string $message
      */
     public function logInfo(string $message)
@@ -372,6 +386,10 @@ abstract class AbstractWorker
     {
         if ($this->logger) {
             $this->logger->error($message);
+        }
+
+        if ($this->triggerErrorOnError) {
+            trigger_error($message, E_USER_WARNING);
         }
     }
 }
