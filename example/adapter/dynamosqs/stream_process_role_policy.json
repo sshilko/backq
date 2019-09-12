@@ -1,0 +1,48 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "VisualEditor0",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetShardIterator",
+        "dynamodb:DescribeStream",
+        "dynamodb:GetRecords"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:{region}:{account_id}:table/{table_name}/stream/{stream_label}",
+        "arn:aws:dynamodb:{region}:{account_id}:table/{table2_name}/stream/{stream_label}"
+      ]
+    },
+    {
+      "Sid": "VisualEditor1",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:ListStreams"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:{region}:{account_id}:table/{table_name}/stream/*",
+        "arn:aws:dynamodb:{region}:{account_id}:table/{table2_name}/stream/*"
+      ]
+    },
+    {
+      "Sid": "VisualEditor2",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:SendMessage"
+      ],
+      "Resource": [
+        "arn:aws:sqs:{region}:{account_id}:{sqs_queue_name}",
+        "arn:aws:sqs:{region}:{account_id}:{sqs_queue2_name}"
+      ]
+    },
+    {
+      "Sid": "VisualEditor3",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutMetricData"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
