@@ -30,7 +30,7 @@ Workers compatibility with adapters
 
 | Adapter / Worker  |[FCM](https://firebase.google.com/docs/cloud-messaging)|[APNS](https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW9)|[Process](http://symfony.com/doc/current/components/process.html)|[Guzzle](https://www.php-fig.org/psr/psr-7/)|Serialized|
 |----|---|---|---|---|---|
-| [Beanstalkd](https://beanstalkd.github.io/)   | +  | +  | +  | +  | ?  |
+| [Beanstalkd](https://beanstalkd.github.io/)   | +  | +  | +  | +  | +  |
 | [Redis](https://redis.io)        | +  | +  | +  | +  | ?  |
 | [NSQ](https://nsq.io/)          | +  | +  | +  | +  | ?  |
 | [DynamoSQS](https://aws.amazon.com/)    | +  | +  | +  | +  | +  |
