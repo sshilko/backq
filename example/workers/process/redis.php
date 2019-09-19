@@ -14,8 +14,7 @@
  * Queues a process execution
  * Publishes a job into default queue="process"
  */
-
-include_once '../../../vendor/autoload.php';
+include_once '../../../../../../vendor/autoload.php';
 
 $command = 'echo $( date +%s ) >> /tmp/test';
 

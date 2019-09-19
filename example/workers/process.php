@@ -8,7 +8,7 @@
  * Redistributions of files must retain the above copyright notice.
  */
 
-include_once '../../vendor/autoload.php';
+include_once '../../../../../vendor/autoload.php';
 
 /**
  * Worker

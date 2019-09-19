@@ -12,7 +12,7 @@
  * APNS Publisher
  * Queues APNS (Apple Push Notifications)
  */
-include_once '../../vendor/autoload.php';
+include_once '../../../../../vendor/autoload.php';
 
 class MyApnsdPublisher extends \BackQ\Publisher\Apnsd
 {

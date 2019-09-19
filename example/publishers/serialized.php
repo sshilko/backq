@@ -13,7 +13,7 @@
  * Delays `Process` message execution via Serialized worker
  */
 
-include_once '../../vendor/autoload.php';
+include_once '../../../../../vendor/autoload.php';
 include_once 'lib/myprocesspublisher.php';
 
 final class MySerializedPublisher extends \BackQ\Publisher\Serialized
