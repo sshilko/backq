@@ -1,6 +1,6 @@
 {
     "name": "sshilko/backq",
-    "licence": "MIT",
+    "license": "MIT",
     "description": "Background push notifications processing with workers & publisher",
     "type": "library",
     "minimum-stability": "dev",
