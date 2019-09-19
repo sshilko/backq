@@ -15,7 +15,7 @@
  * Publishes a job into default queue="process"
  */
 
-include_once '../../../vendor/autoload.php';
+include_once '../../../../../../vendor/autoload.php';
 
 final class MyProcessPublisher extends \BackQ\Publisher\Process
 {

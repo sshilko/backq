@@ -15,7 +15,7 @@
  * Launches a worker that listens for jobs on queue="apnsd-myapp1"
  */
 
-include_once '../../vendor/autoload.php';
+include_once '../../../../../vendor/autoload.php';
 
 $app = '-myapp1';
 $env = \ApnsPHP_Abstract::ENVIRONMENT_SANDBOX;
