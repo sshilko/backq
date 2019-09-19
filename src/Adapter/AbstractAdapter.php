@@ -1,28 +1,12 @@
 <?php
 /**
- *  The MIT License (MIT)
+ * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2013-2019 Sergei Shilko
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- **/
+ * Distributed under the terms of the MIT License.
+ * Redistributions of files must retain the above copyright notice.
+ */
 
 namespace BackQ\Adapter;
 
@@ -32,6 +16,12 @@ abstract class AbstractAdapter
     const PARAM_READYWAIT = 'readywait';
 
     const JOBTTR_DEFAULT  = 60;
+
+    /**
+     * Whether logError should always call trigger_error
+     * @var bool
+     */
+    protected $triggerErrorOnError = true;
 
     /**
      * @var \Psr\Log\LoggerInterface
@@ -97,6 +87,53 @@ abstract class AbstractAdapter
      */
     abstract public function setWorkTimeout(int $seconds = null);
 
-    public function setLogger(\Psr\Log\LoggerInterface $logger) : void {
+    /**
+     * @param \Psr\Log\LoggerInterface $logger
+     */
+    public function setLogger(\Psr\Log\LoggerInterface $logger): void
+    {
         $this->logger = $logger;
-    }}
+    }
+
+    /**
+     * @param bool $triggerError
+     */
+    public function setTriggerErrorOnError(bool $triggerError)
+    {
+        $this->triggerErrorOnError = $triggerError;
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logInfo(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->info($message);
+        }
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logDebug(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->debug($message);
+        }
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logError(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->error($message);
+        }
+
+        if ($this->triggerErrorOnError) {
+            trigger_error($message, E_USER_WARNING);
+        }
+    }
+}

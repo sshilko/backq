@@ -1,50 +1,44 @@
 <?php
 /**
- * Copyright (c) 2016, Tripod Technology GmbH <support@tandem.net>
- * All rights reserved.
+ * Backq: Background tasks with workers & publishers via queues
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
+ * Copyright (c) 2013-2019 Sergei Shilko
  *
- *    1. Redistributions of source code must retain the above copyright notice,
- *       this list of conditions and the following disclaimer.
- *
- *    2. Redistributions in binary form must reproduce the above copyright notice,
- *       this list of conditions and the following disclaimer in the documentation
- *       and/or other materials provided with the distribution.
- *
- *    3. Neither the name of Tripod Technology GmbH nor the names of its contributors
- *       may be used to endorse or promote products derived from this software
- *       without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- **/
+ * Distributed under the terms of the MIT License.
+ * Redistributions of files must retain the above copyright notice.
+ */
 
 namespace BackQ\Publisher;
 
 abstract class AbstractPublisher
 {
     private $adapter;
-    private $bind;
 
+    protected $bind;
     protected $queueName;
 
-   #protected static $instances = null;
-
-    protected function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
+    protected function __construct()
     {
-        $this->adapter = $adapter;
+        $this->adapter = $this->setupAdapter();
     }
+
+    public function __sleep()
+    {
+        if ($this->adapter) {
+            $this->adapter->disconnect();
+        }
+
+        $vars = array_keys(get_object_vars($this));
+        unset($vars[array_search('adapter', $vars, true)]);
+        return array_values($vars);
+    }
+
+    public function __wakeup()
+    {
+        $this->adapter = $this->setupAdapter();
+    }
+
+    abstract protected function setupAdapter(): \Backq\Adapter\AbstractAdapter;
 
     /**
      * Specify worker queue to push job to
@@ -71,17 +65,10 @@ abstract class AbstractPublisher
      *
      * @return AbstractPublisher
      */
-    public static function getInstance(\BackQ\Adapter\AbstractAdapter $adapter)
+    public static function getInstance()
     {
         $class = get_called_class();
-        return new $class($adapter);
-
-        #$cname = get_class($adapter);
-        #if (null === self::$instances || (is_array(self::$instances) && !isset(self::$instances[$cname]))) {
-        #    $class = get_called_class();
-        #    self::$instances[$cname] = new $class($adapter);
-        #}
-        #return self::$instances[$cname];
+        return new $class();
     }
 
     /**

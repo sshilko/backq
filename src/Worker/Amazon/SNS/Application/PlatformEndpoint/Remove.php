@@ -1,34 +1,12 @@
 <?php
 /**
- * Copyright (c) 2016, Tripod Technology GmbH <support@tandem.net>
- * All rights reserved.
+ * Backq: Background tasks with workers & publishers via queues
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
+ * Copyright (c) 2013-2019 Sergei Shilko
  *
- *    1. Redistributions of source code must retain the above copyright notice,
- *       this list of conditions and the following disclaimer.
- *
- *    2. Redistributions in binary form must reproduce the above copyright notice,
- *       this list of conditions and the following disclaimer in the documentation
- *       and/or other materials provided with the distribution.
- *
- *    3. Neither the name of Tripod Technology GmbH nor the names of its contributors
- *       may be used to endorse or promote products derived from this software
- *       without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- **/
+ * Distributed under the terms of the MIT License.
+ * Redistributions of files must retain the above copyright notice.
+ */
 
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
@@ -43,15 +21,15 @@ class Remove extends PlatformEndpoint
 
     public function run()
     {
-        $this->debug('started');
+        $this->logDebug('started');
         $connected = $this->start();
         if ($connected)  {
             $client = null;
             try {
-                $this->debug('connected to queue');
+                $this->logDebug('connected to queue');
 
                 $work = $this->work();
-                $this->debug('after init work generator');
+                $this->logDebug('after init work generator');
 
                 /**
                  * Keep an array with taskId and the number of times it was
@@ -63,7 +41,7 @@ class Remove extends PlatformEndpoint
                  * Process all messages that were published pointing to a disabled or non existing endpoint
                  */
                 foreach ($work as $taskId => $payload) {
-                    $this->debug('got some work');
+                    $this->logDebug('got some work');
 
                     if (!$payload && $this->workTimeout > 0) {
                         /**
@@ -76,7 +54,7 @@ class Remove extends PlatformEndpoint
 
                     if (!($message instanceof RemoveMessageInterface)) {
                         $work->send(true);
-                        $this->debug('Worker does not support payload of: ' . gettype($message));
+                        $this->logDebug('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
 
@@ -100,7 +78,7 @@ class Remove extends PlatformEndpoint
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html#API_DeleteEndpoint_Errors
                              * @var $e SnsException
                              */
-                            $this->debug('Could not delete endpoint with error: ' . $e->getAwsErrorCode());
+                            $this->logDebug('Could not delete endpoint with error: ' . $e->getAwsErrorCode());
 
                             /**
                              * With issues regarding Authorization or parameters, nothing
@@ -126,7 +104,7 @@ class Remove extends PlatformEndpoint
                                 if (isset($reprocessedTasks[$taskId])) {
 
                                     if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
-                                        $this->debug('Retried re-processing the same job too many times');
+                                        $this->logDebug('Retried re-processing the same job too many times');
                                         unset($reprocessedTasks[$taskId]);
 
                                         $work->send(true);
@@ -147,7 +125,7 @@ class Remove extends PlatformEndpoint
                      * Proceed un-registering the device and endpoint (managed by the token provider)
                      * Retry sending the job to the queue on error/problems deleting
                      */
-                    $this->debug('Deleting device with Arn ' . $message->getEndpointArn());
+                    $this->logDebug('Deleting device with Arn ' . $message->getEndpointArn());
                     $delSuccess = $this->onSuccess($message);
 
                     if (!$delSuccess) {
@@ -157,7 +135,7 @@ class Remove extends PlatformEndpoint
                         $work->send(false);
                         continue;
                     } else {
-                        $this->debug('Endpoint/Device successfully deleted on Service provider and backend');
+                        $this->logDebug('Endpoint/Device successfully deleted on Service provider and backend');
                         $work->send(true);
                     }
                 }

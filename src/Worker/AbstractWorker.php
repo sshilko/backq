@@ -1,34 +1,12 @@
 <?php
 /**
- * Copyright (c) 2016, Tripod Technology GmbH <support@tandem.net>
- * All rights reserved.
+ * Backq: Background tasks with workers & publishers via queues
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
+ * Copyright (c) 2013-2019 Sergei Shilko
  *
- *    1. Redistributions of source code must retain the above copyright notice,
- *       this list of conditions and the following disclaimer.
- *
- *    2. Redistributions in binary form must reproduce the above copyright notice,
- *       this list of conditions and the following disclaimer in the documentation
- *       and/or other materials provided with the distribution.
- *
- *    3. Neither the name of Tripod Technology GmbH nor the names of its contributors
- *       may be used to endorse or promote products derived from this software
- *       without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- **/
+ * Distributed under the terms of the MIT License.
+ * Redistributions of files must retain the above copyright notice.
+ */
 
 namespace BackQ\Worker;
 
@@ -38,7 +16,6 @@ abstract class AbstractWorker
 {
     private $adapter;
     private $bind;
-    private $doDebug;
 
     /**
      * Whether syscalls should be delayed
@@ -46,6 +23,12 @@ abstract class AbstractWorker
      */
     protected $manualDelaySignal  = false;
     protected $delaySignalPending = 0;
+
+    /**
+     * Whether logError should always call trigger_error
+     * @var bool
+     */
+    protected $triggerErrorOnError = true;
 
     protected $queueName;
 
@@ -69,6 +52,29 @@ abstract class AbstractWorker
      * @var int
      */
     public $workTimeout = null;
+
+    /**
+     * @var \Psr\Log\LoggerInterface
+     */
+    protected $logger;
+
+    /**
+     * @param int|null $timeout
+     */
+    public function setWorkTimeout(?int $timeout = null)
+    {
+        $this->workTimeout = $timeout;
+    }
+
+    /**
+     * Declare logger
+     *
+     * @param null|\Psr\Log\LoggerInterface $log
+     */
+    public function setLogger(?\Psr\Log\LoggerInterface $log)
+    {
+        $this->logger = $log;
+    }
 
     /**
      * Specify worker queue to pick job from
@@ -95,6 +101,8 @@ abstract class AbstractWorker
     public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
     {
         $this->adapter = $adapter;
+        $output        = new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_NORMAL);
+        $this->setLogger(new \Symfony\Component\Console\Logger\ConsoleLogger($output));
     }
 
     /**
@@ -199,6 +207,7 @@ abstract class AbstractWorker
                 break;
             }
 
+            $this->logDebug('Picking task');
             $job = $this->adapter->pickTask();
             /**
              * @todo $job[2] is optinal array of adapter specific results
@@ -215,8 +224,10 @@ abstract class AbstractWorker
 
                 $ack = false;
                 if ($response === false) {
+                    $this->logDebug('Calling afterWorkFailed, worker reported failure');
                     $ack = $this->adapter->afterWorkFailed($job[0]);
                 } else {
+                    $this->logDebug('Calling afterWorkSuccess, worker reported success');
                     $ack = $this->adapter->afterWorkSuccess($job[0]);
                 }
 
@@ -225,14 +236,17 @@ abstract class AbstractWorker
                 }
 
             } else {
+                /**
+                 * Job is a lie
+                 */
                 if (!$timeout) {
                     throw new Exception('Worker failed to fetch new job');
                 } else {
                     /**
                      * Two yield's are not mistake
                      */
-                    yield;
-                    yield;
+                    yield null;
+                    yield null;
                 }
             }
 
@@ -240,16 +254,22 @@ abstract class AbstractWorker
              * Break infinite loop when a limit condition is reached
              */
             if ($this->idleTimeout > 0 && (time() - $lastActive) > ($this->idleTimeout - $timeout)) {
-                $this->debug('Idle timeout reached, returning job, quitting');
+                $this->logDebug('Idle timeout reached, returning job, quitting');
                 if ($this->onIdleTimeout()) {
+                    $this->logDebug('onIdleTimeout true');
                     break;
+                } else {
+                    $this->logDebug('onIdleTimeout false');
                 }
             }
 
             if ($this->restartThreshold > 0 && ++$jobsdone > ($this->restartThreshold - 1)) {
-                $this->debug('Restart threshold reached, returning job, quitting');
+                $this->logDebug('Restart threshold reached, returning job, quitting');
                 if ($this->onRestartThreshold()) {
+                    $this->logDebug('onRestartThreshold true');
                     break;
+                } else {
+                    $this->logDebug('onRestartThreshold false');
                 }
             }
         }
@@ -280,6 +300,7 @@ abstract class AbstractWorker
                 /**
                  * Received request to stop/terminate process
                  */
+                $this->logDebug('termination requested');
                 return true;
             }
         }
@@ -291,32 +312,20 @@ abstract class AbstractWorker
      */
     protected function finish()
     {
+        $this->logDebug('finish() called');
         if ($this->bind) {
+            $this->logDebug('disconnecting binded adapter');
             $this->adapter->disconnect();
+            $this->logDebug('disconnected binded adapter');
             return true;
         }
         return false;
     }
 
-    public function toggleDebug($flag)
-    {
-        $this->doDebug = $flag;
-    }
-
-    /**
-     * Process debug logging if needed
-     */
-    protected function debug($log)
-    {
-        if ($this->doDebug) {
-            echo $log . "\n";
-        }
-    }
-
     /**
      * Quit after processing X amount of pushes
      *
-     * @param $int
+     * @param int $int
      */
     public function setRestartThreshold(int $int)
     {
@@ -326,10 +335,61 @@ abstract class AbstractWorker
     /**
      * Quit after reaching idle timeout
      *
-     * @param $int
+     * @param int $int
      */
     public function setIdleTimeout(int $int)
     {
         $this->idleTimeout = (int) $int;
+    }
+
+    /**
+     * @param bool $triggerError
+     */
+    public function setTriggerErrorOnError(bool $triggerError)
+    {
+        $this->triggerErrorOnError = $triggerError;
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logInfo(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->info($message);
+        }
+    }
+
+    /**
+     * @param string $message
+     * @deprecated
+     */
+    public function debug(string $message)
+    {
+        $this->logDebug($message);
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logDebug(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->debug($message);
+        }
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logError(string $message)
+    {
+        if ($this->logger) {
+            $this->logger->error($message);
+        }
+
+        if ($this->triggerErrorOnError) {
+            trigger_error($message, E_USER_WARNING);
+        }
     }
 }

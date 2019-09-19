@@ -1,28 +1,13 @@
 <?php
 /**
- *  The MIT License (MIT)
+ * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2018 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2013-2019 Sergei Shilko
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- **/
+ * Distributed under the terms of the MIT License.
+ * Redistributions of files must retain the above copyright notice.
+ */
+
 namespace BackQ\Adapter;
 
 use Datetime;
@@ -88,7 +73,6 @@ class Nsq extends AbstractAdapter
          * @see http://nsq.io/clients/building_client_libraries.html
          */
         'persistent' => false,
-        'logger' => null,
         /**
          * DEFAULT Milliseconds between heartbeats
          * Cannot SUB with heartbeats disabled (-1)
@@ -143,20 +127,20 @@ class Nsq extends AbstractAdapter
         }
     }
 
+    /**
+     * @param $info
+     * @deprecated
+     */
     public function info($info) {
-        if ($this->config['logger']          &&
-            $this->config['logger'] != $this &&
-            method_exists($this->config['logger'], __FUNCTION__)) {
-            $this->config['logger']->info($info);
-        }
+        $this->logInfo($info);
     }
 
+    /**
+     * @param $msg
+     * @deprecated
+     */
     public function error($msg) {
-        if ($this->config['logger']          &&
-            $this->config['logger'] != $this &&
-            method_exists($this->config['logger'], __FUNCTION__)) {
-            $this->config['logger']->error($msg);
-        }
+        $this->logError($msg);
     }
 
     public function setWorkTimeout(int $seconds = null) {
@@ -164,7 +148,7 @@ class Nsq extends AbstractAdapter
             /**
              * 1000ms is minimum hearbeat
              */
-            $this->config['heartbeat_interval_ms'] = intval($seconds * 1000);
+            $this->config['heartbeat_interval_ms'] = (int) ($seconds * 1000);
         }
     }
 
@@ -185,7 +169,7 @@ class Nsq extends AbstractAdapter
                 }
                 $this->_io->close();
             } catch (\Exception $ex) {
-                $this->error(__CLASS__ . ' ' . __FUNCTION__ . ': ' . $ex->getMessage());
+                $this->logError(__CLASS__ . ' ' . __FUNCTION__ . ': ' . $ex->getMessage());
             }
 
             $this->state     = self::STATE_NOTHING;
@@ -284,7 +268,7 @@ class Nsq extends AbstractAdapter
      */
     public function hasWorkers($queue = false)
     {
-        $this->info(__CLASS__ . '.' . __FUNCTION__ . ' not supported');
+        $this->logInfo(__CLASS__ . '.' . __FUNCTION__ . ' not supported');
         return true;
     }
 
@@ -297,7 +281,7 @@ class Nsq extends AbstractAdapter
     public function pickTask($timeout = null)
     {
         if ($timeout) {
-            $this->info(__CLASS__ . '.' . __FUNCTION__ . ' arguments deprecated');
+            $this->logInfo(__CLASS__ . '.' . __FUNCTION__ . ' arguments deprecated');
             $timeout = null;
         }
 
@@ -432,7 +416,7 @@ class Nsq extends AbstractAdapter
             $this->writeIdentify();
 
         } catch (\Exception $ex) {
-            $this->error($ex->getCode() . ': ' . $ex->getMessage());
+            $this->logError($ex->getCode() . ': ' . $ex->getMessage());
         }
         return $this->connected;
     }
@@ -557,7 +541,7 @@ class Nsq extends AbstractAdapter
      */
     private function write($buffer)
     {
-        $this->info('--> writing ' . trim($buffer));
+        $this->logInfo('--> writing ' . trim($buffer));
         $this->_io->write($buffer);
     }
 
@@ -580,7 +564,7 @@ class Nsq extends AbstractAdapter
 
             $frameData = $this->read($frameSize - 4);
 
-            $this->info("received frameType=" . $frameType);
+            $this->logInfo("received frameType=" . $frameType);
             if ($raw) {
                 break;
 
@@ -609,12 +593,12 @@ class Nsq extends AbstractAdapter
      */
     private function read($size)
     {
-        $this->info('--> reading ' . $size . ' bytes');
+        $this->logInfo('--> reading ' . $size . ' bytes');
         $result = $this->_io->read($size);
         if ($size != strlen($result)) {
             throw new \RuntimeException('Failed to read ' . $size . ' bytes from IO');
         }
-        $this->info('<-- reading ' . $size . ' bytes');
+        $this->logInfo('<-- reading ' . $size . ' bytes');
         return $result;
     }
 }

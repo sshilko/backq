@@ -1,4 +1,13 @@
 <?php
+/**
+ * Backq: Background tasks with workers & publishers via queues
+ *
+ * Copyright (c) 2013-2019 Sergei Shilko
+ *
+ * Distributed under the terms of the MIT License.
+ * Redistributions of files must retain the above copyright notice.
+ */
+
 namespace BackQ\Worker;
 
 final class Guzzle extends AbstractWorker
@@ -9,20 +18,24 @@ final class Guzzle extends AbstractWorker
     public function run()
     {
         $connected = $this->start();
-        $this->debug('started');
+        $this->logDebug('started');
         $push = null;
         if ($connected) {
             try {
                 $client  = new \GuzzleHttp\Client();
-                $this->debug('connected to queue');
+                $this->logDebug('connected to queue');
 
                 $work = $this->work();
-                $this->debug('after init work generator');
+                $this->logDebug('after init work generator');
 
                 foreach ($work as $taskId => $payload) {
-                    $this->debug('got some work: ' . ($payload ? 'yes' : 'no'));
+                    $this->logDebug('got some work: ' . ($payload ? 'yes' : 'no'));
 
                     if (!$payload && $this->workTimeout > 0) {
+                        /**
+                         * Just empty loop, no work fetched
+                         */
+                        $work->send(true);
                         continue;
                     }
 
@@ -34,9 +47,23 @@ final class Guzzle extends AbstractWorker
                          * Nothing to do + report as a success
                          */
                         $work->send($processed);
-                        $this->debug('Worker does not support payload of: ' . gettype($message));
+                        $this->logDebug('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
+
+                    if (!$message->isReady()) {
+                        /**
+                         * Message should not be processed now
+                         */
+                        $work->send(false);
+                        continue;
+                    }
+
+                    if ($message->isExpired()) {
+                        $work->send(true);
+                        continue;
+                    }
+
                     try {
                         $me = $this;
 
@@ -44,12 +71,12 @@ final class Guzzle extends AbstractWorker
                         $promise = $client->sendAsync($request)->then(
                             function ($fulfilledResponse) use ($me) {
                             /** @var $fulfilledResponse \GuzzleHttp\Psr7\Response */
-                            $me->debug('Request sent, got response ' . $fulfilledResponse->getStatusCode() .
+                            $me->logDebug('Request sent, got response ' . $fulfilledResponse->getStatusCode() .
                                          ' ' . json_encode((string)    $fulfilledResponse->getBody()));
                             },
                             function ($rejectedResponse) use ($me) {
                                 /** @var $rejectedResponse \GuzzleHttp\Exception\RequestException */
-                                $me->debug('Request sent, FAILED with ' . $rejectedResponse->getMessage());
+                                $me->logDebug('Request sent, FAILED with ' . $rejectedResponse->getMessage());
                             });
 
                         $promise->wait();
@@ -64,7 +91,7 @@ final class Guzzle extends AbstractWorker
                     }
                 }
             } catch (\Exception $e) {
-                $this->debug('[' . date('Y-m-d H:i:s') . '] EXCEPTION: ' . $e->getMessage());
+                $this->logDebug('[' . date('Y-m-d H:i:s') . '] EXCEPTION: ' . $e->getMessage());
             }
         }
         $this->finish();

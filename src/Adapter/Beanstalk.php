@@ -1,28 +1,12 @@
 <?php
 /**
- *  The MIT License (MIT)
+ * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2013-2019 Sergei Shilko
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- **/
+ * Distributed under the terms of the MIT License.
+ * Redistributions of files must retain the above copyright notice.
+ */
 
 namespace BackQ\Adapter;
 
@@ -92,12 +76,13 @@ class Beanstalk extends AbstractAdapter
         return null;
     }
 
+    /**
+     * This overrides the original Beanstalkd logger
+     * @see \Beanstalk\Client._error()
+     * @param $msg
+     */
     public function error($msg) {
-        if ($this->logger) {
-            $this->logger->error($msg);
-        } else {
-            error_log($msg);
-        }
+        $this->logError($msg);
     }
 
     /**
@@ -175,7 +160,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -194,7 +179,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -215,7 +200,7 @@ class Beanstalk extends AbstractAdapter
                     return [$result['id'], $result['body'], []];
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -234,7 +219,7 @@ class Beanstalk extends AbstractAdapter
         if ($this->connected) {
             try {
                 $result = array();
-                for ($i=0; $i<$max; $i++) {
+                for ($i = 0; $i < $max; $i++) {
                     /**
                      * Pick a task or return immediattely if no (more) tasks available
                      */
@@ -248,7 +233,7 @@ class Beanstalk extends AbstractAdapter
                 return $result;
 
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -288,7 +273,7 @@ class Beanstalk extends AbstractAdapter
                     return (string) $result;
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -310,7 +295,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -329,7 +314,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -348,10 +333,9 @@ class Beanstalk extends AbstractAdapter
                 $this->connected = false;
                 return true;
             } catch (Exception $e) {
-                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->logError(__CLASS__ . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
     }
-
 }

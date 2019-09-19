@@ -1,36 +1,18 @@
 <?php
 /**
- *  The MIT License (MIT)
+ * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2013-2019 Sergei Shilko
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- **/
+ * Distributed under the terms of the MIT License.
+ * Redistributions of files must retain the above copyright notice.
+ */
 
 namespace BackQ\Worker;
 
-use RuntimeException;
-
 final class Apnsd extends AbstractWorker
 {
-    private $logger;
+    private $pushLogger;
     private $pem;
     private $caCert;
     private $environment;
@@ -91,9 +73,9 @@ final class Apnsd extends AbstractWorker
     /**
      * Declare Logger
      */
-    public function setLogger(\ApnsPHP_Log_Interface $log)
+    public function setPushLogger(\ApnsPHP_Log_Interface $log)
     {
-        $this->logger = $log;
+        $this->pushLogger = $log;
     }
 
     /**
@@ -123,25 +105,25 @@ final class Apnsd extends AbstractWorker
     public function run()
     {
         $connected = $this->start();
-        $this->debug('started');
+        $this->logDebug('started');
         $push = null;
         if ($connected) {
             try {
-                $this->debug('connected to queue');
+                $this->logDebug('connected to queue');
                 $push = new \BackQ\Adapter\ApnsdPush($this->environment, $this->pem);
-                if ($this->logger) {
-                    $push->setLogger($this->logger);
+                if ($this->pushLogger) {
+                    $push->setLogger($this->pushLogger);
                 }
                 $push->setRootCertificationAuthority($this->caCert);
 
                 $push->setConnectTimeout($this->connectTimeout);
                 $push->setReadWriteTimeout($this->readWriteTimeout);
 
-                $this->debug('ready to connect to ios');
+                $this->logDebug('ready to connect to ios');
 
                 $push->connect();
 
-                $this->debug('ios connected');
+                $this->logDebug('ios connected');
 
                 /**
                  * Do NOT retry, will restart worker in case things go south
@@ -158,16 +140,16 @@ final class Apnsd extends AbstractWorker
                 $push->setSocketSelectTimeout($this->socketSelectTimeout);
 
                 $work = $this->work();
-                $this->debug('after init work generator');
+                $this->logDebug('after init work generator');
 
                 $jobsdone   = 0;
                 #$lastactive = time();
 
                 foreach ($work as $taskId => $payload) {
-                    $this->debug('got some work: ' . ($payload ? 'yes' : 'no'));
+                    $this->logDebug('got some work: ' . ($payload ? 'yes' : 'no'));
 
                     #if ($this->idleTimeout > 0 && (time() - $lastactive) > $this->idleTimeout) {
-                    #    $this->debug('idle timeout reached, returning job, quitting');
+                    #    $this->logDebug('idle timeout reached, returning job, quitting');
                     #    $work->send(false);
                     #    $push->disconnect();
                     #    break;
@@ -177,13 +159,14 @@ final class Apnsd extends AbstractWorker
                         /**
                          * Just empty loop, no work fetched
                          */
+                        $work->send(true);
                         continue;
                     }
 
                     #$lastactive = time();
 
                     #if ($this->restartThreshold > 0 && ++$jobsdone > $this->restartThreshold) {
-                    #    $this->debug('restart threshold reached, returning job, quitting');
+                    #    $this->logDebug('restart threshold reached, returning job, quitting');
                     #    $work->send(false);
                     #    $push->disconnect();
                     #    break;
@@ -192,12 +175,12 @@ final class Apnsd extends AbstractWorker
                     $message   = @unserialize($payload);
                     $processed = true;
 
-                    if (!($message instanceof \ApnsPHP_Message) || !$message->getRecipientsNumber()) {
+                    if (!($message instanceof \ApnsPHP_Message)) {
                         /**
                          * Nothing to do + report as a success
                          */
                         $work->send($processed);
-                        $this->debug('Worker does not support payload of: ' . gettype($message));
+                        $this->logDebug('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
 
@@ -211,13 +194,13 @@ final class Apnsd extends AbstractWorker
                          * We send 1 message per push
                          */
                         $push->add($message);
-                        $this->debug('job added to apns queue');
+                        $this->logDebug('job added to apns queue');
                         $push->send();
-                        $this->debug('job queue pushed to apple');
+                        $this->logDebug('job queue pushed to apple');
                     } catch (\ApnsPHP_Message_Exception $longpayload) {
-                        $this->debug('bad job payload: ' . $longpayload->getMessage());
+                        $this->logDebug('bad job payload: ' . $longpayload->getMessage());
                     } catch (\ApnsPHP_Push_Exception $networkIssue) {
-                        $this->debug('bad connection network: ' . $networkIssue->getMessage());
+                        $this->logDebug('bad connection network: ' . $networkIssue->getMessage());
                         $processed = $networkIssue->getMessage();
                     } finally {
                         /**
@@ -250,7 +233,7 @@ final class Apnsd extends AbstractWorker
                                  * 10 - shutdown (last message was successfuly sent)
                                  * ...
                                  */
-                                $this->debug('Closing & reconnecting, received code [' . $statusCode . ']');
+                                $this->logDebug('Closing & reconnecting, received code [' . $statusCode . ']');
                                 $push->disconnect();
                                 $push->connect();
                             }
@@ -263,7 +246,7 @@ final class Apnsd extends AbstractWorker
                     }
                 };
             } catch (\Exception $e) {
-                $this->debug('[' . date('Y-m-d H:i:s') . '] EXCEPTION: ' . $e->getMessage());
+                $this->logDebug('[' . date('Y-m-d H:i:s') . '] EXCEPTION: ' . $e->getMessage());
             } finally {
                 if ($push) {
                     $push->disconnect();

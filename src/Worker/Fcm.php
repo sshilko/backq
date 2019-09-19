@@ -1,28 +1,12 @@
 <?php
 /**
- *  The MIT License (MIT)
+ * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2013-2019 Sergei Shilko
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- **/
+ * Distributed under the terms of the MIT License.
+ * Redistributions of files must retain the above copyright notice.
+ */
 
 namespace BackQ\Worker;
 
@@ -71,17 +55,17 @@ final class Fcm extends AbstractWorker
     public function run()
     {
         $connected = $this->start();
-        $this->debug('started');
+        $this->logDebug('started');
         $push = null;
         if ($connected) {
             try {
-                $this->debug('connected to queue');
+                $this->logDebug('connected to queue');
 
                 $work = $this->work();
-                $this->debug('after init work generator');
+                $this->logDebug('after init work generator');
 
                 foreach ($work as $taskId => $payload) {
-                    $this->debug('got some work: ' . ($payload ? 'yes' : 'no'));
+                    $this->logDebug('got some work: ' . ($payload ? 'yes' : 'no'));
 
                     if (!$payload && $this->workTimeout > 0) {
                         continue;
@@ -95,7 +79,7 @@ final class Fcm extends AbstractWorker
                          * Nothing to do + report as a success
                          */
                         $work->send($processed);
-                        $this->debug('Worker does not support payload of: ' . gettype($message));
+                        $this->logDebug('Worker does not support payload of: ' . gettype($message));
                         continue;
                     }
                     try {
@@ -108,7 +92,7 @@ final class Fcm extends AbstractWorker
                         $zhr     = $this->pusher->send($message);
                         $status  = $zhr->getStatus();
                         $body    = @json_decode($zhr->getBody());
-                        $this->debug('Response body: ' . json_encode($body));
+                        $this->logDebug('Response body: ' . json_encode($body));
 
                         $stokens = $message->getToken();
                         if ($status >= 500 && $status <= 599) {
@@ -314,7 +298,7 @@ final class Fcm extends AbstractWorker
                     }
                 }
             } catch (\Exception $e) {
-                $this->debug('[' . date('Y-m-d H:i:s') . '] EXCEPTION: ' . $e->getMessage());
+                $this->logDebug('[' . date('Y-m-d H:i:s') . '] EXCEPTION: ' . $e->getMessage());
             }
         }
         $this->finish();

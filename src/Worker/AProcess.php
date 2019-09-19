@@ -1,28 +1,12 @@
 <?php
 /**
- *  The MIT License (MIT)
+ * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2013-2019 Sergei Shilko
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- **/
+ * Distributed under the terms of the MIT License.
+ * Redistributions of files must retain the above copyright notice.
+ */
 
 namespace BackQ\Worker;
 
@@ -40,13 +24,13 @@ final class AProcess extends AbstractWorker
     public function run()
     {
         $connected = $this->start();
-        $this->debug('started');
+        $this->logDebug('started');
         $forks = array();
         if ($connected) {
             try {
-                $this->debug('connected');
+                $this->logDebug('connected');
                 $work = $this->work();
-                $this->debug('after init work generator');
+                $this->logDebug('after init work generator');
 
                 /**
                  * Until next job maximum 1 zombie process might be hanging,
@@ -59,7 +43,7 @@ final class AProcess extends AbstractWorker
                     $processed = true;
 
                     if ($payload) {
-                        $this->debug('got some payload: ' . $payload);
+                        $this->logDebug('got some payload: ' . $payload);
 
                         $message = @unserialize($payload);
                         if (!($message instanceof \BackQ\Message\Process)) {
@@ -69,7 +53,7 @@ final class AProcess extends AbstractWorker
                             $run = true;
                         }
                     } else {
-                        $this->debug('empty loop due to empty payload');
+                        $this->logDebug('empty loop due to empty payload: ' . var_export($payload, true));
 
                         $message   = null;
                         $run       = false;
@@ -87,6 +71,19 @@ final class AProcess extends AbstractWorker
                         }
 
                         if ($run) {
+                            if (!$message->isReady()) {
+                                /**
+                                 * Message should not be processed yet
+                                 */
+                                $work->send(false);
+                                continue;
+                            }
+
+                            if ($message->isExpired()) {
+                                $work->send(true);
+                                continue;
+                            }
+
                             /**
                              * Enclosure in anonymous function
                              *
@@ -99,7 +96,7 @@ final class AProcess extends AbstractWorker
                              * @tip use PHP_BINARY for php path
                              */
                             $run = function() use ($message) {
-                                $this->debug('launching ' . $message->getCommandline());
+                                $this->logDebug('launching ' . $message->getCommandline());
                                 $cmd = $message->getCommandline();
                                 $timeout = $message->getTimeout() ?? 60;
 
@@ -201,6 +198,7 @@ final class AProcess extends AbstractWorker
                         @error_log('Process worker failed to run: ' . $e->getMessage());
                     }
 
+                    $this->logDebug('reporting work as processed: ' . var_export($processed, true));
                     $work->send($processed);
 
                     if (true !== $processed) {
@@ -209,7 +207,7 @@ final class AProcess extends AbstractWorker
                          */
                         throw new \RuntimeException('Worker not reliable, failed to process task: ' . $processed);
                     }
-                };
+                }
             } catch (\Exception $e) {
                 @error_log('Process worker exception: ' . $e->getMessage());
             }
