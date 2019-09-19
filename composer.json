@@ -1,6 +1,6 @@
 {
     "name": "viveme/backq",
-    "licence": "proprietary",
+    "license": "proprietary",
     "description": "Background jobs processing with queue, workers & publishers",
     "type": "library",
     "minimum-stability": "dev",
