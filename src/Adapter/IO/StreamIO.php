@@ -2,7 +2,7 @@
 /**
  *  The MIT License (MIT)
  *
- * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,6 +31,18 @@ use \BackQ\Adapter\IO\Exception\TimeoutException;
 
 class StreamIO extends AbstractIO
 {
+    /**
+     * Attempt to connect N times before give up
+     * @var int
+     */
+    public $connAttempts        = 2;
+
+    /**
+     * Sleep between connection attempts
+     * @var int
+     */
+    public $connRetryIntervalMs = 50;
+
     private $sock       = null;
     private $persistent = null;
 
@@ -60,23 +72,30 @@ class StreamIO extends AbstractIO
         $errstr = $errno  = null;
         $this->sock       = null;
         $this->persistent = ($persistent) ? true : false;
+        $triesLeft        = $this->connAttempts;
 
-        if ($context) {
-            $remote = sprintf('tls://%s:%s/%s', $host, $port, strval($persistent));
-            if ($persistent) {
-                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT, $context);
+        while (!$this->sock && $triesLeft > 0) {
+            if ($context) {
+                $remote = sprintf('tls://%s:%s/%s', $host, $port, strval($persistent));
+                if ($persistent) {
+                    $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT, $context);
+                } else {
+                    $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT, $context);
+                }
             } else {
-                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT, $context);
+                $remote = sprintf('tcp://%s:%s/%s', $host, $port, strval($persistent));
+                if ($persistent) {
+                    $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT);
+                } else {
+                    $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT);
+                }
             }
-        } else {
-            $remote = sprintf('tcp://%s:%s/%s', $host, $port, strval($persistent));
-            if ($persistent) {
-                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT);
-            } else {
-                $this->sock = @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT);
+            if (!$this->sock) {
+                $triesLeft--;
+                usleep($this->connRetryIntervalMs * 1000);
             }
         }
-
+    
         if (!$this->sock) {
             throw new RuntimeException("Error Connecting to server($errno): $errstr ");
         }
@@ -124,7 +143,7 @@ class StreamIO extends AbstractIO
     {
         $info = stream_get_meta_data($this->sock);
 
-        if ($info['eof'] || feof($this->sock))  {
+        if ($info['eof'] || @feof($this->sock))  {
             throw new TimeoutException('Error reading data. Socket connection EOF', self::READ_EOF_CODE);
         }
 
@@ -132,13 +151,17 @@ class StreamIO extends AbstractIO
             throw new TimeoutException('Error reading data. Socket connection TIME OUT', self::READ_TIME_CODE);
         }
 
+        /**
+         * @todo add custom error handler as in write()
+         */
+
         $tries = self::FREAD_0_TRIES;
         $fread_result = '';
-        while (!feof($this->sock) && strlen($fread_result) < $n) {
+        while (!@feof($this->sock) && strlen($fread_result) < $n) {
             /**
              * Up to $n number of bytes read.
              */
-            $fdata = fread($this->sock, $n);
+            $fdata = @fread($this->sock, $n);
             if (false === $fdata) {
                 throw new RuntimeException("Failed to fread() from socket", self::READ_ERR_CODE);
             }
@@ -168,9 +191,9 @@ class StreamIO extends AbstractIO
     public function write($data)
     {
         // get status of socket to determine whether or not it has timed out
-        $info = stream_get_meta_data($this->sock);
+        $info = @stream_get_meta_data($this->sock);
 
-        if ($info['eof'] || feof($this->sock)) {
+        if ($info['eof'] || @feof($this->sock)) {
             throw new TimeoutException("Error sending data. Socket connection EOF");
         }
 
@@ -202,6 +225,7 @@ class StreamIO extends AbstractIO
             for ($written = 0; $written < $len; true) {
 
                 $fwrite = fwrite($this->sock, substr($data, $written));
+                fflush($this->sock);
                 $written += intval($fwrite);
 
                 if ($fwrite === false || (feof($this->sock) && $written < $len)) {
@@ -270,7 +294,15 @@ class StreamIO extends AbstractIO
         if ($info['timed_out']) {
             throw new TimeoutException('Error reading data. Socket connection TIME OUT', self::READ_TIME_CODE);
         }
+        /**
+         * Reading ends when length bytes have been read,
+         * when the string specified by ending is found (which is not included in the return value),
+         * or on EOF (whichever comes first).
+         */
         $data = stream_get_line($this->sock, $length, $delimiter);
+        if (false === $data && feof($this->sock)) {
+            throw new TimeoutException('Failed stream_get_line. Socket EOF detected', self::READ_EOF_CODE);
+        }
         return $data;
     }
 
@@ -308,5 +340,13 @@ class StreamIO extends AbstractIO
         $write  = null;
         $except = null;
         return stream_select($read, $write, $except, $sec, $usec);
+    }
+
+    public function isSocketReady() : bool {
+        $info = stream_get_meta_data($this->sock);
+        if ($info['eof'] || feof($this->sock) || $info['timed_out'])  {
+            return true;
+        }
+        return false;
     }
 }

@@ -2,7 +2,7 @@
 /**
  *  The MIT License (MIT)
  *
- * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +29,13 @@ namespace BackQ\Worker;
 use \RuntimeException;
 use \Symfony\Component\Process\Process;
 
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Process\Exception\ProcessSignaledException;
+
 final class AProcess extends AbstractWorker
 {
     protected $queueName = 'process';
-    public $workTimeout  = 4;
+    public $workTimeout  = 5;
 
     public function run()
     {
@@ -42,7 +45,7 @@ final class AProcess extends AbstractWorker
         if ($connected) {
             try {
                 $this->debug('connected');
-                $work = $this->work($this->workTimeout);
+                $work = $this->work();
                 $this->debug('after init work generator');
 
                 /**
@@ -50,25 +53,40 @@ final class AProcess extends AbstractWorker
                  * we cleanup-up zombies when receiving next job
                  */
                 foreach ($work as $taskId => $payload) {
-                    if (!$payload && $this->workTimeout > 0) {
-                        /**
-                         * Just empty loop, no work fetched
-                         */
-                        continue;
-                    }
-
-                    $this->debug('got some work');
-
-                    $message   = @unserialize($payload);
+                    /**
+                     * Whatever happends, always report successful processing
+                     */
                     $processed = true;
 
-                    if (!($message instanceof \BackQ\Message\Process)) {
-                        $work->send($processed);
-                        @error_log('Worker does not support payload of: ' . gettype($message));
-                    } else {
-                        try {
-                            $this->debug('job timeout=' . $message->getTimeout());
+                    if ($payload) {
+                        $this->debug('got some payload: ' . $payload);
 
+                        $message = @unserialize($payload);
+                        if (!($message instanceof \BackQ\Message\Process)) {
+                            $run = false;
+                            @error_log('Worker does not support payload of: ' . gettype($message));
+                        } else {
+                            $run = true;
+                        }
+                    } else {
+                        $this->debug('empty loop due to empty payload');
+
+                        $message   = null;
+                        $run       = false;
+                    }
+
+                    try {
+
+                        if ($run && $message && $deadline = $message->getDeadline()) {
+                            if ($deadline < time()) {
+                                /**
+                                 * Do not run any tasks beyond their deadline
+                                 */
+                                $run = false;
+                            }
+                        }
+
+                        if ($run) {
                             /**
                              * Enclosure in anonymous function
                              *
@@ -82,73 +100,114 @@ final class AProcess extends AbstractWorker
                              */
                             $run = function() use ($message) {
                                 $this->debug('launching ' . $message->getCommandline());
-                                $process = new \Symfony\Component\Process\Process($message->getCommandline(),
-                                                                                  $message->getCwd(),
-                                                                                  $message->getEnv(),
-                                                                                  $message->getInput(),
-                                                                                  /**
-                                                                                   * timeout does not really work with async (start)
-                                                                                   */
-                                                                                  $message->getTimeout(),
-                                                                                  $message->getOptions());
-                                /**
-                                 * no win support here
-                                 */
-                                $process->setEnhanceWindowsCompatibility(false);
+                                $cmd = $message->getCommandline();
+                                $timeout = $message->getTimeout() ?? 60;
+
+                                if (!is_array($cmd) && is_string($cmd)) {
+                                    /**
+                                     * @todo remove - deprecated since symfony 4
+                                     * @deprecated
+                                     */
+                                    $process = Process::fromShellCommandline($cmd,
+                                                                             $message->getCwd(),
+                                                                             $message->getEnv(),
+                                                                             $message->getInput(),
+                                                                             /**
+                                                                              * timeout does not really work with async (start)
+                                                                              */
+                                                                             $timeout);
+                                } else {
+                                    /**
+                                     * Using array of arguments is the recommended way to define commands.
+                                     * This saves you from any escaping and allows sending signals seamlessly
+                                     * (e.g. to stop processes before completion.):
+                                     */
+                                    $process = new Process($message->getCommandline(),
+                                                           $message->getCwd(),
+                                                           $message->getEnv(),
+                                                           $message->getInput(),
+                                                           /**
+                                                            * timeout does not really work with async (start)
+                                                            */
+                                                           $timeout);
+                                }
 
                                 /**
                                  * ultimately also disables callbacks
                                  */
-                                $process->disableOutput();
+                                //$process->disableOutput();
 
                                 /**
-                                 * Execute call
+                                 * Execute call, starts process in the background
                                  * proc_open($commandline, $descriptors, $this->processPipes->pipes, $this->cwd, $this->env, $this->options);
                                  *
                                  * @throws RuntimeException When process can't be launched
                                  */
                                 $process->start();
+
                                 return $process;
                             };
+                        }
 
-                            /**
-                             * Loop over previous forks and gracefully stop/close them,
-                             * doing this before pushing new fork in the pool
-                             */
-                            if (!empty($forks)) {
-                                foreach ($forks as $f) {
-                                    try {
+                        /**
+                         * Loop over previous forks and gracefully stop/close them,
+                         * doing this before pushing new fork in the pool
+                         */
+                        if (!empty($forks)) {
+                            /** @var Process $f */
+                            foreach ($forks as $f) {
+                                try {
+                                    /**
+                                     * here we PREVENTs ZOMBIES
+                                     * isRunning itself closes the process if its ended (not running)
+                                     * use `pstree` to look out for zombies
+                                     */
+                                    if ($f->isRunning()) {
                                         /**
-                                         * here we PREVENTs ZOMBIES
-                                         * isRunning itself closes the process if its ended (not running)
-                                         * use `pstree` to look out for zombies
+                                         * If its still running, check the timeouts
                                          */
-                                        if ($f->isRunning()) {
-                                            /**
-                                             * If its still running, check the timeouts
-                                             */
-                                            $f->checkTimeout();
+                                        $f->checkTimeout();
+                                        usleep(200000);
+                                    } else {
+                                        /**
+                                         * Only first call of this function return real value, next calls return -1
+                                         */
+                                        $ec = $f->getExitCode();
+                                        if ($ec > 0) {
+                                            trigger_error($f->getCommandLine() . ' [' . $f->getErrorOutput() . '] ' . ' existed with error code ' . $ec, E_USER_WARNING);
+                                            $f->clearOutput();
+                                            $f->clearErrorOutput();
+                                            $ec = null;
                                         }
-                                    } catch (ProcessTimedOutException $e) {}
+                                    }
+
+                                } catch (ProcessTimedOutException $e) {
+
+                                } catch (ProcessSignaledException $e) {
+                                        /**
+                                         * Child process has been terminated by an uncaught signal.
+                                         */
                                 }
                             }
+                        }
 
+                        if ($run) {
                             $forks[] = $run();
-                        } catch (\Exception $e) {
-                            /**
-                             * Not caching exceptions, just launching processes async
-                             */
-                            @error_log('Process worker failed to run: ' . $e->getMessage());
                         }
+                    } catch (\Exception $e) {
+                        /**
+                         * Not caching exceptions, just launching processes async
+                         */
+                        @error_log('Process worker failed to run: ' . $e->getMessage());
+                    }
 
-                        $work->send((true === $processed));
+                    $work->send($processed);
 
-                        if (true !== $processed) {
-                            /**
-                             * Worker not reliable, quitting
-                             */
-                            throw new \RuntimeException('Worker not reliable, failed to process task: ' . $processed);
-                        }
+                    if (true !== $processed) {
+                        /**
+                         * Worker not reliable, quitting
+                         */
+                        throw new \RuntimeException('Worker not reliable, failed to process task: ' . $processed);
                     }
                 };
             } catch (\Exception $e) {
@@ -171,7 +230,12 @@ final class AProcess extends AbstractWorker
                      * @see http://symfony.com/doc/current/components/process.html
                      */
                     $f->checkTimeout();
-                    $f->stop(1, SIGINT);
+                    usleep(100000);
+
+                    $f->clearOutput();
+                    $f->clearErrorOutput();
+
+                    $f->stop(2, SIGINT);
                     if ($f->isRunning()) {
                         $f->signal(SIGKILL);
                     }

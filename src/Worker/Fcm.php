@@ -37,6 +37,33 @@ final class Fcm extends AbstractWorker
 
     public $workTimeout = 4;
 
+    /**
+     * List of no longer registered tokens
+     * @var array
+     */
+    protected $uninstalls    = [];
+
+    /**
+     * Hash of tokens that changed
+     * @var array
+     */
+    protected $updatedTokens = [];
+
+    /**
+     * @var callable
+     */
+    protected $onUninstall;
+
+    /**
+     * @var callable
+     */
+    protected $onUpdatedTokens;
+
+    public function setCallbacks(callable $onUninstall, callable $onUpdatedTokens) {
+        $this->onUninstall     = $onUninstall;
+        $this->onUpdatedTokens = $onUpdatedTokens;
+    }
+
     public function setPusher(\Zend_Mobile_Push_Gcm $pusher) {
         $this->pusher = $pusher;
     }
@@ -50,7 +77,7 @@ final class Fcm extends AbstractWorker
             try {
                 $this->debug('connected to queue');
 
-                $work = $this->work($this->workTimeout);
+                $work = $this->work();
                 $this->debug('after init work generator');
 
                 foreach ($work as $taskId => $payload) {
@@ -97,9 +124,6 @@ final class Fcm extends AbstractWorker
                             $processed = false;
                         }
 
-                        $updatedTokens = [];
-                        $uninstalls    = [];
-
                         switch ($status) {
                             /**
                              * JSON request is successful (HTTP status code 200)
@@ -122,12 +146,12 @@ final class Fcm extends AbstractWorker
                                             /**
                                              * @see https://developers.google.com/cloud-messaging/http-server-ref#table5
                                              */
-                                            if ($br->message_id) {
+                                            if (!empty($br->message_id)) {
                                                 if ($br->registration_id) {
                                                     /**
                                                      * replace the original ID with the new value (canonical ID) in your server database
                                                      */
-                                                    $updatedTokens[$stokens[$i]] = $br->registration_id;
+                                                    $this->updatedTokens[$stokens[$i]] = $br->registration_id;
                                                 } else {
                                                     /**
                                                      * all OK
@@ -219,7 +243,7 @@ final class Fcm extends AbstractWorker
                                                              * Make sure it matches the registration token the client app receives
                                                              * from registering with GCM. Do not truncate or add additional characters.
                                                              */
-                                                            $uninstalls[] = $stokens[$i];
+                                                            $this->uninstalls[] = $stokens[$i];
                                                             break;
 
                                                         case 'MissingRegistration':
@@ -236,7 +260,7 @@ final class Fcm extends AbstractWorker
                                                              * because the application was uninstalled from the device,
                                                              * or the client app isn't configured to receive messages
                                                              */
-                                                            $uninstalls[] = $stokens[$i];
+                                                            $this->uninstalls[] = $stokens[$i];
                                                             break;
 
                                                         default:
@@ -278,13 +302,10 @@ final class Fcm extends AbstractWorker
                                 error_log('Unexpected HTTP status code from FCM: ' . $status);
                                 break;
                         }
-                        /**
-                         * $updatedTokens is list of tokens that changed
-                         * $uninstalls    is list of no longer registered tokens
-                         */
                     } catch (\Exception $e) {
                         error_log('Error while sending FCM: ' . $e->getMessage());
                     } finally {
+                        $this->postProcessing();
                         /**
                          * If using Beanstalk and not returned success after TTR time,
                          * the job considered failed and is put back into pool of "ready" jobs
@@ -297,5 +318,19 @@ final class Fcm extends AbstractWorker
             }
         }
         $this->finish();
+    }
+
+    protected function postProcessing() {
+        if ($this->onUninstall && is_callable($this->onUninstall)) {
+            if (($this->onUninstall)($this->uninstalls)) {
+                $this->uninstalls = [];
+            }
+        }
+
+        if ($this->onUpdatedTokens && is_callable($this->onUpdatedTokens)) {
+            if (($this->onUpdatedTokens)($this->updatedTokens)) {
+                $this->updatedTokens = [];
+            }
+        }
     }
 }

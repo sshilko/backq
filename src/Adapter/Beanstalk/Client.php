@@ -2,7 +2,7 @@
 /**
  *  The MIT License (MIT)
  *
- * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -37,6 +37,15 @@ class Client extends \Beanstalk\Client {
     private $_io = null;
 
     const IO_TIMEOUT = 2;
+
+    public function __destruct() {
+        if (!empty($this->_config)) {
+            if ($this->_config['persistent']) {
+                return true;
+            }
+        }
+        $this->disconnect();
+    }
 
     public function __construct(array $config = []) {
         $defaults = [
@@ -84,16 +93,55 @@ class Client extends \Beanstalk\Client {
         return $this->connected;
     }
 
+    /**
+     * @param null $timeout not specifying timeout may result in undetected connection issue and infinite waiting time
+     *
+     * @return array|false
+     */
     public function reserve($timeout = null) {
+        /**
+         * Writing will throw Exception on timeout -->
+         */
         if (isset($timeout)) {
-            $this->_io->stream_set_timeout($timeout + self::IO_TIMEOUT);
+            $streamTimeout = $timeout + self::IO_TIMEOUT;
+            $this->_io->stream_set_timeout($streamTimeout);
             $this->_write(sprintf('reserve-with-timeout %d', $timeout));
         } else {
-            $this->_io->stream_set_timeout(PHP_INT_MAX);
+            $streamTimeout = PHP_INT_MAX;
+            /**
+             * Dangerously long waiting time, also pretty optimistic to expect an answer w/o timeout,
+             * NOT RECOMMENDED use reserve w/o timeout
+             */
+            $this->_io->stream_set_timeout($streamTimeout);
             $this->_write('reserve');
         }
+        /**
+         * Writing will throw Exception on timeout <--
+         */
 
-        $status = strtok($this->_read(), ' ');
+        /**
+         * Read mig
+         */
+        $readio = $this->_read();
+        $status = strtok($readio, ' ');
+
+        /**
+         * Every subsequent call to strtok only needs the token to use,
+         * as it keeps track of where it is in the current string
+         * @see http://php.net/manual/en/function.strtok.php
+         */
+
+        /**
+         * is the job id -- an integer unique to this job in this instance of
+         * beanstalkd.
+         */
+        $jobid  = intval(strtok(' '));
+
+        /**
+         * is an integer indicating the size of the job body, not including
+         * the trailing "\r\n"
+         */
+        $bodyN  = intval(strtok(' '));
 
         /**
          * Read is blocking
@@ -106,13 +154,29 @@ class Client extends \Beanstalk\Client {
         switch ($status) {
             case 'RESERVED':
                 return [
-                    'id' => (integer) strtok(' '),
-                    'body' => $this->_read((integer) strtok(' '))
+                    'id'   => $jobid,
+                    'body' => $this->_read($bodyN)
                 ];
-            case 'DEADLINE_SOON':
+                break;
+            /**
+             * If a non-negative timeout was specified and the timeout exceeded before a job
+             * became available, or if the client's connection is half-closed, the server
+             * will respond with TIMED_OUT.
+             */
             case 'TIMED_OUT':
+                if (!isset($timeout)) {
+                    $this->_error(__FUNCTION__ . " status = '" . $status . "', timeout=" . $streamTimeout);
+                }
+                /**
+                 * Expected behaviour,
+                 * we waited TIMEOUT period and no payload was received, basicly a HEARTBEAT
+                 */
+                return false;
+                break;
+
+            case 'DEADLINE_SOON':
             default:
-                $this->_error($status);
+                $this->_error(__FUNCTION__ . " status = '" . $status . "', timeout=" . $streamTimeout);
                 return false;
         }
     }
@@ -121,8 +185,10 @@ class Client extends \Beanstalk\Client {
         if ($this->connected) {
             try {
                 $this->_write('quit');
+                //$this->_io->close();
             } catch (\Exception $ex) {}
         }
+        $this->_io = null;
         $this->connected = false;
         return $this->connected;
     }
@@ -132,11 +198,7 @@ class Client extends \Beanstalk\Client {
             $message = 'No connecting found while writing data to socket.';
             throw new RuntimeException($message);
         }
-        try {
-            $this->_io->write($data . "\r\n");
-        } catch (\Exception $e) {
-            throw new $e;
-        }
+        $this->_io->write($data . "\r\n");
         return strlen($data);
     }
 
@@ -148,8 +210,19 @@ class Client extends \Beanstalk\Client {
 
         if ($length) {
             try {
+                /**
+                 * +2 for trailing "\r\n"
+                 */
                 $packet = $this->_io->stream_get_contents($length + 2);
-                $packet = rtrim($packet, "\r\n");
+                if (false === $packet) {
+                    /**
+                     * stream_get_contents returns false on failure
+                     */
+                    throw new RuntimeException('Failed to io.stream_get_contents on ' . __FUNCTION__);
+                }
+                if ($packet) {
+                    $packet = rtrim($packet, "\r\n");
+                }
             } catch (IO\Exception\TimeoutException $ex) {
                 if ($ex->getCode() == IO\StreamIO::READ_EOF_CODE) {
                     return false;
@@ -158,8 +231,42 @@ class Client extends \Beanstalk\Client {
                 }
             }
         } else {
-            $packet = $this->_io->stream_get_line(16384, "\r\n");
+            /**
+             * The number of bytes to read from the handle
+             */
+            $packet = $this->_io->stream_get_line(32768, "\r\n");
+            if (false === $packet) {
+                /**
+                 * stream_get_line can also return false on failure
+                 */
+                throw new RuntimeException('Failed to io.stream_get_line on ' . __FUNCTION__);
+            }
         }
         return $packet;
+    }
+
+    /**
+     * Gives statistical information about the specified tube if it exists.
+     *
+     * @param string $tube Name of the tube.
+     * @return string|boolean `false` on error otherwise a string with a yaml formatted dictionary.
+     */
+    public function statsTube($tube) {
+        $cmd = sprintf('stats-tube %s', $tube);
+        $this->_write($cmd);
+        return $this->_statsRead($cmd);
+    }
+
+    protected function _statsRead($readWhat = '') {
+        $status = strtok($this->_read(), ' ');
+
+        switch ($status) {
+            case 'OK':
+                $data = $this->_read((integer) strtok(' '));
+                return $this->_decode($data);
+            default:
+                $this->_error(__FUNCTION__ . ' after ' . $readWhat . ' got ' . $status . ' expected OK');
+                return false;
+        }
     }
 }

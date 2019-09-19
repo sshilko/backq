@@ -5,8 +5,9 @@
  * Queues APNS (Apple Push Notifications)
  * Publishes a jobs to queue="apnsd-myapp1"
  * 
- * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
  */
+include_once '../../vendor/autoload.php';
 
 $iostokn = '1e82db91c7ceddd72bf33d74ae052ac9c84a065b35148ac401388843106a7485';
 $message = new ApnsPHP_Message($iostokn);

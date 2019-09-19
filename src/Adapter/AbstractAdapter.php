@@ -2,7 +2,7 @@
 /**
  *  The MIT License (MIT)
  *
- * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,15 +28,20 @@ namespace BackQ\Adapter;
 
 abstract class AbstractAdapter
 {
+    const PARAM_JOBTTR    = 'jobttr';
+    const PARAM_READYWAIT = 'readywait';
+
+    const JOBTTR_DEFAULT  = 60;
+
+    /**
+     * @var \Psr\Log\LoggerInterface
+     */
+    protected $logger;
+
     /**
      * Connect to server
      */
     abstract public function connect();
-
-    /**
-     * Report some errors
-     */
-    abstract public function error($msg);
 
     /**
      * Disconnect from server
@@ -57,7 +62,7 @@ abstract class AbstractAdapter
      * Get job to process
      * @param int $timeout seconds
      */
-    abstract public function pickTask($timeout = null);
+    abstract public function pickTask();
 
     /**
      * Put job to process
@@ -84,4 +89,14 @@ abstract class AbstractAdapter
      */
     abstract public function hasWorkers($queue);
 
-}
+    /**
+     * Preffered limit of one work cycle
+     * @param int|null $seconds
+     *
+     * @return null
+     */
+    abstract public function setWorkTimeout(int $seconds = null);
+
+    public function setLogger(\Psr\Log\LoggerInterface $logger) : void {
+        $this->logger = $logger;
+    }}

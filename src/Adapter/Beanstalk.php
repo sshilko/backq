@@ -2,7 +2,7 @@
 /**
  *  The MIT License (MIT)
  *
- * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -39,38 +39,29 @@ class Beanstalk extends AbstractAdapter
     const ADAPTER_NAME = 'beanstalk';
 
     const PARAM_PRIORITY  = 'priority';
-    const PARAM_READYWAIT = 'readywait';
-    const PARAM_JOBTTR    = 'jobttr';
 
     const PRIORITY_DEFAULT = 1024;
 
+    /**
+     * @var \BackQ\Adapter\Beanstalk\Client
+     */
     private $client;
+
     private $connected;
 
     /**
-     * Simple log
+     * Timeout for reserve() command
+     *
+     * @var null|int
      */
-    public function error($msg)
-    {
-        /**
-         * Adapter throws NOT_FOUND error at 
-         * statsTube->_statsRead after the 'use' tube, which is unexpected
-         *
-         * @see https://github.com/davidpersson/beanstalk/issues/12
-         *
-         * Adapter throws TIMED_OUT if reserve specified with timeout
-         **/
-        if ($msg != 'NOT_FOUND' && $msg != 'TIMED_OUT') {
-            @error_log('beanstalk adapter error: ' . $msg . ' at ' . print_r(debug_backtrace(false, 5), true));
-        }
-    }
+    private $workTimeout = null;
 
     /**
      * Connects adapter
      *
      * @return bool
      */
-    public function connect($host = '127.0.0.1', $port = 11300, $timeout = 1, $persistent = false)
+    public function connect($host = '127.0.0.1', $port = 11300, $timeout = 1, $persistent = false, $logger = null)
     {
         if (true === $this->connected && $this->client) {
             return true;
@@ -81,7 +72,7 @@ class Beanstalk extends AbstractAdapter
                              'port' => $port,
                              'timeout' => $timeout,
                              'persistent' => $persistent,
-                             'logger'  => $this);
+                             'logger'  => ($logger ? $logger : $this));
 
             //$this->client = new \Beanstalk\Client($bconfig);
             $this->client = new \BackQ\Adapter\Beanstalk\Client($bconfig);
@@ -91,9 +82,22 @@ class Beanstalk extends AbstractAdapter
                 return true;
             }
         } catch (Exception $e) {
-            @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+            $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
         }
         return false;
+    }
+
+    public function setWorkTimeout(int $seconds = null) {
+        $this->workTimeout = $seconds;
+        return null;
+    }
+
+    public function error($msg) {
+        if ($this->logger) {
+            $this->logger->error($msg);
+        } else {
+            error_log($msg);
+        }
     }
 
     /**
@@ -129,8 +133,13 @@ class Beanstalk extends AbstractAdapter
                         return $result['current-workers'];
                     }
                 }
-            } catch (RuntimeException $e) {}
+            } catch (RuntimeException $e) {
+                $this->error(__FUNCTION__ . ' ' . $e->getMessage());
+
+            }
         }
+
+        return null;
     }
 
     /**
@@ -166,7 +175,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -185,7 +194,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -197,16 +206,16 @@ class Beanstalk extends AbstractAdapter
      * @param $timeout integer $timeout If given specifies number of seconds to wait for a job, '0' returns immediately
      * @return boolean|array [id, payload]
      */
-    public function pickTask($timeout = null)
+    public function pickTask()
     {
         if ($this->connected) {
             try {
-                $result = $this->client->reserve($timeout);
+                $result = $this->client->reserve($this->workTimeout);
                 if (is_array($result)) {
-                    return array($result['id'], $result['body']);
+                    return [$result['id'], $result['body'], []];
                 }
             } catch (Exception $e) {
-                @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -239,17 +248,17 @@ class Beanstalk extends AbstractAdapter
                 return $result;
 
             } catch (Exception $e) {
-                @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
     }
 
     /**
-     * Pick task from queue
+     * Put task into queue
      *
      * @param  string $data The job body.
-     * @return integer|boolean `false` on error otherwise an integer indicating
+     * @return integer|boolean `false` on  otherwise an integer indicating
      *         the job id.
      */
     public function putTask($body, $params = array())
@@ -259,7 +268,7 @@ class Beanstalk extends AbstractAdapter
 
                 $priority  = self::PRIORITY_DEFAULT;
                 $readywait = 0;
-                $jobttr    = 60;
+                $jobttr    = self::JOBTTR_DEFAULT;
 
                 if (isset($params[self::PARAM_PRIORITY])) {
                     $priority  = $params[self::PARAM_PRIORITY];
@@ -276,10 +285,10 @@ class Beanstalk extends AbstractAdapter
                 $result = $this->client->put($priority, $readywait, $jobttr, $body);
 
                 if (false != $result) {
-                    return $result;
+                    return (string) $result;
                 }
             } catch (Exception $e) {
-                @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -301,7 +310,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -320,7 +329,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Exception $e) {
-                @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;
@@ -339,7 +348,7 @@ class Beanstalk extends AbstractAdapter
                 $this->connected = false;
                 return true;
             } catch (Exception $e) {
-                @error_log('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
         return false;

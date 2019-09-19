@@ -5,8 +5,10 @@
  * Send APNS (Apple Push Notifications)
  * Launches a worker that listens for jobs on queue="apnsd-myapp1"
  * 
- * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
  */
+
+include_once '../../vendor/autoload.php';
 
 $app = '-myapp1';
 $env = \ApnsPHP_Abstract::ENVIRONMENT_SANDBOX;

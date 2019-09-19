@@ -2,7 +2,7 @@
 /**
  *  The MIT License (MIT)
  *
- * Copyright (c) 2017 Sergei Shilko <contact@sshilko.com>
+ * Copyright (c) 2016 Sergei Shilko <contact@sshilko.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,15 +33,35 @@ class Process extends AbstractMessage
     private $env;
     private $input;
     private $timeout;
-    private $options;
 
-    public function __construct($commandline, $cwd = null, array $env = null, $input = null, $timeout = 60, array $options = array()) {
+    /**
+     * Timestamp until has to be done, otherwise ignored
+     * @var int
+     */
+    private $until = 0;
+
+    /**
+     * Process constructor.
+     * @param array $commandline
+     * @param string|null $cwd
+     * @param array|null $env
+     * @param null $input
+     * @param float $timeout
+     */
+    public function __construct($commandline, string $cwd = null, array $env = null, $input = null, ?float $timeout = 60) {
         $this->commandline = $commandline;
         $this->cwd = $cwd;
         $this->env = $env;
         $this->input = $input;
         $this->timeout = $timeout;
-        $this->options = $options;
+    }
+
+    public function getDeadline() {
+        return $this->until;
+    }
+
+    public function setDeadline(int $timestamp) {
+        $this->until = $timestamp;
     }
 
     public function getCommandline() {
@@ -62,10 +82,6 @@ class Process extends AbstractMessage
 
     public function getTimeout() {
         return $this->timeout;
-    }
-
-    public function getOptions() {
-        return $this->options;
     }
 
     public function getRecipientsNumber() {
