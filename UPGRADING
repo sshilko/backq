@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
-2.0.0
+2.0.6
 
 1. Backward Incompatible Changes
 2. New Features
@@ -32,6 +32,7 @@ in SQS queue (DynamoDB->DynamoDB Stream->Lambda->SQS) where they are picked up b
   - New `Serialized` publisher
 - Workers:
   - New `Serialized` worker
+  - New `Closure`    worker
 - Message
   - New `Serialized` message
 - Adapter
@@ -58,7 +59,7 @@ and possibly others.
 Recommended PHP version 7.2 or 7.3.
 
 -------------------------------------------------------------------------------
-1.9
+1.9.13
 
 1. New Features
 2. Deprecated Functionality
