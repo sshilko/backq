@@ -17,6 +17,8 @@ class Guzzle extends AbstractMessage
      */
     private $request;
 
+    private $scheme = null;
+
     /**
      * Guzzle constructor.
      *
@@ -28,6 +30,10 @@ class Guzzle extends AbstractMessage
         if ($request) {
             if ($request->getUri()->getScheme() === 'https') {
                 $request->withRequestTarget('absolute-form');
+                /**
+                 * Preserver HTTPS schema correctly
+                 */
+                $this->scheme = 'https';
             }
             $this->request = \GuzzleHttp\Psr7\str($request);
         } else {
@@ -43,6 +49,12 @@ class Guzzle extends AbstractMessage
      */
     public function getRequest(): \GuzzleHttp\Psr7\Request
     {
-        return \GuzzleHttp\Psr7\parse_request($this->request);
+        $request = \GuzzleHttp\Psr7\parse_request($this->request);
+        if (!empty($this->scheme)) {
+            $uri    = $request->getUri();
+            $newuri = $uri->withScheme($this->scheme);
+            return $request->withUri($newuri);
+        }
+        return $request;
     }
 }
