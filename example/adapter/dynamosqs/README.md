@@ -1,6 +1,6 @@
 ## Stream process lambda function ##
 
-[`backq-scheduled-stream`] (backq-scheduled-stream.js) is a Lambda function setup as trigger for DynamoDB Streams. The Streams record all events from DynamoDB tables: Inserts, Updates, Removals.
+[`backq-scheduled-stream`](backq-scheduled-stream.js) is a Lambda function setup as trigger for DynamoDB Streams. The Streams record all events from DynamoDB tables: Inserts, Updates, Removals.
 
 The function processes only items that were expired by Dynamo and sends the item body to an SQS queue. It is assumed that the DynamoDB table and the SQS queue have the same name (same requirement on DynamoSQS adapter).
 
@@ -28,7 +28,7 @@ By default, DynamoDB tables won't have a time to live attribute. It can be easil
 
 ### Environment differences ###
 
-The lambda function has exactly the same source code per environment. Via [environment] (environment.txt)variables, different resource names for test/production/... can be accessed.
+The lambda function has exactly the same source code per environment. Via [environment](environment.txt) variables, different resource names for test/production/... can be accessed.
 
 
 ### Lambda execution role policy ##
@@ -38,4 +38,4 @@ The lambda role needs permissions beyond the basic ones to:
 - Send messages to the linked SQS queues.
 - Send custom metrics to CloudWatch.
 
-Check [minimum working policy] (backq-scheduled-stream-policy.json).
+Check [minimum working policy](backq-scheduled-stream-policy.json).
