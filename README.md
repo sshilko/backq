@@ -14,7 +14,7 @@ Background tasks with workers &amp; publishers via queues
 #### Installation
 ```
 #composer self-update && composer clear-cache && composer diagnose
-composer require viveme/backq:^2.0
+composer require viveme/backend-backq:^2.0
 ```
 
 #### Supported queue servers
@@ -51,9 +51,9 @@ Worker available features
 
 TLDR
 
-![Backq](https://github.com/viveme/backq/raw/master/example/example.jpg "Background tasks with workers and publishers via queues")
+![Backq](https://github.com/viveme/backend-backq/raw/master/example/example.jpg "Background tasks with workers and publishers via queues")
 
-See [/example](https://github.com/viveme/backq/tree/master/example) folder for usage examples
+See [/example](https://github.com/viveme/backend-backq/tree/master/example) folder for usage examples
 
 #### Old version 1 detailed review
 

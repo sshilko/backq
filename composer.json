@@ -1,16 +1,16 @@
 {
-    "name": "viveme/backq",
+    "name": "viveme/backend-backq",
     "license": "proprietary",
     "description": "Background jobs processing with queue, workers & publishers",
     "type": "library",
     "minimum-stability": "dev",
     "support": {
-        "issues": "https://github.com/viveme/backq/issues"
+        "issues": "https://github.com/viveme/backend-backq/issues"
     },
     "keywords": ["queue", "worker", "apns", "push", "ios", "fcm", "apple", "guzzle", "process", "notification", "sqs", "dynamodb", "send", "background", "async"],
-    "homepage": "https://github.com/viveme/backq",
+    "homepage": "https://github.com/viveme/backend-backq",
     "require": {
-        "php": "^7.1",
+        "php": "^7.2",
         "ext-redis": "*",
         "davidpersson/beanstalk": "^2.0",
         "symfony/process": "^4.2",
