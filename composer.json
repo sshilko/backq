@@ -18,7 +18,8 @@
         "illuminate/queue": ">=5",
         "illuminate/redis": ">=5",
         "aws/aws-sdk-php": "^3.133",
-        "opis/closure": "^3.6"
+        "opis/closure": "^3.6",
+        "psr/log":"^1.1"
     },
     "autoload": {
         "psr-4": { "BackQ\\": "src/" }
