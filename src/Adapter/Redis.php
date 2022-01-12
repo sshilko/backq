@@ -2,7 +2,7 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2021 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
@@ -11,7 +11,6 @@
 namespace BackQ\Adapter;
 
 /**
- * Class Nsq
  * @package BackQ\Adapter
  */
 class Redis extends AbstractAdapter
@@ -196,6 +195,19 @@ class Redis extends AbstractAdapter
          *
          * Declared Safe since Laravel 5.8
          */
+        if (($seconds >= $this->timeout || $seconds >= $this->read_timeout) && 0 === self::BLOCKFOR_EMULATE) {
+            /**
+             * Cannot redis.blpop for > read_timeout seconds, wrong settings
+             */
+            $newWorkTimeout = (int) $this->read_timeout - 1;
+            if ($newWorkTimeout > 0) {
+                $this->logDebug('workTimeout ' . $seconds . ' > read_timeout, using workTimeout = ' . $newWorkTimeout);
+                $seconds = $newWorkTimeout;
+            } else {
+                $this->logError('workTimeout ' . $seconds . ' > read_timeout, MUST increase read_timeout');
+                $seconds = 1;
+            }
+        }
         $this->blockFor = $seconds;
     }
 

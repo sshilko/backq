@@ -14,7 +14,7 @@ Background tasks with workers &amp; publishers via queues
 #### Installation
 ```
 #composer self-update && composer clear-cache && composer diagnose
-composer require sshilko/backq:^2.0
+composer require sshilko/backq:^3.0
 ```
 
 #### Supported queue servers
@@ -28,12 +28,12 @@ composer require sshilko/backq:^2.0
 
 Workers compatibility with adapters
 
-| Adapter / Worker  |[FCM](https://firebase.google.com/docs/cloud-messaging)|[APNS](https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW9)|[Process](http://symfony.com/doc/current/components/process.html)|[Guzzle](https://www.php-fig.org/psr/psr-7/)|Serialized|[AWS SNS](https://aws.amazon.com/sns/)|
-|----|---|---|---|---|---|---|
-| [Beanstalkd](https://beanstalkd.github.io/)   | +  | +  | +  | +  | +  | +  |
-| [Redis](https://redis.io)        | +  | +  | +  | +  | ?  | +  |
-| [NSQ](https://nsq.io/)          | +  | +  | +  | +  | ?  | +  |
-| [DynamoSQS](https://aws.amazon.com/)    | +  | +  | +  | +  | +  | ?  |
+| Adapter / Worker  |[FCM](https://firebase.google.com/docs/cloud-messaging)|[APNS](https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW9)|[Process](http://symfony.com/doc/current/components/process.html)|[Guzzle](https://www.php-fig.org/psr/psr-7/)|Serialized|[AWS SNS](https://aws.amazon.com/sns/)|[Closure](https://github.com/opis/closure)|
+|----|---|---|---|---|---|---|---|
+| [Beanstalkd](https://beanstalkd.github.io/)   | +  | +  | +  | +  | +  | +  | + |
+| [Redis](https://redis.io)        | +  | +  | +  | +  | ?  | +  | + |
+| [NSQ](https://nsq.io/)          | +  | +  | +  | +  | ?  | +  | ? |
+| [DynamoSQS](https://aws.amazon.com/)    | +  | +  | +  | +  | +  | ?  | + |
 
 Adapter implemented features
 

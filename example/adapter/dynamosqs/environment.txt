@@ -1,0 +1,6 @@
+CLOUDWATCH_METRIC_NAMESPACE=BackqScheduler
+DYNAMODB_PRINCIPAL_ID=dynamodb.amazonaws.com
+EVENT_REMOVE=REMOVE
+SQS_FAST={fast-queue-name}
+SQS_SLOW={slow-queue-name}
+SQS_URL_PREFIX=https://sqs.{region}.amazonaws.com/{account_id}/

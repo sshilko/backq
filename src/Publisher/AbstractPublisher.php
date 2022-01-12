@@ -123,7 +123,12 @@ abstract class AbstractPublisher
         if (!$this->bind) {
             return false;
         }
-        return $this->adapter->putTask(serialize($serializable), $params);
+        return $this->adapter->putTask($this->serialize($serializable), $params);
+    }
+
+    protected function serialize($serializable): string
+    {
+        return serialize($serializable);
     }
 
     public function finish()

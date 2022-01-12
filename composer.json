@@ -10,14 +10,15 @@
     "keywords": ["queue", "worker", "apns", "push", "ios", "fcm", "apple", "guzzle", "process", "notification", "sqs", "dynamodb", "send", "background", "async"],
     "homepage": "https://github.com/sshilko/backq",
     "require": {
-        "php": "^7.1",
+        "php": ">=7.2",
         "ext-redis": "*",
         "davidpersson/beanstalk": "^2.0",
-        "symfony/process": "^4.2",
+        "symfony/process": ">=4",
         "duccio/apns-php": "=1.0.1",
-        "illuminate/queue": "^5.8",
-        "illuminate/redis": "^5.8",
-        "aws/aws-sdk-php": "^3.11"
+        "illuminate/queue": ">=5",
+        "illuminate/redis": ">=5",
+        "aws/aws-sdk-php": "^3.133",
+        "opis/closure": "^3.6"
     },
     "autoload": {
         "psr-4": { "BackQ\\": "src/" }
