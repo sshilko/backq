@@ -15,6 +15,52 @@ Background tasks with workers &amp; publishers via queues
 ```
 #composer self-update && composer clear-cache && composer diagnose
 composer require sshilko/backq:^3.0
+
+```
+
+#### Example with Redis adapter and `process` worker
+```
+#launch local redis
+docker run -d --name=example-backq-redis --network=host redis
+
+#install library in any folder for testing
+mkdir /tmp/example && cd /tmp/example
+composer require sshilko/backq:^3.0
+
+#post job to queue (schedule)
+cd vendor/sshilko/backq/example/publishers/process && php redis.php && cd /tmp/example
+
+#[debug] connect
+#[debug] _connect
+#[debug] putTask
+#[debug] putTask is connected and ready to: write
+#[debug] putTask pushed task without delay xoOgPKcS9bIDVXSaLYH9aLB22gzzptRo
+#[debug] putTask return 'xoOgPKcS9bIDVXSaLYH9aLB22gzzptRo'
+#Published process message via redis adapter as ID=xoOgPKcS9bIDVXSaLYH9aLB22gzzptRo
+
+#fetch job from queue (work)
+cd vendor/sshilko/backq/example/workers/process && php redis.php && cd /tmp/example
+
+#[debug] connect
+#[debug] _connect
+#[debug] pickTask
+#[debug] pickTask blocking for 5 seconds until get a job
+#[debug] pickTask reserved a job nOgykJV81g969yw2wRMF94V9KiIeKN4P
+#[debug] afterWorkSuccess
+#[debug] afterWorkSuccess currently 1 reserved job(s)
+#[debug] afterWorkSuccess releasing completed nOgykJV81g969yw2wRMF94V9KiIeKN4P job
+#[debug] Disconnecting
+#[debug] Disconnecting, previously connected
+#[debug] Disconnecting, state detected
+#[debug] Disconnecting, state detected, queue is connected
+#[debug] Disconnecting, state 0 jobs reserved and not finalized
+#[debug] Disconnecting, state detected, disconnecting queue manager
+#[debug] Disconnecting, successful
+
+#verify job executed (example process worker does echo $( date +%s ) >> /tmp/test) 
+cat /tmp/test
+
+docker stop example-backq-redis
 ```
 
 #### Supported queue servers
