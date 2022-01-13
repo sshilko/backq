@@ -108,6 +108,7 @@ See [/example](https://github.com/sshilko/backq/tree/master/example) folder for 
 #### Licence
 MIT
 
-Copyright 2013-2019 Sergei Shilko
+Copyright 2013-2022 Sergei Shilko
+Copyright 2016-2019 Carolina Alarcon
 
 
