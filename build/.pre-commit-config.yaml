@@ -1,0 +1,62 @@
+# (c) Sergei Shilko <contact@sshilko.com>
+#
+# MIT License
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code.
+# @license https://opensource.org/licenses/mit-license.php MIT
+---
+# https://pre-commit.com/#installation
+#default_stages: [commit, push]
+default_language_version:
+  # force all unspecified Python hooks to run python3
+  python: python3
+minimum_pre_commit_version: "1.20.0"
+exclude: ^(vendor/.*)$
+repos:
+  - repo: local
+    hooks:
+      - id: php-code-syntax-check
+        name: php-code-syntax-check
+        entry: php -l -d display_errors=0
+        language: system
+        types: [php]
+      - id: php-code-phpcbf
+        name: php-code-phpcbf
+        entry: php ./vendor/bin/phpcbf --standard=build/phpcs-ruleset.xml
+        language: system
+        types: [php]
+      - id: php-code-phpcs
+        name: php-code-phpcs
+        entry: php ./vendor/bin/phpcs --standard=build/phpcs-ruleset.xml
+        language: system
+        types: [php]
+      - id: php-code-phpstan
+        name: php-code-phpstan
+        entry: php ./vendor/bin/phpstan analyse --memory-limit=-1 --no-progress -c build/phpstan.neon
+        language: system
+        types: [php]
+      - id: php-code-psalm-single-changed-file-check
+        name: php-code-psalm-single-changed-file-check
+        entry: |
+            php ./vendor/bin/psalm.phar --config build/psalm.xml
+                                        --memory-limit=-1
+                                        --no-diff
+                                        --long-progress
+                                        --show-info=true
+                                        --stats
+                                        --disable-extension=xdebug
+        language: system
+        types: [php]
+        verbose: false
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+      - id: check-case-conflict
+      - id: check-json
+      - id: check-xml
+      - id: check-yaml

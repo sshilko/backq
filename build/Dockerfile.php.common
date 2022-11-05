@@ -1,0 +1,80 @@
+# (c) Sergei Shilko <contact@sshilko.com>
+#
+# MIT License
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code.
+# @license https://opensource.org/licenses/mit-license.php MIT
+LABEL author='Sergei Shilko <contact@sshilko.com>'
+
+ENV DEBIAN_FRONTEND noninteractive
+
+# /usr/share/man/man1 needs to be created before installing openjdk-11-jre lest it will fail
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=863199#23
+RUN mkdir -p /usr/share/man/man1
+
+# https://wiki.ubuntu.com/ReducingDiskFootprint
+RUN set -eux; \
+echo '\n\
+path-exclude /usr/share/doc/*                       \n\
+path-include /usr/share/doc/*/copyright             \n\
+path-exclude /usr/share/man/*                       \n\
+path-exclude /usr/share/groff/*                     \n\
+path-exclude /usr/share/info/*                      \n\
+path-exclude /usr/share/locale/*                    \n\
+path-exclude /usr/share/lintian/*                   \n\
+path-exclude /usr/share/linda/*                     \n\
+' >> /etc/dpkg/dpkg.cfg.d/01_excludes                                         && \
+    cat  /etc/dpkg/dpkg.cfg.d/01_excludes                                     && \
+    echo 'APT::Install-Recommends "0";' > /etc/apt/apt.conf.d/no-recommends   && \
+    find /usr/share/locale -maxdepth 1 -mindepth 1 ! -name 'en' |xargs rm -rf && \
+    apt-get update                                           && \
+    docker-php-ext-install -j$(nproc) mysqli                 && \
+    docker-php-ext-install -j$(nproc) pcntl                  && \
+    apt-get install -y --no-install-recommends                  \
+    unzip                                                       \
+    python3-pip                                                 \
+    pre-commit                                                  \
+    locales                                                     \
+    netcat                                                      \
+    git                                                      && \
+    apt-get clean                                            && \
+    apt-get -y autoremove                                    && \
+    rm -rf /var/lib/{apt,cache,log}/                         && \
+    rm -rf /tmp/* /var/tmp/*                                 && \
+    echo "* hard nofile 524280" >> /etc/security/limits.conf && \
+    echo "* soft nofile 262140" >> /etc/security/limits.conf && \
+    echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen               && \
+    /usr/sbin/locale-gen                                     && \
+    echo "TZ=Etc/UTC" >> /etc/environment                    && \
+    echo 'Done'
+
+ENV LANG "en_US.UTF-8"
+ENV LC_ALL "en_US.UTF-8"
+ENV TZ "Etc/UTC"
+
+HEALTHCHECK --interval=10s --timeout=1s --retries=2 --start-period=5s CMD /usr/local/bin/php -v || exit 1
+WORKDIR /app
+COPY --from=0 /usr/bin/composer /usr/bin/composer
+
+#https://www.phpdoc.org
+ADD https://phpdoc.org/phpDocumentor.phar /usr/bin/phpdoc
+RUN chmod +x /usr/bin/phpdoc
+
+#phan/phan php-ast dependency
+#https://github.com/mlocati/docker-php-extension-installer
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions ast
+
+#ADD https://phar.phpunit.de/phpcpd.phar /usr/bin/phpcpd
+#RUN chmod +x /usr/bin/phpcpd
+
+#phpunit coverage requirement
+#RUN mkdir /root/tmp && pear config-set temp_dir /root/tmp && install-php-extensions xdebug
+#ENV XDEBUG_MODE "coverage"
+
+RUN docker-php-ext-enable opcache
+
+STOPSIGNAL SIGINT
+ENTRYPOINT [ "/bin/bash" ]
+CMD ["-c", "trap exit INT; while sleep 1; do sleep 1; done;"]

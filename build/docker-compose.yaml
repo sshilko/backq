@@ -1,0 +1,64 @@
+# (c) Sergei Shilko <contact@sshilko.com>
+#
+# MIT License
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code.
+# @license https://opensource.org/licenses/mit-license.php MIT
+x-app: &app
+  tty: true
+  dns: 1.1.1.1
+  stop_grace_period: 5s
+  platform: linux/amd64
+  logging:
+    options:
+      max-size: "1m"
+      max-file: "2"
+#  healthcheck:
+#    test: ["CMD", "nc", "-w1", "-zv", "mysql", "3306"]
+#    timeout: 2s
+#    start_period: 10s
+  ulimits:
+    nproc: 65535
+    nofile:
+      soft: 262140
+      hard: 262140
+  tmpfs:
+    - /tmp
+  volumes:
+    - ./php.ini:/usr/local/etc/php/php.ini:ro,cached
+    - ./../:/app:rw,cached
+  environment:
+    XDEBUG_MODE: "off"
+    COMPOSER_NO_AUDIT: "1"
+    COMPOSER_PROCESS_TIMEOUT: 300
+    COMPOSER_NO_INTERACTION: "1"
+    COMPOSER_DISABLE_XDEBUG_WARN: "1"
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  restart: on-failure:2
+
+version: "3.7"
+services:
+  app.php:
+    <<: *app
+    image: app/php
+    container_name: backq.php
+    build:
+      context: .
+      dockerfile: Dockerfile.php74
+  app.php80:
+    <<: *app
+    image: app/php80
+    container_name: backq.php80
+    build:
+      context: .
+      dockerfile: Dockerfile.php80
+  app.php81:
+    <<: *app
+    image: app/php81
+    container_name: backq.php81
+    build:
+      context: .
+      dockerfile: Dockerfile.php81
+

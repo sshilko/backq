@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+ (c) Sergei Shilko <contact@sshilko.com>
+
+ MIT License
+
+ For the full copyright and license information, please view the LICENSE
+ file that was distributed with this source code.
+
+ @license https://opensource.org/licenses/mit-license.php MIT
+-->
+<phpdocumentor configVersion="3.0" xmlns="https://www.phpdoc.org">
+    <!-- https://docs.phpdoc.org/guide/references/configuration.html -->
+    <title>phpDocumentor</title>
+    <paths>
+        <output>tmp/phpdoc-output</output>
+        <cache>tmp/phpdoc-cache</cache>
+    </paths>
+    <version number="latest">
+        <folder>latest</folder>
+        <api format="php">
+            <source dsn="/app">
+                <path>src</path>
+            </source>
+            <default-package-name>Application</default-package-name>
+            <markers>
+                <marker>TODO</marker>
+                <marker>FIXME</marker>
+            </markers>
+        </api>
+    </version>
+</phpdocumentor>

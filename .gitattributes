@@ -1,0 +1,14 @@
+/vendor export-ignore
+/build export-ignore
+/.github export-ignore
+/.editorconfig export-ignore
+/.env export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+
+CODE_OF_CONDUCT export-ignore
+DCO export-ignore
+MAINTAINERS export-ignore
+
+* text=false
+*.php text eol=lf

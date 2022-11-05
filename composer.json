@@ -1,6 +1,28 @@
 {
     "name": "sshilko/backq",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Sergei Shilko",
+            "email": "contact@sshilko.com",
+            "homepage": "https://github.com/sshilko",
+            "role": "Developer"
+        }
+    ],
+    "config": {
+        "vendor-dir": "vendor",
+        "preferred-install": {
+            "*": "dist"
+        },
+        "prepend-autoloader": false,
+        "optimize-autoloader": true,
+        "classmap-authoritative": true,
+        "process-timeout": 360,
+        "sort-packages": true,
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
     "description": "Background jobs processing with queue, workers & publishers",
     "type": "library",
     "minimum-stability": "dev",
@@ -21,7 +43,73 @@
         "opis/closure": "^3.6",
         "psr/log":"^1.1"
     },
+    "require-dev": {
+        "ext-posix": "*",
+        "ext-ast": "*",
+        "nikic/php-parser": "^4",
+        "pdepend/pdepend": "^2.12",
+        "phan/phan": "^5.4",
+        "phpmd/phpmd": "^2.13",
+        "phpstan/phpstan": "^1.8",
+        "psalm/phar": "*",
+        "slevomat/coding-standard": "^8.4",
+        "squizlabs/php_codesniffer": "^3.7"
+    },
     "autoload": {
         "psr-4": { "BackQ\\": "src/" }
+    },
+    "scripts": {
+        "app-code-quality": [
+            "@app-phpcbf",
+            "@app-phpcs",
+            "@app-pdepend",
+            "@app-phpmd",
+            "@app-phpstan",
+            "@app-psalm-alter",
+            "@app-psalm-taint",
+            "@app-psalm",
+            "@app-phan"
+        ],
+        "app-psalm":[
+            "@putenv XDEBUG_MODE=off",
+            "php ./vendor/bin/psalm.phar --php-version=$(php -r 'echo PHP_VERSION;') --config build/psalm.xml --memory-limit=-1 --no-diff --show-info=true --long-progress --stats --disable-extension=xdebug"
+        ],
+        "app-psalm-shepherd":[
+            "@putenv XDEBUG_MODE=off",
+            "php ./vendor/bin/psalm.phar --php-version=$(php -r 'echo PHP_VERSION;') --config build/psalm.xml --shepherd --long-progress --memory-limit=-1 --no-diff --disable-extension=xdebug"
+        ],
+        "app-psalm-alter": [
+            "@putenv XDEBUG_MODE=off",
+            "php ./vendor/bin/psalm.phar --php-version=$(php -r 'echo PHP_VERSION;') --config build/psalm.xml --alter --issues=MissingParamType,MissingReturnType,InvalidReturnType,InvalidNullableReturnType,InvalidFalsableReturnType,PossiblyUndefinedVariable,UnnecessaryVarAnnotation,ParamNameMismatch"
+        ],
+        "app-psalm-taint": [
+            "@putenv XDEBUG_MODE=off",
+            "php ./vendor/bin/psalm.phar --php-version=$(php -r 'echo PHP_VERSION;') --config build/psalm.xml --taint-analysis --long-progress --disable-extension=xdebug"
+        ],
+        "app-phpcbf":[
+            "@putenv XDEBUG_MODE=off",
+            "pre-commit run --all-files --config build/.pre-commit-config.yaml php-code-phpcbf"
+        ],
+        "app-phpcs":[
+            "@putenv XDEBUG_MODE=off",
+            "pre-commit run --all-files --config build/.pre-commit-config.yaml php-code-phpcs"
+        ],
+        "app-phpstan":[
+            "@putenv XDEBUG_MODE=off",
+            "pre-commit run --all-files --config build/.pre-commit-config.yaml php-code-phpstan"
+        ],
+        "app-phpmd": [
+            "@putenv XDEBUG_MODE=off",
+            "php ./vendor/phpmd/phpmd/src/bin/phpmd src/ ansi build/phpmd-rulesets.xml"
+        ],
+        "app-phan": [
+            "@putenv XDEBUG_MODE=off",
+            "@putenv PHAN_DISABLE_XDEBUG_WARN=1",
+            "@putenv PHAN_ALLOW_XDEBUG=1",
+            "php ./vendor/bin/phan --color -k ./build/phan.php"
+        ],
+        "app-pdepend": [
+            "php ./vendor/bin/pdepend --configuration=$PWD/build/pdepend.xml --dependency-xml=$PWD/build/tmp/pdepend-dependency-xml.xml --jdepend-chart=$PWD/build/tmp/pdepend-jdepend-chart.svg --jdepend-xml=$PWD/build/tmp/pdepend-jdepend-xml.xml --summary-xml=$PWD/build/tmp/pdepend-summary-xml.xml --overview-pyramid=$PWD/build/tmp/pdepend-overview-pyramid.svg src"
+        ]
     }
 }

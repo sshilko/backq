@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<!--
+ (c) Sergei Shilko <contact@sshilko.com>
+
+ MIT License
+
+ For the full copyright and license information, please view the LICENSE
+ file that was distributed with this source code.
+
+ @license https://opensource.org/licenses/mit-license.php MIT
+-->
+<ruleset name="PHPMD rule set"
+         xmlns="http://pmd.sf.net/ruleset/1.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd"
+         xsi:noNamespaceSchemaLocation="http://pmd.sf.net/ruleset_xml_schema.xsd">
+
+    <rule ref="rulesets/codesize.xml/CyclomaticComplexity">
+        <properties>
+            <property name="reportLevel">
+                <value>25</value>
+            </property>
+        </properties>
+    </rule>
+
+    <rule ref="rulesets/codesize.xml">
+        <exclude name="CyclomaticComplexity" />
+        <exclude name="ExcessiveClassLength" />
+        <exclude name="TooManyMethods" />
+        <exclude name="TooManyPublicMethods" />
+        <exclude name="ExcessiveClassComplexity" />
+    </rule>
+
+  <rule ref="rulesets/cleancode.xml">
+      <exclude name="BooleanArgumentFlag" />
+      <exclude name="ElseExpression" />
+  </rule>
+  <rule ref="rulesets/design.xml">
+      <exclude name="NumberOfChildren" />
+  </rule>
+
+    <rule ref="rulesets/controversial.xml">
+    </rule>
+
+
+  <rule ref="rulesets/naming.xml">
+      <exclude name="ShortVariable" />
+      <exclude name="LongVariable" />
+  </rule>
+</ruleset>
