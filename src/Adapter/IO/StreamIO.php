@@ -250,7 +250,7 @@ class StreamIO extends AbstractIO
         $oreporting = error_reporting(E_ALL);
         set_error_handler(static function ($severity, $text): void {
         //$ohandler   = set_error_handler(function($severity, $text) {
-            throw new \RuntimeException('fwrite() error (' . $severity . '): ' . $text);
+            throw new RuntimeException('fwrite() error (' . $severity . '): ' . $text);
         });
 
         $tries  = self::WRITE_0_TRIES;

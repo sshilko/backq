@@ -188,6 +188,7 @@ class Client extends \Beanstalk\Client
                 $this->_write('quit');
                 //$this->_io->close();
             } catch (Throwable $ex) {
+                $this->_error(__FUNCTION__ . " error: " . $ex->getMessage());
             }
         }
         $this->_io = null;

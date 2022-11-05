@@ -14,11 +14,11 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd"
          xsi:noNamespaceSchemaLocation="http://pmd.sf.net/ruleset_xml_schema.xsd">
-
+    <!-- @see https://github.com/phpmd/phpmd/tree/master/src/main/resources/rulesets -->
     <rule ref="rulesets/codesize.xml/CyclomaticComplexity">
         <properties>
             <property name="reportLevel">
-                <value>25</value>
+                <value>35</value>
             </property>
         </properties>
     </rule>
@@ -29,19 +29,30 @@
         <exclude name="TooManyMethods" />
         <exclude name="TooManyPublicMethods" />
         <exclude name="ExcessiveClassComplexity" />
+        <exclude name="NPathComplexity" />
+        <exclude name="ExcessiveMethodLength" />
+        <exclude name="TooManyFields" />
     </rule>
 
-  <rule ref="rulesets/cleancode.xml">
-      <exclude name="BooleanArgumentFlag" />
-      <exclude name="ElseExpression" />
-  </rule>
-  <rule ref="rulesets/design.xml">
-      <exclude name="NumberOfChildren" />
-  </rule>
+    <rule ref="rulesets/cleancode.xml">
+        <exclude name="BooleanArgumentFlag" />
+        <exclude name="ElseExpression" />
+        <exclude name="ErrorControlOperator" />
+        <exclude name="IfStatementAssignment" />
+        <exclude name="StaticAccess" />
+    </rule>
+
+    <rule ref="rulesets/design.xml">
+        <exclude name="NumberOfChildren" />
+    </rule>
 
     <rule ref="rulesets/controversial.xml">
+      <exclude name="CamelCasePropertyName" />
+      <exclude name="CamelCaseVariableName" />
+      <exclude name="CamelCaseMethodName" />
+      <exclude name="CamelCaseParameterName" />
+      <exclude name="CamelCaseClassName" />
     </rule>
-
 
   <rule ref="rulesets/naming.xml">
       <exclude name="ShortVariable" />

@@ -31,6 +31,7 @@ use const E_USER_WARNING;
 
 /**
  * @package BackQ\Adapter
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class Redis extends AbstractAdapter
 {

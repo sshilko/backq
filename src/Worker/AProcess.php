@@ -207,10 +207,12 @@ final class AProcess extends AbstractWorker
                                         }
                                     }
                                 } catch (ProcessTimedOutException $e) {
+                                    @error_log('Process worker caught ProcessTimedOutException: ' . $e->getMessage());
                                 } catch (ProcessSignaledException $e) {
-                                        /**
-                                         * Child process has been terminated by an uncaught signal.
-                                         */
+                                    @error_log('Process worker caught ProcessSignaledException: ' . $e->getMessage());
+                                    /**
+                                     * Child process has been terminated by an uncaught signal.
+                                     */
                                 }
                             }
                         }
@@ -266,6 +268,7 @@ final class AProcess extends AbstractWorker
                     }
                 }
             } catch (Throwable $e) {
+                @error_log('Process worker failed to stop forked child: ' . $e->getMessage());
             }
         }
         $this->finish();

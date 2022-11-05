@@ -1,7 +1,7 @@
-backq
-=====
+BackQ - Component
+=================
 
-Background tasks with workers &amp; publishers via queues
+Background **queue processing** - publish tasks and process with workers, simplified.
 
 * Sending [APNS](https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW9) push notifications (Legacy API)
 * Sending [FCM](https://firebase.google.com/docs/cloud-messaging) push notifications to Android (GCM/FCM)
