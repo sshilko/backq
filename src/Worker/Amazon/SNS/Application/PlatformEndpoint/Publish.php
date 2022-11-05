@@ -10,21 +10,30 @@
 
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
+use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\PublishMessageInterface;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
-use \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\PublishMessageInterface;
+use Throwable;
+use function date;
+use function error_log;
+use function get_class;
+use function gettype;
+use function is_subclass_of;
+use function trigger_error;
+use function unserialize;
+use const E_USER_WARNING;
 
 class Publish extends PlatformEndpoint
 {
+
     public $workTimeout = 5;
 
-    public function run()
+    public function run(): void
     {
         $this->logDebug('Started');
         $connected = $this->start();
 
         if ($connected) {
-
             try {
                 $this->logDebug('Connected to queue');
 
@@ -54,12 +63,13 @@ class Publish extends PlatformEndpoint
                     if (!($message instanceof PublishMessageInterface)) {
                         $work->send(true);
                         $this->logDebug('Worker does not support payload of: ' . gettype($message));
+
                         continue;
                     }
 
                     try {
                         $payload = ['Message'   => $message->getMessage(),
-                                    'TargetArn' => $message->getTargetArn()];
+                            'TargetArn' => $message->getTargetArn()];
 
                         $attributes = $message->getAttributes();
                         if ($attributes) {
@@ -74,10 +84,11 @@ class Publish extends PlatformEndpoint
                         $this->snsClient->publish($payload);
 
                         $this->logDebug('SNS Client delivered message to endpoint');
-                    } catch (\Exception $e) {
-
-                        if (is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
-                                           get_class($e))) {
+                    } catch (Throwable $e) {
+                        if (is_subclass_of(
+                            '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
+                            get_class($e)
+                        )) {
 
                             /**
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_Publish.html#API_Publish_Errors
@@ -102,14 +113,15 @@ class Publish extends PlatformEndpoint
                              * Aws Internal errors and general network error
                              * will cause the job to be sent back to queue
                              */
-                            if (SnsException::INTERNAL == $e->getAwsErrorCode() ||
-                                is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
-                                               get_class($e->getPrevious()))) {
+                            if (SnsException::INTERNAL === $e->getAwsErrorCode() ||
+                                is_subclass_of(
+                                    '\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
+                                    get_class($e->getPrevious())
+                                )) {
                                 /**
                                  * Only retry if the max threshold has not been reached
                                  */
                                 if (isset($reprocessedTasks[$taskId])) {
-
                                     if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
                                         $this->logDebug('Retried re-processing the same job too many times');
                                         unset($reprocessedTasks[$taskId]);
@@ -119,6 +131,7 @@ class Publish extends PlatformEndpoint
                                          * pretend it worked
                                          */
                                         $work->send(true);
+
                                         continue;
                                     }
                                     $reprocessedTasks[$taskId] += 1;
@@ -130,17 +143,18 @@ class Publish extends PlatformEndpoint
                                  * max retry = NUM_WORKERS*NUM_RETRIES)
                                  */
                                 $work->send(false);
+
                                 continue;
                             }
                         } else {
                             $this->logDebug('Hard error: ' . $e->getMessage());
-                            trigger_error(__CLASS__ . ' ' . $e->getMessage(), E_USER_WARNING);
+                            trigger_error(self::class . ' ' . $e->getMessage(), E_USER_WARNING);
                         }
                     } finally {
                         $work->send(true);
                     }
-                };
-            } catch (\Exception $e) {
+                }
+            } catch (Throwable $e) {
                 @error_log('[' . date('Y-m-d H:i:s') . '] SNS worker exception: ' . $e->getMessage());
             }
         } else {
@@ -158,8 +172,10 @@ class Publish extends PlatformEndpoint
      *
      * @return null
      */
-    protected function onFailure(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message, string $getAwsErrorCode)
-    {
+    protected function onFailure(
+        \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message,
+        string $getAwsErrorCode
+    ) {
         return null;
     }
 }

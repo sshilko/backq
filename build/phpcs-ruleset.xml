@@ -17,9 +17,13 @@
 <!-- https://github.com/slevomat/coding-standard -->
 <!-- https://github.com/symplify/easy-coding-standard#ignore-what-you-cant-fix -->
     <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/Zend/*</exclude-pattern>
+    <exclude-pattern>*/example/*</exclude-pattern>
 
     <arg name="error-severity" value="1" />
-    <arg name="warning-severity" value="1" />
+    <!-- TODO: warning-severity=1 -->
+    <arg name="warning-severity" value="0" />
+    <!-- TODO: warning-severity=1 -->
 
     <arg name="cache" value="tmp/phpcs-tempfile" />
     <arg name="encoding" value="utf8" />
@@ -34,9 +38,29 @@
 
     <ini name="memory_limit" value="-1" />
 
-    <rule ref="PSR1"/>
+    <rule ref="PSR1">
+        <exclude name="PSR1.Methods.CamelCapsMethodName.NotCamelCaps" />
+    </rule>
     <rule ref="PSR2"/>
     <rule ref="vendor/slevomat/coding-standard/SlevomatCodingStandard/ruleset.xml">
+        <!-- TODO: remove below -->
+        <exclude name="SlevomatCodingStandard.TypeHints.DeclareStrictTypes" />
+        <exclude name="SlevomatCodingStandard.TypeHints.PropertyTypeHint.MissingAnyTypeHint" />
+        <exclude name="SlevomatCodingStandard.ControlStructures.DisallowEmpty.DisallowedEmpty" />
+        <exclude name="SlevomatCodingStandard.TypeHints.ReturnTypeHint.MissingAnyTypeHint" />
+        <exclude name="SlevomatCodingStandard.ControlStructures.AssignmentInCondition.AssignmentInCondition" />
+        <exclude name="SlevomatCodingStandard.Files.LineLength.LineTooLong" />
+        <exclude name="SlevomatCodingStandard.Classes.ForbiddenPublicProperty.ForbiddenPublicProperty" />
+        <exclude name="SlevomatCodingStandard.Functions.StrictCall.StrictParameterMissing" />
+        <exclude name="SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter" />
+        <exclude name="SlevomatCodingStandard.PHP.DisallowReference.DisallowedAssigningByReference" />
+        <exclude name="SlevomatCodingStandard.Operators.DisallowIncrementAndDecrementOperators.DisallowedPostIncrementOperator" />
+        <exclude name="SlevomatCodingStandard.Operators.DisallowIncrementAndDecrementOperators.DisallowedPostDecrementOperator" />
+        <exclude name="SlevomatCodingStandard.Operators.DisallowIncrementAndDecrementOperators.DisallowedPreIncrementOperator" />
+        <exclude name="SlevomatCodingStandard.Operators.RequireOnlyStandaloneIncrementAndDecrementOperators.PreIncrementOperatorNotUsedStandalone" />
+        <exclude name="SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh" />
+        <!-- TODO: remove above -->
+
         <exclude name="SlevomatCodingStandard.TypeHints.ParameterTypeHint" />
         <exclude name="SlevomatCodingStandard.TypeHints.TypeHintDeclaration.MissingTraversableReturnTypeHintSpecification" />
         <exclude name="SlevomatCodingStandard.TypeHints.TypeHintDeclaration.MissingTraversablePropertyTypeHintSpecification" />
@@ -48,6 +72,7 @@
         <exclude name="SlevomatCodingStandard.Commenting" />
 
         <exclude name="SlevomatCodingStandard.Classes.RequireAbstractOrFinal" />
+        <exclude name="SlevomatCodingStandard.Classes.SuperfluousAbstractClassNaming" />
         <exclude name="SlevomatCodingStandard.Classes.SuperfluousInterfaceNaming" />
         <exclude name="SlevomatCodingStandard.Classes.SuperfluousExceptionNaming" />
         <exclude name="SlevomatCodingStandard.Classes.SuperfluousTraitNaming" />
@@ -267,15 +292,11 @@
     </rule>
     <rule ref="Squiz.WhiteSpace.SemicolonSpacing"/>
     <rule ref="PSR12.Properties.ConstantVisibility" />
-    <rule ref="Squiz.Strings.DoubleQuoteUsage.ContainsVar" />
     <rule ref="Squiz.Strings.ConcatenationSpacing">
         <properties>
             <property name="ignoreNewlines" value="true"/>
             <property name="spacing" value="1"/>
         </properties>
-    </rule>
-    <rule ref="Squiz.Strings.DoubleQuoteUsage.ContainsVar">
-        <message>Variable "%s" not allowed in double quoted string; use sprintf() instead</message>
     </rule>
     <rule ref="Squiz.Scope.StaticThisUsage"/>
     <rule ref="Internal.NoCodeFound">

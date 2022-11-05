@@ -12,16 +12,19 @@ namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
 interface PublishMessageInterface
 {
-    public function getMessage();
-    public function setMessage(array $message);
+    public function getMessage(): void;
 
-    public function getTargetArn() : string;
-    public function setTargetArn(string $targetArn);
+    public function setMessage(array $message): void;
 
-    public function getAttributes() : array;
-    public function setAttributes(array $attrs);
+    public function getTargetArn(): string;
 
-    public function getMessageStructure() : string;
-    public function setMessageStructure(string $structure);
+    public function setTargetArn(string $targetArn): void;
 
+    public function getAttributes(): array;
+
+    public function setAttributes(array $attrs): void;
+
+    public function getMessageStructure(): string;
+
+    public function setMessageStructure(string $structure): void;
 }

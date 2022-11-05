@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -7,6 +8,12 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+use Backq\Adapter\AbstractAdapter;
+use BackQ\Adapter\Beanstalk;
+use BackQ\Adapter\Redis;
+use BackQ\Publisher\Process;
+use Symfony\Component\Console\Logger\ConsoleLogger;
+use Symfony\Component\Console\Output\ConsoleOutput;
 
 /**
  * Publisher
@@ -17,18 +24,19 @@
 
 include_once '../../../../../vendor/autoload.php';
 
-final class MyProcessPublisher extends \BackQ\Publisher\Process
+final class MyProcessPublisher extends Process
 {
+
     protected $queueName = 'abc';
 
-    protected function setupAdapter(): \Backq\Adapter\AbstractAdapter
+    protected function setupAdapter(): AbstractAdapter
     {
-        $adapters = [new \BackQ\Adapter\Redis(), new \BackQ\Adapter\Beanstalk()];
+        $adapters = [new Redis(), new Beanstalk()];
         $adapter  = $adapters[array_rand($adapters)];
         echo 'Using ' . get_class($adapter) . ' adapter' . "\n";
 
-        $output  = new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG);
-        $logger  = new \Symfony\Component\Console\Logger\ConsoleLogger($output);
+        $output  = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
+        $logger  = new ConsoleLogger($output);
 
         $adapter->setLogger($logger);
 

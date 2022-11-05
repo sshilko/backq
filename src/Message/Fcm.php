@@ -10,6 +10,8 @@
 
 namespace BackQ\Message;
 
-class Fcm extends \Zend_Mobile_Push_Message_Gcm
+use Zend_Mobile_Push_Message_Gcm;
+
+class Fcm extends Zend_Mobile_Push_Message_Gcm
 {
 }

@@ -11,10 +11,10 @@
 namespace BackQ\Worker\Amazon\SNS;
 
 use BackQ\Worker\AbstractWorker;
-use BackQ\Worker\Amazon\SNS\SnsClient as AwsSnsClient;
 
 abstract class Application extends AbstractWorker
 {
+
     /** @var $snsClient AwsSnsClient */
     protected $snsClient;
 
@@ -23,7 +23,7 @@ abstract class Application extends AbstractWorker
      *
      * @param AwsSnsClient $awsSnsClient
      */
-    public function setClient($awsSnsClient)
+    public function setClient($awsSnsClient): void
     {
         $this->snsClient = $awsSnsClient;
     }

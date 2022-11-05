@@ -10,74 +10,74 @@
 
 namespace BackQ\Adapter;
 
+use Psr\Log\LoggerInterface;
+use function trigger_error;
+use const E_USER_WARNING;
+
 abstract class AbstractAdapter
 {
-    const PARAM_JOBTTR    = 'jobttr';
-    const PARAM_READYWAIT = 'readywait';
+    public const PARAM_JOBTTR    = 'jobttr';
+    public const PARAM_READYWAIT = 'readywait';
 
-    const JOBTTR_DEFAULT  = 60;
+    public const JOBTTR_DEFAULT  = 60;
 
     /**
      * Whether logError should always call trigger_error
-     * @var bool
      */
-    protected $triggerErrorOnError = true;
+    protected bool $triggerErrorOnError = true;
 
-    /**
-     * @var \Psr\Log\LoggerInterface
-     */
-    protected $logger;
+    protected LoggerInterface $logger;
 
     /**
      * Connect to server
      */
-    abstract public function connect();
+    abstract public function connect(): void;
 
     /**
      * Disconnect from server
      */
-    abstract public function disconnect();
+    abstract public function disconnect(): void;
 
     /**
      * Subscribe to server queue
      */
-    abstract public function bindRead($queue);
+    abstract public function bindRead($queue): void;
 
     /**
      * Prepare to write to server queue
      */
-    abstract public function bindWrite($queue);
+    abstract public function bindWrite($queue): void;
 
     /**
      * Get job to process
      * @param int $timeout seconds
      */
-    abstract public function pickTask();
+    abstract public function pickTask(): void;
 
     /**
      * Put job to process
      */
-    abstract public function putTask($body, $params = array());
+    abstract public function putTask($body, $params = []): void;
 
     /**
      * Acknowledge server: callback after successfully processing job
      */
-    abstract public function afterWorkSuccess($workId);
+    abstract public function afterWorkSuccess($workId): void;
 
     /**
      * Acknowledge server: callback after failing to process job
      */
-    abstract public function afterWorkFailed($workId);
+    abstract public function afterWorkFailed($workId): void;
 
     /**
      * Ping if still has alive connection to server
      */
-    abstract public function ping();
+    abstract public function ping(): void;
 
     /**
      * Is there workers ready for job immediately
      */
-    abstract public function hasWorkers($queue);
+    abstract public function hasWorkers($queue): void;
 
     /**
      * Preffered limit of one work cycle
@@ -85,12 +85,12 @@ abstract class AbstractAdapter
      *
      * @return null
      */
-    abstract public function setWorkTimeout(int $seconds = null);
+    abstract public function setWorkTimeout(?int $seconds = null);
 
     /**
-     * @param \Psr\Log\LoggerInterface $logger
+     * @param LoggerInterface $logger
      */
-    public function setLogger(\Psr\Log\LoggerInterface $logger): void
+    public function setLogger(LoggerInterface $logger): void
     {
         $this->logger = $logger;
     }
@@ -98,7 +98,7 @@ abstract class AbstractAdapter
     /**
      * @param bool $triggerError
      */
-    public function setTriggerErrorOnError(bool $triggerError)
+    public function setTriggerErrorOnError(bool $triggerError): void
     {
         $this->triggerErrorOnError = $triggerError;
     }
@@ -106,7 +106,7 @@ abstract class AbstractAdapter
     /**
      * @param string $message
      */
-    public function logInfo(string $message)
+    public function logInfo(string $message): void
     {
         if ($this->logger) {
             $this->logger->info($message);
@@ -116,7 +116,7 @@ abstract class AbstractAdapter
     /**
      * @param string $message
      */
-    public function logDebug(string $message)
+    public function logDebug(string $message): void
     {
         if ($this->logger) {
             $this->logger->debug($message);
@@ -126,7 +126,7 @@ abstract class AbstractAdapter
     /**
      * @param string $message
      */
-    public function logError(string $message)
+    public function logError(string $message): void
     {
         if ($this->logger) {
             $this->logger->error($message);

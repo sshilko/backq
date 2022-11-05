@@ -10,7 +10,9 @@
 
 namespace BackQ\Adapter\IO\Exception;
 
-class IOException extends \Exception
+use Exception;
+
+class IOException extends Exception
 {
 
 }

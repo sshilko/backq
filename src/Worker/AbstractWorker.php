@@ -10,58 +10,77 @@
 
 namespace BackQ\Worker;
 
+use BackQ\Adapter\AbstractAdapter;
 use Exception;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Console\Logger\ConsoleLogger;
+use Symfony\Component\Console\Output\ConsoleOutput;
+use function function_exists;
+use function is_array;
+use function pcntl_async_signals;
+use function pcntl_signal;
+use function pcntl_signal_dispatch;
+use function time;
+use function trigger_error;
+use const E_USER_WARNING;
+use const SIGHUP;
+use const SIGINT;
+use const SIGTERM;
 
 abstract class AbstractWorker
 {
-    private $adapter;
-    private $bind;
+
+    /**
+     * Work timeout value
+     *
+     */
+    public int $workTimeout = null;
 
     /**
      * Whether syscalls should be delayed
-     * @var bool
      */
-    protected $manualDelaySignal  = false;
+    protected bool $manualDelaySignal  = false;
+
     protected $delaySignalPending = 0;
 
     /**
      * Whether logError should always call trigger_error
-     * @var bool
      */
-    protected $triggerErrorOnError = true;
+    protected bool $triggerErrorOnError = true;
 
     protected $queueName;
 
     /**
      * Quit after processing X amount of pushes
      *
-     * @var int
      */
-    protected $restartThreshold = 0;
+    protected int $restartThreshold = 0;
 
     /**
      * Quit if inactive for specified time (seconds)
      *
-     * @var int
      */
-    protected $idleTimeout = 0;
+    protected int $idleTimeout = 0;
 
-    /**
-     * Work timeout value
-     *
-     * @var int
-     */
-    public $workTimeout = null;
+    protected LoggerInterface $logger;
 
-    /**
-     * @var \Psr\Log\LoggerInterface
-     */
-    protected $logger;
+    private $adapter;
+
+    private $bind;
+
+    abstract public function run(): void;
+
+    public function __construct(AbstractAdapter $adapter)
+    {
+        $this->adapter = $adapter;
+        $output        = new ConsoleOutput(ConsoleOutput::VERBOSITY_NORMAL);
+        $this->setLogger(new ConsoleLogger($output));
+    }
 
     /**
      * @param int|null $timeout
      */
-    public function setWorkTimeout(?int $timeout = null)
+    public function setWorkTimeout(?int $timeout = null): void
     {
         $this->workTimeout = $timeout;
     }
@@ -69,9 +88,9 @@ abstract class AbstractWorker
     /**
      * Declare logger
      *
-     * @param null|\Psr\Log\LoggerInterface $log
+     * @param LoggerInterface|null $log
      */
-    public function setLogger(?\Psr\Log\LoggerInterface $log)
+    public function setLogger(?LoggerInterface $log): void
     {
         $this->logger = $log;
     }
@@ -79,9 +98,8 @@ abstract class AbstractWorker
     /**
      * Specify worker queue to pick job from
      *
-     * @return string
      */
-    public function getQueueName() : string
+    public function getQueueName(): string
     {
         return $this->queueName;
     }
@@ -91,26 +109,87 @@ abstract class AbstractWorker
      *
      * @param $string
      */
-    public function setQueueName(string $string)
+    public function setQueueName(string $string): void
     {
         $this->queueName = (string) $string;
     }
 
-    abstract public function run();
-
-    public function __construct(\BackQ\Adapter\AbstractAdapter $adapter)
+    /**
+     * Quit after processing X amount of pushes
+     *
+     * @param int $int
+     */
+    public function setRestartThreshold(int $int): void
     {
-        $this->adapter = $adapter;
-        $output        = new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_NORMAL);
-        $this->setLogger(new \Symfony\Component\Console\Logger\ConsoleLogger($output));
+        $this->restartThreshold = (int) $int;
+    }
+
+    /**
+     * Quit after reaching idle timeout
+     *
+     * @param int $int
+     */
+    public function setIdleTimeout(int $int): void
+    {
+        $this->idleTimeout = (int) $int;
+    }
+
+    /**
+     * @param bool $triggerError
+     */
+    public function setTriggerErrorOnError(bool $triggerError): void
+    {
+        $this->triggerErrorOnError = $triggerError;
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logInfo(string $message): void
+    {
+        if ($this->logger) {
+            $this->logger->info($message);
+        }
+    }
+
+    /**
+     * @param string $message
+     * @deprecated
+     */
+    public function debug(string $message): void
+    {
+        $this->logDebug($message);
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logDebug(string $message): void
+    {
+        if ($this->logger) {
+            $this->logger->debug($message);
+        }
+    }
+
+    /**
+     * @param string $message
+     */
+    public function logError(string $message): void
+    {
+        if ($this->logger) {
+            $this->logger->error($message);
+        }
+
+        if ($this->triggerErrorOnError) {
+            trigger_error($message, E_USER_WARNING);
+        }
     }
 
     /**
      * Initialize provided adapter
      *
-     * @return bool
      */
-    protected function start()
+    protected function start(): bool
     {
         /**
          * Tell adapter about our desire for work cycle duration, if any
@@ -131,7 +210,7 @@ abstract class AbstractWorker
                 $this->delaySignalPending = 0;
                 $me = $this;
                 if (function_exists('pcntl_signal')) {
-                    $signalHandler = function($n) use (&$me) {
+                    $signalHandler = static function ($n) use (&$me): void {
                         $me->delaySignalPending = $n;
                     };
 
@@ -169,6 +248,7 @@ abstract class AbstractWorker
                 return true;
             }
         }
+
         return false;
     }
 
@@ -223,7 +303,7 @@ abstract class AbstractWorker
                 yield;
 
                 $ack = false;
-                if ($response === false) {
+                if (false === $response) {
                     $this->logDebug('Calling afterWorkFailed, worker reported failure');
                     $ack = $this->adapter->afterWorkFailed($job[0]);
                 } else {
@@ -234,162 +314,95 @@ abstract class AbstractWorker
                 if (!$ack) {
                     throw new Exception('Worker failed to acknowledge job result');
                 }
-
             } else {
                 /**
                  * Job is a lie
                  */
                 if (!$timeout) {
                     throw new Exception('Worker failed to fetch new job');
-                } else {
-                    /**
-                     * Two yield's are not mistake
-                     */
-                    yield null;
-                    yield null;
                 }
+
+                /**
+                 * Two yield's are not mistake
+                 */
+                yield null;
+                yield null;
             }
 
             /**
              * Break infinite loop when a limit condition is reached
              */
-            if ($this->idleTimeout > 0 && (time() - $lastActive) > ($this->idleTimeout - $timeout)) {
+            if ($this->idleTimeout > 0 && (time() - $lastActive) > $this->idleTimeout - $timeout) {
                 $this->logDebug('Idle timeout reached, returning job, quitting');
                 if ($this->onIdleTimeout()) {
                     $this->logDebug('onIdleTimeout true');
+
                     break;
-                } else {
-                    $this->logDebug('onIdleTimeout false');
                 }
+
+                $this->logDebug('onIdleTimeout false');
             }
 
-            if ($this->restartThreshold > 0 && ++$jobsdone > ($this->restartThreshold - 1)) {
+            if ($this->restartThreshold > 0 && ++$jobsdone > $this->restartThreshold - 1) {
                 $this->logDebug('Restart threshold reached, returning job, quitting');
                 if ($this->onRestartThreshold()) {
                     $this->logDebug('onRestartThreshold true');
+
                     break;
-                } else {
-                    $this->logDebug('onRestartThreshold false');
                 }
+
+                $this->logDebug('onRestartThreshold false');
             }
         }
     }
 
     /**
-     * @return bool
      */
-    protected function onIdleTimeout() {
+    protected function onIdleTimeout(): bool
+    {
         return true;
     }
 
     /**
-     * @return bool
      */
-    protected function onRestartThreshold() {
+    protected function onRestartThreshold(): bool
+    {
         return true;
     }
 
     /**
-     * @return bool
      */
-    protected function isTerminationRequested() : bool {
+    protected function isTerminationRequested(): bool
+    {
         if ($this->delaySignalPending > 0) {
-            if ($this->delaySignalPending == SIGTERM ||
-                $this->delaySignalPending == SIGINT  ||
-                $this->delaySignalPending == SIGHUP) {
+            if (SIGTERM === $this->delaySignalPending ||
+                SIGINT === $this->delaySignalPending ||
+                SIGHUP === $this->delaySignalPending) {
                 /**
                  * Received request to stop/terminate process
                  */
                 $this->logDebug('termination requested');
+
                 return true;
             }
         }
+
         return false;
     }
 
     /**
-     * @return bool
      */
-    protected function finish()
+    protected function finish(): bool
     {
         $this->logDebug('finish() called');
         if ($this->bind) {
             $this->logDebug('disconnecting binded adapter');
             $this->adapter->disconnect();
             $this->logDebug('disconnected binded adapter');
+
             return true;
         }
+
         return false;
-    }
-
-    /**
-     * Quit after processing X amount of pushes
-     *
-     * @param int $int
-     */
-    public function setRestartThreshold(int $int)
-    {
-        $this->restartThreshold = (int) $int;
-    }
-
-    /**
-     * Quit after reaching idle timeout
-     *
-     * @param int $int
-     */
-    public function setIdleTimeout(int $int)
-    {
-        $this->idleTimeout = (int) $int;
-    }
-
-    /**
-     * @param bool $triggerError
-     */
-    public function setTriggerErrorOnError(bool $triggerError)
-    {
-        $this->triggerErrorOnError = $triggerError;
-    }
-
-    /**
-     * @param string $message
-     */
-    public function logInfo(string $message)
-    {
-        if ($this->logger) {
-            $this->logger->info($message);
-        }
-    }
-
-    /**
-     * @param string $message
-     * @deprecated
-     */
-    public function debug(string $message)
-    {
-        $this->logDebug($message);
-    }
-
-    /**
-     * @param string $message
-     */
-    public function logDebug(string $message)
-    {
-        if ($this->logger) {
-            $this->logger->debug($message);
-        }
-    }
-
-    /**
-     * @param string $message
-     */
-    public function logError(string $message)
-    {
-        if ($this->logger) {
-            $this->logger->error($message);
-        }
-
-        if ($this->triggerErrorOnError) {
-            trigger_error($message, E_USER_WARNING);
-        }
     }
 }

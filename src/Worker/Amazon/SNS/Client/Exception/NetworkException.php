@@ -10,8 +10,9 @@
 
 namespace BackQ\Worker\Amazon\SNS\Client\Exception;
 
+use GuzzleHttp\Exception\RequestException;
 
-class NetworkException extends \GuzzleHttp\Exception\RequestException
+class NetworkException extends RequestException
 {
 
 }

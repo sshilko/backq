@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -7,6 +8,10 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+use BackQ\Adapter\Beanstalk;
+use BackQ\Worker\Serialized;
+use Symfony\Component\Console\Logger\ConsoleLogger;
+use Symfony\Component\Console\Output\ConsoleOutput;
 
 include_once '../../../../../vendor/autoload.php';
 include_once '../publishers/lib/myprocesspublisher.php';
@@ -16,8 +21,8 @@ include_once '../publishers/lib/myprocesspublisher.php';
  * Re-queue serialized messages
  */
 
-$worker = new \BackQ\Worker\Serialized(new \BackQ\Adapter\Beanstalk);
-$logger = new \Symfony\Component\Console\Logger\ConsoleLogger(new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG));
+$worker = new Serialized(new Beanstalk());
+$logger = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
 $worker->setLogger($logger);
 $worker->setQueueName('123');
 $worker->setWorkTimeout(1);

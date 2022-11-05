@@ -10,51 +10,55 @@
 
 namespace BackQ\Message;
 
+use GuzzleHttp\Psr7\Request;
+use LogicException;
+use function GuzzleHttp\Psr7\parse_request;
+use function GuzzleHttp\Psr7\str;
+
 class Guzzle extends AbstractMessage
 {
-    /**
-     * @var \GuzzleHttp\Psr7\Request
-     */
-    private $request;
+
+    private Request $request;
 
     private $scheme = null;
 
     /**
      * Guzzle constructor.
      *
-     * @param \GuzzleHttp\Psr7\Request|null $request
+     * @param Request|null $request
      * @param string|null                   $rawRequest
      */
-    public function __construct($request = null, string $rawRequest = null)
+    public function __construct($request = null, ?string $rawRequest = null)
     {
         if ($request) {
-            if ($request->getUri()->getScheme() === 'https') {
+            if ('https' === $request->getUri()->getScheme()) {
                 $request->withRequestTarget('absolute-form');
                 /**
                  * Preserver HTTPS schema correctly
                  */
                 $this->scheme = 'https';
             }
-            $this->request = \GuzzleHttp\Psr7\str($request);
+            $this->request = str($request);
         } else {
             $this->request = $rawRequest;
         }
         if (empty($this->request)) {
-            throw new \LogicException('Provide either PSR7 request or PSR-7 compatible request body');
+            throw new LogicException('Provide either PSR7 request or PSR-7 compatible request body');
         }
     }
 
     /**
-     * @return \GuzzleHttp\Psr7\Request
      */
-    public function getRequest(): \GuzzleHttp\Psr7\Request
+    public function getRequest(): Request
     {
-        $request = \GuzzleHttp\Psr7\parse_request($this->request);
+        $request = parse_request($this->request);
         if (!empty($this->scheme)) {
             $uri    = $request->getUri();
             $newuri = $uri->withScheme($this->scheme);
+
             return $request->withUri($newuri);
         }
+
         return $request;
     }
 }

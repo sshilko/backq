@@ -10,10 +10,22 @@
 
 namespace BackQ\Adapter;
 
-use Aws\Sqs\SqsClient;
 use Aws\DynamoDb\DynamoDbClient;
-use BackQ\Adapter\Amazon\DynamoDb\QueueTableRow;
+use Aws\DynamoDb\Exception\DynamoDbException;
 use Aws\Exception\AwsException;
+use Aws\Sqs\SqsClient;
+use BackQ\Adapter\Amazon\DynamoDb\QueueTableRow;
+use InvalidArgumentException;
+use function assert;
+use function count;
+use function crc32;
+use function gethostname;
+use function getmypid;
+use function is_array;
+use function json_decode;
+use function max;
+use function strtotime;
+use function time;
 
 /**
  * Adapter uses DynamoDB for writing tasks
@@ -25,6 +37,11 @@ use Aws\Exception\AwsException;
  */
 class DynamoSQS extends AbstractAdapter
 {
+    /**
+     * Some identifier whatever it is
+     */
+    public const PARAM_MESSAGE_ID = 'msgid';
+
     protected const API_VERSION_DYNAMODB  = '2012-08-10';
     protected const API_VERSION_SQS       = '2012-11-05';
 
@@ -39,74 +56,45 @@ class DynamoSQS extends AbstractAdapter
      */
     protected const DYNAMODB_MAXIMUM_PROCESSABLE_TIME = '5 years';
 
-    /**
-     * Some identifier whatever it is
-     */
-    public const PARAM_MESSAGE_ID = 'msgid';
-
     protected const TIMEOUT_VISIBILITY_MIN = 10;
 
-    /**
-     * Controls how many times and how often the job can be retried on failures
-     */
+    protected ?DynamoDbClient $dynamoDBClient = null;
 
-    /**
-     * @var ?DynamoDbClient
-     */
-    protected $dynamoDBClient;
+    protected ?SqsClient $sqsClient = null;
 
-    /**
-     * @var ?SqsClient
-     */
-    protected $sqsClient;
+    protected ?string $dynamoDbTableName = null;
 
-    /**
-     * @var ?string
-     */
-    protected $dynamoDbTableName;
-
-    /**
-     * @var ?string
-     */
-    protected $sqsQueueURL;
+    protected ?string $sqsQueueURL = null;
 
     /**
      * AWS DynamoDB API Key
-     * @var string
      */
-    protected $apiKey    = '';
+    protected string $apiKey    = '';
 
     /**
      * AWS DynamoDB API Secret
-     * @var string
      */
-    protected $apiSecret = '';
+    protected string $apiSecret = '';
 
     /**
      * AWS DynamoDB API Region
-     * @var string
      */
-    protected $apiRegion = '';
+    protected string $apiRegion = '';
 
     /**
      * AWS Account ID
-     * @var string
      */
-    protected $apiAccountId = '';
+    protected string $apiAccountId = '';
 
     /**
      * Timeout for receiveMessage from SQS command (Long polling)
      *
-     * @var int
      */
-    private $workTimeout = 5;
+    private int $workTimeout = 5;
 
     private $maxNumberOfMessages = 1;
 
-    public function __construct(string $apiAccountId,
-                                string $apiKey,
-                                string $apiSecret,
-                                string $apiRegion)
+    public function __construct(string $apiAccountId, string $apiKey, string $apiSecret, string $apiRegion)
     {
         $this->apiKey       = $apiKey;
         $this->apiSecret    = $apiSecret;
@@ -115,98 +103,60 @@ class DynamoSQS extends AbstractAdapter
     }
 
     /**
-     * @return bool
      */
-    public function connect()
+    public function connect(): bool
     {
-        $arguments = ['version'     => static::API_VERSION_DYNAMODB,
-                      'region'      => $this->apiRegion,
-                      'credentials' => ['key'    => $this->apiKey,
-                                        'secret' => $this->apiSecret]];
+        $arguments = ['version'     => self::API_VERSION_DYNAMODB,
+            'region'      => $this->apiRegion,
+            'credentials' => ['key'    => $this->apiKey,
+                'secret' => $this->apiSecret]];
 
         $this->dynamoDBClient = new DynamoDbClient($arguments);
 
-        $arguments['version'] = static::API_VERSION_SQS;
+        $arguments['version'] = self::API_VERSION_SQS;
         $this->sqsClient      = new SqsClient($arguments);
+
         return true;
     }
 
     /**
-     * @return bool
      */
-    public function disconnect()
+    public function disconnect(): bool
     {
         $this->dynamoDBClient    = null;
         $this->dynamoDbTableName = null;
         $this->sqsClient         = null;
         $this->sqsQueueURL       = null;
+
         return true;
     }
 
     /**
      * @param string $queue
-     * @return bool
      */
-    public function bindRead($queue)
+    public function bindRead($queue): bool
     {
         $this->sqsQueueURL = $this->generateSqsEndpointUrl($queue);
-        return true;
-    }
 
-    /**
-     * Expected SQS Queue URL
-     *
-     * https://sqs.REGION.amazonaws.com/XXXXXXXX/QUEUENAME
-     *
-     * @param string $queue
-     * @return string
-     */
-    private function generateSqsEndpointUrl(string $queue): string
-    {
-        return 'https://sqs.' . $this->apiRegion . '.amazonaws.com/' . $this->apiAccountId . '/' . $queue;
+        return true;
     }
 
     /**
      * @param string $sqsURL
-     * @return bool
      */
-    public function bindWrite($queue)
+    public function bindWrite($queue): bool
     {
         $this->dynamoDbTableName = $queue;
+
         return true;
-    }
-
-    private function calculateVisibilityTimeout(): int
-    {
-        /**
-         * How much time we estimate it takes to process the picked results
-         */
-        return max($this->workTimeout * 4, self::TIMEOUT_VISIBILITY_MIN);
-    }
-
-    /**
-     * Calculate a TTL value based on the average delay from 'expired' DynamoDB Stream items
-     *
-     * @param int $expectedTTL
-     *
-     * @return int
-     */
-    private function getEstimatedTTL(int $expectedTTL): int
-    {
-        $estimatedTTL = $expectedTTL;
-        if ($expectedTTL >= self::DYNAMODB_ESTIMATED_DELAY) {
-            $estimatedTTL -= self::DYNAMODB_ESTIMATED_DELAY;
-        }
-
-        return $estimatedTTL;
     }
 
     public function pickTask()
     {
         $this->logDebug(__FUNCTION__);
 
-        /** @var SqsClient $sqs */
         $sqs = $this->sqsClient;
+        assert($sqs instanceof SqsClient);
         if (!$sqs) {
             return false;
         }
@@ -217,12 +167,12 @@ class DynamoSQS extends AbstractAdapter
         $result = null;
         try {
             $result = $sqs->receiveMessage(['AttributeNames'        => ['All'],
-                                            'MaxNumberOfMessages'   => $this->maxNumberOfMessages,
-                                            'MessageAttributeNames' => ['All'],
-                                            'QueueUrl'          => $this->sqsQueueURL,
-                                            'WaitTimeSeconds'   => (int) $this->workTimeout,
-                                            'VisibilityTimeout' => $this->calculateVisibilityTimeout()]);
-        }  catch (AwsException $e) {
+                'MaxNumberOfMessages'   => $this->maxNumberOfMessages,
+                'MessageAttributeNames' => ['All'],
+                'QueueUrl'          => $this->sqsQueueURL,
+                'WaitTimeSeconds'   => (int) $this->workTimeout,
+                'VisibilityTimeout' => $this->calculateVisibilityTimeout()]);
+        } catch (AwsException $e) {
             $this->logError($e->getMessage());
         }
 
@@ -244,6 +194,7 @@ class DynamoSQS extends AbstractAdapter
             }
 
             $messageId = $messagePayload['ReceiptHandle'];
+
             return [$messageId, $itemPayload];
         }
 
@@ -268,7 +219,7 @@ class DynamoSQS extends AbstractAdapter
          */
         $minTTL = strtotime('-' . self::DYNAMODB_MAXIMUM_PROCESSABLE_TIME);
         if ($readyTime <= $minTTL) {
-            throw new \InvalidArgumentException('Cannot process item with TTL: ' . $readyTime);
+            throw new InvalidArgumentException('Cannot process item with TTL: ' . $readyTime);
         }
 
         $msgid = crc32(getmypid() . gethostname());
@@ -279,16 +230,15 @@ class DynamoSQS extends AbstractAdapter
         $item = new QueueTableRow($body, $readyTime, $msgid);
         try {
             $response = $this->dynamoDBClient->putItem(['Item'      => $item->toArray(),
-                                                        'TableName' => $this->dynamoDbTableName]);
+                'TableName' => $this->dynamoDbTableName]);
             if ($response &&
                 isset($response['@metadata']['statusCode']) &&
-                $response['@metadata']['statusCode'] == 200) {
-
+                200 === $response['@metadata']['statusCode']) {
                 $this->logDebug(__FUNCTION__ . ' success');
 
                 return true;
             }
-        } catch (\Aws\DynamoDb\Exception\DynamoDbException $e) {
+        } catch (DynamoDbException $e) {
             $this->logError(__FUNCTION__ . ' service failed: ' . $e->getMessage());
         }
 
@@ -297,30 +247,28 @@ class DynamoSQS extends AbstractAdapter
 
     /**
      * @param $workId
-     *
-     * @return bool
      */
-    public function afterWorkSuccess($workId)
+    public function afterWorkSuccess($workId): bool
     {
         if ($this->sqsClient) {
-            /** @var SqsClient $sqs */
             $sqs = $this->sqsClient;
+            assert($sqs instanceof SqsClient);
             try {
                 $sqs->deleteMessage(['QueueUrl' => $this->sqsQueueURL, 'ReceiptHandle' => $workId]);
+
                 return true;
-            }  catch (AwsException $e) {
+            } catch (AwsException $e) {
                 $this->logError($e->getMessage());
             }
         }
+
         return true;
     }
 
     /**
-     * @param $workId
-     *
-     * @return bool
+     * @phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
      */
-    public function afterWorkFailed($workId)
+    public function afterWorkFailed($workId): bool
     {
         /**
          * Could call SQS ChangeMessageVisibility but why bother, the message will come back after
@@ -329,20 +277,15 @@ class DynamoSQS extends AbstractAdapter
         return true;
     }
 
-    /**
-     * @return bool
-     */
-    public function ping()
+    public function ping(): bool
     {
         return true;
     }
 
     /**
-     * @param $queue
-     *
-     * @return bool
+     * @phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
      */
-    public function hasWorkers($queue)
+    public function hasWorkers($queue): bool
     {
         /**
          * @todo implement using SQS or DynamoDB as separate table/lock
@@ -356,12 +299,49 @@ class DynamoSQS extends AbstractAdapter
      * If no messages are available and the wait time expires,
      * the call returns successfully with an empty list of messages.
      *
-     * @param null|int $seconds
+     * @param int|null $seconds
      * @return null
      */
-    public function setWorkTimeout(int $seconds = null)
+    public function setWorkTimeout(?int $seconds = null)
     {
         $this->workTimeout = $seconds;
+
         return null;
+    }
+
+    /**
+     * Expected SQS Queue URL
+     *
+     * https://sqs.REGION.amazonaws.com/XXXXXXXX/QUEUENAME
+     *
+     * @param string $queue
+     */
+    private function generateSqsEndpointUrl(string $queue): string
+    {
+        return 'https://sqs.' . $this->apiRegion . '.amazonaws.com/' . $this->apiAccountId . '/' . $queue;
+    }
+
+    private function calculateVisibilityTimeout(): int
+    {
+        /**
+         * How much time we estimate it takes to process the picked results
+         */
+        return max($this->workTimeout * 4, self::TIMEOUT_VISIBILITY_MIN);
+    }
+
+    /**
+     * Calculate a TTL value based on the average delay from 'expired' DynamoDB Stream items
+     *
+     * @param int $expectedTTL
+     *
+     */
+    private function getEstimatedTTL(int $expectedTTL): int
+    {
+        $estimatedTTL = $expectedTTL;
+        if ($expectedTTL >= self::DYNAMODB_ESTIMATED_DELAY) {
+            $estimatedTTL -= self::DYNAMODB_ESTIMATED_DELAY;
+        }
+
+        return $estimatedTTL;
     }
 }

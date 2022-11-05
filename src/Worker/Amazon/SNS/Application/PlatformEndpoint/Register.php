@@ -10,20 +10,28 @@
 
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
+use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RegisterMessageInterface;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
-use \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RegisterMessageInterface;
+use Throwable;
+use function date;
+use function error_log;
+use function get_class;
+use function gettype;
+use function in_array;
+use function is_subclass_of;
+use function unserialize;
 
 class Register extends PlatformEndpoint
 {
+
     public $workTimeout = 5;
 
-    public function run()
+    public function run(): void
     {
         $this->logDebug('Started');
         $connected = $this->start();
         if ($connected) {
-
             try {
                 $this->logDebug('Connected to queue');
 
@@ -54,6 +62,7 @@ class Register extends PlatformEndpoint
                     if (!($message instanceof RegisterMessageInterface)) {
                         $work->send(true);
                         $this->logDebug('Worker does not support payload of: ' . gettype($message));
+
                         continue;
                     }
 
@@ -61,22 +70,26 @@ class Register extends PlatformEndpoint
                         $endpointResult = $this->snsClient->createPlatformEndpoint([
                             'PlatformApplicationArn' => $message->getApplicationArn(),
                             'Token'                  => $message->getToken(),
-                            'Attributes'             => $message->getAttributes()
+                            'Attributes'             => $message->getAttributes(),
                         ]);
-                    } catch (\Exception $e) {
-
-                        if (is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
-                                           get_class($e))) {
+                    } catch (Throwable $e) {
+                        if (is_subclass_of(
+                            '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
+                            get_class($e)
+                        )) {
                             /**
                              * We can't do anything on specific errors and then the job is marked as processed
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html#API_CreatePlatformEndpoint_Errors
                              * @var $e SnsException
                              */
-                            if (in_array($e->getAwsErrorCode(),
-                                         [SnsException::AUTHERROR,
-                                          SnsException::INVALID_PARAM,
-                                          SnsException::NOTFOUND])) {
+                            if (in_array(
+                                $e->getAwsErrorCode(),
+                                [SnsException::AUTHERROR,
+                                    SnsException::INVALID_PARAM,
+                                    SnsException::NOTFOUND]
+                            )) {
                                 $work->send(true);
+
                                 continue;
                             }
 
@@ -85,9 +98,11 @@ class Register extends PlatformEndpoint
                              * temporary issue and we can retry creating the endpoint
                              * Same process for general network issues
                              */
-                            if (SnsException::INTERNAL == $e->getAwsErrorCode() ||
-                                is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
-                                               get_class($e->getPrevious()))) {
+                            if (SnsException::INTERNAL === $e->getAwsErrorCode() ||
+                                is_subclass_of(
+                                    '\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
+                                    get_class($e->getPrevious())
+                                )) {
                                 /**
                                  * Only retry if the max threshold has not been reached
                                  */
@@ -101,6 +116,7 @@ class Register extends PlatformEndpoint
                                          * pretend it worked
                                          */
                                         $work->send(true);
+
                                         continue;
                                     }
                                     $reprocessedTasks[$taskId] += 1;
@@ -108,6 +124,7 @@ class Register extends PlatformEndpoint
                                     $reprocessedTasks[$taskId] = 1;
                                 }
                                 $work->send(false);
+
                                 continue;
                             }
                         }
@@ -122,6 +139,7 @@ class Register extends PlatformEndpoint
 
                         if (!$result) {
                             $work->send(false);
+
                             break;
                         }
                         $this->logDebug('Endpoint registered successfully on Service provider and backend');
@@ -130,7 +148,7 @@ class Register extends PlatformEndpoint
                     }
                     $work->send(true === $processed);
                 }
-            } catch (\Exception $e) {
+            } catch (Throwable $e) {
                 @error_log('[' . date('Y-m-d H:i:s') . '] Register SNS worker exception: ' . $e->getMessage());
             }
         }
@@ -143,10 +161,11 @@ class Register extends PlatformEndpoint
      * @param string $endpointArn
      * @param        $message
      *
-     * @return bool
      */
-    protected function onSuccess(string $endpointArn, \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register $message)
-    {
+    protected function onSuccess(
+        string $endpointArn,
+        \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register $message
+    ): bool {
         return true;
     }
 }

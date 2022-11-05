@@ -10,56 +10,73 @@
 
 namespace BackQ\Adapter;
 
-class Fcm extends \Zend_Mobile_Push_Gcm
-{
-    public $connectTimeout = 2;
-    public $actionTimeout  = 3;
-    public $maxredirects   = 2;
+use Zend_Http_Client;
+use Zend_Mobile_Push_Exception;
+use Zend_Mobile_Push_Gcm;
+use Zend_Mobile_Push_Message_Abstract;
+use function defined;
+use const CURL_IPRESOLVE_V4;
+use const CURL_SSLVERSION_TLSv1_2;
+use const CURLOPT_FORBID_REUSE;
+use const CURLOPT_FRESH_CONNECT;
+use const CURLOPT_IPRESOLVE;
+use const CURLOPT_NOPROGRESS;
+use const CURLOPT_NOSIGNAL;
+use const CURLOPT_SSLVERSION;
+use const CURLOPT_TIMEOUT;
 
+class Fcm extends Zend_Mobile_Push_Gcm
+{
     /**
      * @see https://developers.google.com/cloud-messaging/http#auth
      * @see https://developers.google.com/cloud-messaging/server#role
      * @see https://firebase.google.com/docs/cloud-messaging/server
      */
-    const SERVER_URI = 'https://fcm.googleapis.com/fcm/send';
+    public const SERVER_URI = 'https://fcm.googleapis.com/fcm/send';
 
-    public function __construct(string $apiKey) {
+    public $connectTimeout = 2;
+
+    public $actionTimeout  = 3;
+
+    public $maxredirects   = 2;
+
+    public function __construct(string $apiKey)
+    {
         $this->setApiKey($apiKey);
     }
 
     /**
      * Send Message
-     * @return Zend_Http_Response
      */
-    public function send(\Zend_Mobile_Push_Message_Abstract $message)
+    public function send(Zend_Mobile_Push_Message_Abstract $message): Zend_Http_Response
     {
         if (!$message->validate()) {
-            throw new \Zend_Mobile_Push_Exception('The message is not valid.');
+            throw new Zend_Mobile_Push_Exception('The message is not valid.');
         }
 
         /**
          * Customize client -->
          */
-        $httpadapter = array('adapter' => 'Zend_Http_Client_Adapter_Curl',
-                             'timeout' => $this->connectTimeout,
-                             'request_timeout' => $this->actionTimeout,
-                             'maxredirects'    => $this->maxredirects,
+        $httpadapter = ['adapter' => 'Zend_Http_Client_Adapter_Curl',
+            'timeout' => $this->connectTimeout,
+            'request_timeout' => $this->actionTimeout,
+            'maxredirects'    => $this->maxredirects,
                              /**
                               * Any options except Zend_Http_Client_Adapter_Curl._invalidOverwritableCurlOptions
                               */
-                             'curloptions' => array(CURLOPT_TIMEOUT       => $this->actionTimeout,
-                                                    CURLOPT_IPRESOLVE     => CURL_IPRESOLVE_V4,
-                                                    CURLOPT_FRESH_CONNECT => 0,
-                                                    CURLOPT_FORBID_REUSE  => 0,
-                                                    CURLOPT_NOSIGNAL      => true,
-                                                    CURLOPT_NOPROGRESS    => true,
+            'curloptions' => [CURLOPT_TIMEOUT       => $this->actionTimeout,
+                CURLOPT_IPRESOLVE     => CURL_IPRESOLVE_V4,
+                CURLOPT_FRESH_CONNECT => 0,
+                CURLOPT_FORBID_REUSE  => 0,
+                CURLOPT_NOSIGNAL      => true,
+                CURLOPT_NOPROGRESS    => true,
                                                   //CURLOPT_TCP_FASTOPEN  => true
-                             ));
+            ]];
         if (defined('CURL_SSLVERSION_TLSv1_2')) {
             $httpadapter['curloptions'][CURLOPT_SSLVERSION] = CURL_SSLVERSION_TLSv1_2;
         }
 
-        $this->setHttpClient(new \Zend_Http_Client(null, $httpadapter));
+        $this->setHttpClient(new Zend_Http_Client(null, $httpadapter));
         /**
          * Customize client <--
          */

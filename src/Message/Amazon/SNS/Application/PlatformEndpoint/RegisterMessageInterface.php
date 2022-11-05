@@ -12,12 +12,15 @@ namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
 interface RegisterMessageInterface
 {
-    public function getAttributes() : array;
-    public function setAttributes(array $attrs);
+    public function getAttributes(): array;
 
-    public function getApplicationArn() : string;
-    public function setApplicationArn(string $appArn);
+    public function setAttributes(array $attrs): void;
 
-    public function getToken() : string;
-    public function addToken(string $token);
+    public function getApplicationArn(): string;
+
+    public function setApplicationArn(string $appArn): void;
+
+    public function getToken(): string;
+
+    public function addToken(string $token): void;
 }

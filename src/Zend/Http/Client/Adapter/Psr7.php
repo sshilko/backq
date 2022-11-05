@@ -1,6 +1,7 @@
 <?php
 class Zend_Http_Client_Adapter_Psr7 extends Zend_Http_Client_Adapter_Test
 {
+
     private $requestRaw = null;
 
     /**
@@ -13,17 +14,21 @@ class Zend_Http_Client_Adapter_Psr7 extends Zend_Http_Client_Adapter_Test
      * @param string        $body
      * @return string Request as string
      */
-    public function write($method, $uri, $http_ver = '1.1', $headers = array(), $body = '')
+    public function write($method, $uri, $http_ver = '1.1', $headers = [], $body = ''): string
     {
         $host = $uri->getHost();
-        $host = (strtolower($uri->getScheme()) == 'https' ? 'https://' . $host : $host);
+        $host = ('https' === strtolower($uri->getScheme()) ? 'https://' . $host : $host);
 
         // Build request headers
         $path = $uri->getPath();
-        if ($uri->getQuery()) $path .= '?' . $uri->getQuery();
+        if ($uri->getQuery()) {
+            $path .= '?' . $uri->getQuery();
+        }
         $request = "{$method} {$host}{$path} HTTP/{$http_ver}\r\n";
         foreach ($headers as $k => $v) {
-            if (is_string($k)) $v = ucfirst($k) . ": $v";
+            if (is_string($k)) {
+                $v = ucfirst($k) . ": $v";
+            }
             $request .= "$v\r\n";
         }
 
@@ -32,14 +37,15 @@ class Zend_Http_Client_Adapter_Psr7 extends Zend_Http_Client_Adapter_Test
 
         // Do nothing - just return the request as string
         $this->requestRaw = $request;
+
         return $request;
     }
 
-    public function getRequestRaw() {
+    public function getRequestRaw()
+    {
         /**
          * Result can be used by \GuzzleHttp\Psr7\str($result) to create GuzzleHttp Psr7 request
          */
         return $this->requestRaw;
     }
-
 }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -7,6 +8,11 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+use BackQ\Adapter\Beanstalk;
+use BackQ\Logger;
+use BackQ\Worker\Apnsd;
+use Symfony\Component\Console\Logger\ConsoleLogger;
+use Symfony\Component\Console\Output\ConsoleOutput;
 
 /**
  * Worker
@@ -19,17 +25,17 @@ include_once '../../../../../vendor/autoload.php';
 
 $app = '-myapp1';
 $env = \ApnsPHP_Abstract::ENVIRONMENT_SANDBOX;
-$logFilePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR .  'backq.apns.' . $env . '.' . $app . '.log';
+$logFilePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'backq.apns.' . $env . '.' . $app . '.log';
 
 $pem = 'myapp_apns_certificate.pem';
 $ca  = 'entrust_2048_ca.cer';
 
-$worker = new \BackQ\Worker\Apnsd(new \BackQ\Adapter\Beanstalk);
+$worker = new Apnsd(new Beanstalk());
 
-$logger = new \Symfony\Component\Console\Logger\ConsoleLogger(new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG));
+$logger = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
 $worker->setLogger($logger);
 
-$worker->setPushLogger(new \BackQ\Logger($logFilePath));
+$worker->setPushLogger(new Logger($logFilePath));
 $worker->setRootCertificationAuthority($ca);
 $worker->setCertificate($pem);
 $worker->setEnvironment($env);
@@ -37,7 +43,7 @@ $worker->setQueueName($worker->getQueueName() . $app);
 
 $worker->setRestartThreshold(250);
 $worker->setIdleTimeout(180);
-if (in_array(PHP_VERSION_ID, array('50523', '50524', '50607', '50608'))) {
+if (in_array(PHP_VERSION_ID, ['50523', '50524', '50607', '50608'])) {
     /**
      * 5.5.23 does not honor fread() timeout
      * @see https://bugs.php.net/bug.php?id=69393
@@ -48,7 +54,7 @@ if (in_array(PHP_VERSION_ID, array('50523', '50524', '50607', '50608'))) {
 /**
  * The lower (faster) the bigger chances we send a message into already closed socket
  */
-$worker->socketSelectTimeout = \BackQ\Worker\Apnsd::SENDSPEED_TIMEOUT_RECOMMENDED;
+$worker->socketSelectTimeout = Apnsd::SENDSPEED_TIMEOUT_RECOMMENDED;
 $worker->readWriteTimeout    = 3;
 
 $worker->run();

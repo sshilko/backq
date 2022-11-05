@@ -10,8 +10,19 @@
 
 namespace BackQ;
 
-class Logger implements \ApnsPHP_Log_Interface
+use ApnsPHP_Log_Interface;
+use function date;
+use function fclose;
+use function fopen;
+use function fwrite;
+use function getmypid;
+use function strpos;
+use function strstr;
+use function trim;
+
+class Logger implements ApnsPHP_Log_Interface
 {
+
     protected $logFile;
 
     public function __construct($logFile)
@@ -19,16 +30,15 @@ class Logger implements \ApnsPHP_Log_Interface
         $this->logFile = $logFile;
     }
 
-    public function log($sMessage, $debug = false)
+    public function log($sMessage, $debug = false): void
     {
         if (!$debug && (false !== strpos($sMessage, 'INFO:') || false !== strstr($sMessage, 'STATUS:'))) {
             return;
         }
 
         if ($log_handler = fopen($this->logFile, 'a')) {
-            fwrite($log_handler, date('Y-m-d H:i:s') . ' - ' . getmypid() . ' - ' . trim($sMessage)."\n");
+            fwrite($log_handler, date('Y-m-d H:i:s') . ' - ' . getmypid() . ' - ' . trim($sMessage) . "\n");
             fclose($log_handler);
         }
     }
-
 }

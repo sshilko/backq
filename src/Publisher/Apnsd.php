@@ -12,6 +12,6 @@ namespace BackQ\Publisher;
 
 abstract class Apnsd extends AbstractPublisher
 {
-    protected $queueName = 'apnsd';
 
+    protected $queueName = 'apnsd';
 }

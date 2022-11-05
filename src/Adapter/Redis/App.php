@@ -9,7 +9,10 @@
  */
 
 namespace BackQ\Adapter\Redis;
-class App extends \Illuminate\Container\Container
+
+use Illuminate\Container\Container;
+
+class App extends Container
 {
     public function isDownForMaintenance()
     {

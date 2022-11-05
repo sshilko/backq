@@ -14,20 +14,15 @@ use BackQ\Publisher\AbstractPublisher;
 
 class Serialized extends AbstractMessage
 {
-    /**
-     * @var ?AbstractMessage
-     */
-    protected $message;
 
-    /**
-     * @var ?AbstractPublisher
-     */
-    protected $publisher;
+    protected ?AbstractMessage $message = null;
+
+    protected ?AbstractPublisher $publisher = null;
 
     /**
      * @var array
      */
-    protected $publishOptions = [];
+    protected array $publishOptions = [];
 
     public function __construct(AbstractMessage $message, AbstractPublisher $publisher, array $publishOptions = [])
     {
@@ -39,7 +34,6 @@ class Serialized extends AbstractMessage
     /**
      * Return publisher to be used for publishing
      *
-     * @return AbstractPublisher
      */
     public function getPublisher(): ?AbstractPublisher
     {
@@ -50,6 +44,7 @@ class Serialized extends AbstractMessage
              */
             return $this->publisher;
         }
+
         return null;
     }
 
@@ -66,11 +61,9 @@ class Serialized extends AbstractMessage
     /**
      * Return message to be (re) published
      *
-     * @return AbstractMessage
      */
     public function getMessage(): ?AbstractMessage
     {
         return $this->message;
     }
-
 }

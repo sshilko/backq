@@ -12,15 +12,20 @@ namespace BackQ\Worker;
 
 use BackQ\Message\AbstractMessage;
 use BackQ\Publisher\AbstractPublisher;
+use Throwable;
+use function gettype;
+use function time;
+use function unserialize;
 
 class Serialized extends AbstractWorker
 {
-    /**
-     * @var int
-     */
-    public $workTimeout = 5;
 
-    public function run()
+    public int $workTimeout = 5;
+
+    /**
+     * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
+     */
+    public function run(): void
     {
         $connected = $this->start();
         $this->logInfo('started');
@@ -32,7 +37,10 @@ class Serialized extends AbstractWorker
                 $work = $this->work();
                 $this->logInfo('after init work generator');
 
-                foreach ($work as $taskId => $payload) {
+                /**
+                 * @phpcs:disable SlevomatCodingStandard.Variables.UnusedVariable.UnusedVariable
+                 */
+                foreach ($work as $_ => $payload) {
                     $this->logInfo(time() . ' got some work: ' . ($payload ? 'yes' : 'no'));
 
                     if (!$payload && $this->workTimeout > 0) {
@@ -40,6 +48,7 @@ class Serialized extends AbstractWorker
                          * Just empty loop, no work fetched
                          */
                         $work->send(true);
+
                         continue;
                     }
 
@@ -49,6 +58,7 @@ class Serialized extends AbstractWorker
                     if (!($message instanceof \BackQ\Message\Serialized)) {
                         $work->send(true);
                         $this->logError('Worker does not support payload of: ' . gettype($message));
+
                         continue;
                     }
 
@@ -62,23 +72,27 @@ class Serialized extends AbstractWorker
                              * Message should not be processed now
                              */
                             $work->send(false);
+
                             continue;
                         }
 
                         if ($message->isExpired()) {
                             $work->send(true);
                             $this->logDebug('Discarding serialized message as already expired');
+
                             continue;
                         }
 
                         $processed = false;
                         try {
-                            if ($this->dispatchOriginalMessage($originalPublisher,
-                                                               $originalMessage,
-                                                               $originalPubOpts)) {
+                            if ($this->dispatchOriginalMessage(
+                                $originalPublisher,
+                                $originalMessage,
+                                $originalPubOpts
+                            )) {
                                 $processed = true;
                             }
-                        } catch (\Exception $ex) {
+                        } catch (Throwable $ex) {
                             $this->logError($ex->getMessage());
                         }
                     } else {
@@ -92,7 +106,7 @@ class Serialized extends AbstractWorker
 
                     $work->send($processed);
                 }
-            } catch (\Exception $e) {
+            } catch (Throwable $e) {
                 $this->logError($e->getMessage());
             }
         }
@@ -103,15 +117,16 @@ class Serialized extends AbstractWorker
      * @param AbstractPublisher $publisher
      * @param AbstractMessage $message
      * @param array $publishOptions
-     * @return string|null
      */
-    private function dispatchOriginalMessage(AbstractPublisher $publisher,
-                                             AbstractMessage $message,
-                                             array $publishOptions = []): ?string
-    {
+    private function dispatchOriginalMessage(
+        AbstractPublisher $publisher,
+        AbstractMessage $message,
+        array $publishOptions = []
+    ): ?string {
         if ($publisher->start()) {
             return (string) $publisher->publish($message, $publishOptions);
         }
+
         return null;
     }
 }

@@ -11,20 +11,22 @@
 namespace BackQ\Worker;
 
 use BackQ\Worker\Closure\RecoverableException;
+use Throwable;
+use function gettype;
+use function time;
+use function unserialize;
 
 class Closure extends AbstractWorker
 {
-    /**
-     * @var string
-     */
-    protected $queueName = 'closure';
+
+    public int $workTimeout = 5;
+
+    protected string $queueName = 'closure';
 
     /**
-     * @var int
+     * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
-    public $workTimeout = 5;
-
-    public function run()
+    public function run(): void
     {
         $connected = $this->start();
         $this->logDebug('started');
@@ -36,10 +38,14 @@ class Closure extends AbstractWorker
                 $work = $this->work();
                 $this->logInfo('after init work generator');
 
-                foreach ($work as $taskId => $payload) {
+                /**
+                 * @phpcs:disable SlevomatCodingStandard.Variables.UnusedVariable.UnusedVariable
+                 */
+                foreach ($work as $_ => $payload) {
                     $this->logInfo(time() . ' got some work: ' . ($payload ? 'yes' : 'no'));
                     if (!$payload) {
                         $work->send(true);
+
                         continue;
                     }
 
@@ -47,6 +53,7 @@ class Closure extends AbstractWorker
                     if (!($message instanceof \BackQ\Message\Closure)) {
                         $work->send(true);
                         $this->logError('Closure worker does not support payload of: ' . gettype($message));
+
                         continue;
                     }
 
@@ -55,11 +62,13 @@ class Closure extends AbstractWorker
                          * Message should not be processed now
                          */
                         $work->send(false);
+
                         continue;
                     }
 
                     if ($message->isExpired()) {
                         $work->send(true);
+
                         continue;
                     }
 
@@ -71,13 +80,14 @@ class Closure extends AbstractWorker
                          */
                         $this->logError('Failed executing closure ' . $e->getMessage());
                         $work->send(false);
+
                         continue;
-                    } catch (\Throwable $e) {
+                    } catch (Throwable $e) {
                         $this->logError('Error executing closure ' . $e->getMessage());
                     }
                     $work->send(true);
                 }
-            } catch (\Exception $e) {
+            } catch (Throwable $e) {
                 $this->logError($e->getMessage());
             }
         }

@@ -11,12 +11,14 @@
 namespace BackQ\Adapter\Redis;
 
 use Illuminate\Contracts\Redis\Factory as Redis;
+use Illuminate\Queue\Connectors\RedisConnector;
 
-class Connector extends \Illuminate\Queue\Connectors\RedisConnector
-{   /**
+class Connector extends RedisConnector
+{
+   /**
      * Create a new Redis queue connector instance.
      *
-     * @param  \Illuminate\Contracts\Redis\Factory  $redis
+     * @param Redis $redis
      * @param  string|null  $connection
      * @return void
      */
@@ -29,12 +31,12 @@ class Connector extends \Illuminate\Queue\Connectors\RedisConnector
      * Establish a queue connection.
      *
      * @param  array  $config
-     * @return \BackQ\Adapter\Redis\Queue
      */
-    public function connect(array $config)
+    public function connect(array $config): Queue
     {
         return new Queue(
-            $this->redis, $config['queue'],
+            $this->redis,
+            $config['queue'],
             $config['connection']  ?? $this->connection,
             $config['retry_after'] ?? null,
             $config['block_for']   ?? null

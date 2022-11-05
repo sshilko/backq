@@ -12,6 +12,7 @@ namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
 interface RemoveMessageInterface
 {
-    public function getEndpointArn() : string;
-    public function setEndpointArn(string $arn);
+    public function getEndpointArn(): string;
+
+    public function setEndpointArn(string $arn): void;
 }

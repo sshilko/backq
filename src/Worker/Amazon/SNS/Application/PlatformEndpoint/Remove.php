@@ -10,21 +10,31 @@
 
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
+use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RemoveMessageInterface;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
-
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
-use \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RemoveMessageInterface;
+use Throwable;
+use function date;
+use function error_log;
+use function get_class;
+use function gettype;
+use function in_array;
+use function is_subclass_of;
+use function unserialize;
 
 class Remove extends PlatformEndpoint
 {
+
     public $workTimeout = 5;
 
-    public function run()
+    /**
+     * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
+     */
+    public function run(): void
     {
         $this->logDebug('started');
         $connected = $this->start();
-        if ($connected)  {
-            $client = null;
+        if ($connected) {
             try {
                 $this->logDebug('connected to queue');
 
@@ -55,6 +65,7 @@ class Remove extends PlatformEndpoint
                     if (!($message instanceof RemoveMessageInterface)) {
                         $work->send(true);
                         $this->logDebug('Worker does not support payload of: ' . gettype($message));
+
                         continue;
                     }
 
@@ -68,11 +79,11 @@ class Remove extends PlatformEndpoint
                          * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html#API_DeleteEndpoint_Errors
                          */
                         $this->snsClient->deleteEndpoint(['EndpointArn' => $message->getEndpointArn()]);
-
-                    } catch (\Exception $e) {
-
-                        if (is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
-                                           get_class($e))) {
+                    } catch (Throwable $e) {
+                        if (is_subclass_of(
+                            '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
+                            get_class($e)
+                        )) {
 
                             /**
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html#API_DeleteEndpoint_Errors
@@ -85,9 +96,10 @@ class Remove extends PlatformEndpoint
                              * can be done, mark as processed
                              */
                             if (in_array($e->getAwsErrorCode(), [SnsException::AUTHERROR,
-                                                                 SnsException::INVALID_PARAM,
-                                                                 SnsException::NOTFOUND])) {
+                                SnsException::INVALID_PARAM,
+                                SnsException::NOTFOUND])) {
                                 $work->send(true);
+
                                 continue;
                             }
 
@@ -95,19 +107,21 @@ class Remove extends PlatformEndpoint
                              * Retry deletion on Internal Server error from Service
                              * or general network exceptions
                              */
-                            if (SnsException::INTERNAL == $e->getAwsErrorCode() ||
-                                is_subclass_of('\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
-                                               get_class($e->getPrevious()))) {
+                            if (SnsException::INTERNAL === $e->getAwsErrorCode() ||
+                                is_subclass_of(
+                                    '\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
+                                    get_class($e->getPrevious())
+                                )) {
                                 /**
                                  * Only retry if the max threshold has not been reached
                                  */
                                 if (isset($reprocessedTasks[$taskId])) {
-
                                     if ($reprocessedTasks[$taskId] >= self::RETRY_MAX) {
                                         $this->logDebug('Retried re-processing the same job too many times');
                                         unset($reprocessedTasks[$taskId]);
 
                                         $work->send(true);
+
                                         continue;
                                     }
                                     $reprocessedTasks[$taskId] += 1;
@@ -116,6 +130,7 @@ class Remove extends PlatformEndpoint
                                 }
 
                                 $work->send(false);
+
                                 continue;
                             }
                         }
@@ -133,14 +148,14 @@ class Remove extends PlatformEndpoint
                          * @todo what happens onSuccess if it fails?
                          */
                         $work->send(false);
-                        continue;
-                    } else {
-                        $this->logDebug('Endpoint/Device successfully deleted on Service provider and backend');
-                        $work->send(true);
-                    }
-                }
 
-            } catch (\Exception $e) {
+                        continue;
+                    }
+
+                    $this->logDebug('Endpoint/Device successfully deleted on Service provider and backend');
+                    $work->send(true);
+                }
+            } catch (Throwable $e) {
                 @error_log('[' . date('Y-m-d H:i:s') . '] Remove endpoints worker exception: ' . $e->getMessage());
             }
         }
@@ -151,7 +166,7 @@ class Remove extends PlatformEndpoint
      * Handles actions to be performed on correct deletion of an amazon endpoint
      * @param \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message
      *
-     * @return bool|array
+     * @phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
      */
     protected function onSuccess(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message)
     {

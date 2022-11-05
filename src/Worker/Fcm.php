@@ -10,28 +10,40 @@
 
 namespace BackQ\Worker;
 
+use RuntimeException;
+use Throwable;
+use Zend_Mobile_Push_Gcm;
+use Zend_Mobile_Push_Message_Gcm;
+use function count;
+use function date;
+use function error_log;
+use function gettype;
+use function is_array;
+use function is_callable;
+use function json_decode;
+use function json_encode;
+use function unserialize;
+
 final class Fcm extends AbstractWorker
 {
-    protected $queueName = 'fcm';
-
-    /**
-     * @var \Zend_Mobile_Push_Gcm
-     */
-    protected $pusher = null;
 
     public $workTimeout = 4;
+
+    protected $queueName = 'fcm';
+
+    protected Zend_Mobile_Push_Gcm $pusher;
 
     /**
      * List of no longer registered tokens
      * @var array
      */
-    protected $uninstalls    = [];
+    protected array $uninstalls    = [];
 
     /**
      * Hash of tokens that changed
      * @var array
      */
-    protected $updatedTokens = [];
+    protected array $updatedTokens = [];
 
     /**
      * @var callable
@@ -43,20 +55,21 @@ final class Fcm extends AbstractWorker
      */
     protected $onUpdatedTokens;
 
-    public function setCallbacks(callable $onUninstall, callable $onUpdatedTokens) {
+    public function setCallbacks(callable $onUninstall, callable $onUpdatedTokens): void
+    {
         $this->onUninstall     = $onUninstall;
         $this->onUpdatedTokens = $onUpdatedTokens;
     }
 
-    public function setPusher(\Zend_Mobile_Push_Gcm $pusher) {
+    public function setPusher(Zend_Mobile_Push_Gcm $pusher): void
+    {
         $this->pusher = $pusher;
     }
 
-    public function run()
+    public function run(): void
     {
         $connected = $this->start();
         $this->logDebug('started');
-        $push = null;
         if ($connected) {
             try {
                 $this->logDebug('connected to queue');
@@ -64,7 +77,10 @@ final class Fcm extends AbstractWorker
                 $work = $this->work();
                 $this->logDebug('after init work generator');
 
-                foreach ($work as $taskId => $payload) {
+                /**
+                 * @phpcs:disable SlevomatCodingStandard.Variables.UnusedVariable.UnusedVariable
+                 */
+                foreach ($work as $_ => $payload) {
                     $this->logDebug('got some work: ' . ($payload ? 'yes' : 'no'));
 
                     if (!$payload && $this->workTimeout > 0) {
@@ -74,12 +90,13 @@ final class Fcm extends AbstractWorker
                     $message   = @unserialize($payload);
                     $processed = true;
 
-                    if (!($message instanceof \Zend_Mobile_Push_Message_Gcm)) {
+                    if (!($message instanceof Zend_Mobile_Push_Message_Gcm)) {
                         /**
                          * Nothing to do + report as a success
                          */
                         $work->send($processed);
                         $this->logDebug('Worker does not support payload of: ' . gettype($message));
+
                         continue;
                     }
                     try {
@@ -125,7 +142,7 @@ final class Fcm extends AbstractWorker
                                 } else {
                                     if (is_array($body->results)) {
                                         $brs = $body->results;
-                                        for ($i = 0;$i < count($body->results); $i++) {
+                                        for ($i = 0; $i < count($body->results); $i++) {
                                             $br = $brs[$i];
                                             /**
                                              * @see https://developers.google.com/cloud-messaging/http-server-ref#table5
@@ -150,8 +167,8 @@ final class Fcm extends AbstractWorker
                                                              * Reduce the number of messages sent for this topic, and do not immediately retry sending.
                                                              */
                                                             $processed = $br->error;
-                                                            break;
 
+                                                            break;
                                                         case 'DeviceMessageRateExceeded':
                                                             /**
                                                              * The rate of messages to a particular device is too high.
@@ -159,16 +176,16 @@ final class Fcm extends AbstractWorker
                                                              * do not immediately retry sending to this device.
                                                              */
                                                             $processed = $br->error;
-                                                            break;
 
+                                                            break;
                                                         case 'InternalServerError':
                                                             /**
                                                              * The server encountered an error while trying to process the request.
                                                              * You could retry the same request following the requirements listed in "Timeout"
                                                              */
                                                             $processed = $br->error;
-                                                            break;
 
+                                                            break;
                                                         case 'Unavailable':
                                                             /**
                                                              * The server couldn't process the request in time. Retry the same request
@@ -176,14 +193,12 @@ final class Fcm extends AbstractWorker
                                                              * + Implement exponential back-off in your retry mechanism
                                                              */
                                                             break;
-
                                                         case 'InvalidTtl':
                                                             /**
                                                              * Check that the value used in time_to_live is an integer
                                                              * representing a duration in seconds between 0 and 2,419,200 (4 weeks).
                                                              */
                                                             break;
-
                                                         case 'InvalidDataKey':
                                                             /**
                                                              * Check that the payload data does not contain a key
@@ -194,7 +209,6 @@ final class Fcm extends AbstractWorker
                                                              * overridden by the GCM value.
                                                              */
                                                             break;
-
                                                         case 'MessageTooBig':
                                                             /**
                                                              * Check that the total size of the payload data included in a message
@@ -203,7 +217,6 @@ final class Fcm extends AbstractWorker
                                                              * messages on iOS. This includes both the keys and the values.
                                                              */
                                                             break;
-
                                                         case 'MismatchSenderId':
                                                             /**
                                                              * A registration token is tied to a certain group of senders.
@@ -213,14 +226,12 @@ final class Fcm extends AbstractWorker
                                                              * If you switch to a different sender, the existing registration tokens won't work.
                                                              */
                                                             break;
-
                                                         case 'InvalidPackageName':
                                                             /**
                                                              * Make sure the message was addressed to a registration token
                                                              * whose package name matches the value passed in the request.
                                                              */
                                                             break;
-
                                                         case 'InvalidRegistration':
                                                             /**
                                                              * Check the format of the registration token you pass to the server.
@@ -228,8 +239,8 @@ final class Fcm extends AbstractWorker
                                                              * from registering with GCM. Do not truncate or add additional characters.
                                                              */
                                                             $this->uninstalls[] = $stokens[$i];
-                                                            break;
 
+                                                            break;
                                                         case 'MissingRegistration':
                                                             /**
                                                              * Check that the request contains a registration token
@@ -237,7 +248,6 @@ final class Fcm extends AbstractWorker
                                                              * or in the to or registration_ids field in JSON).
                                                              */
                                                             break;
-
                                                         case 'NotRegistered':
                                                             /**
                                                              * should remove the registration ID from your server database
@@ -245,8 +255,8 @@ final class Fcm extends AbstractWorker
                                                              * or the client app isn't configured to receive messages
                                                              */
                                                             $this->uninstalls[] = $stokens[$i];
-                                                            break;
 
+                                                            break;
                                                         default:
                                                             /**
                                                              * Otherwise, there is something wrong in the registration token passed
@@ -257,14 +267,21 @@ final class Fcm extends AbstractWorker
                                                             break;
                                                     }
                                                 } else {
-                                                    throw new \RuntimeException('Received unexpected results body in FCM for message, missing error & message_id: ' . json_encode($br));
+                                                    throw new RuntimeException(
+                                                        'Received unexpected results body in FCM for message, missing error & message_id: ' . json_encode(
+                                                            $br
+                                                        )
+                                                    );
                                                 }
                                             }
                                         }
                                     } else {
-                                        throw new \RuntimeException('Received unexpected results body from FCM: ' . json_encode($body));
+                                        throw new RuntimeException(
+                                            'Received unexpected results body from FCM: ' . json_encode($body)
+                                        );
                                     }
                                 }
+
                                 break;
                             case 400:
                                 /**
@@ -284,9 +301,10 @@ final class Fcm extends AbstractWorker
                                 break;
                             default:
                                 error_log('Unexpected HTTP status code from FCM: ' . $status);
+
                                 break;
                         }
-                    } catch (\Exception $e) {
+                    } catch (Throwable $e) {
                         error_log('Error while sending FCM: ' . $e->getMessage());
                     } finally {
                         $this->postProcessing();
@@ -297,14 +315,15 @@ final class Fcm extends AbstractWorker
                         $work->send((true === $processed));
                     }
                 }
-            } catch (\Exception $e) {
+            } catch (Throwable $e) {
                 $this->logDebug('[' . date('Y-m-d H:i:s') . '] EXCEPTION: ' . $e->getMessage());
             }
         }
         $this->finish();
     }
 
-    protected function postProcessing() {
+    protected function postProcessing(): void
+    {
         if ($this->onUninstall && is_callable($this->onUninstall)) {
             if (($this->onUninstall)($this->uninstalls)) {
                 $this->uninstalls = [];

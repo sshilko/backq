@@ -13,7 +13,6 @@ namespace BackQ\Message;
 abstract class AbstractMessage implements ConsumeInterface
 {
     /**
-     * @return bool
      */
     public function isReady(): bool
     {
@@ -21,7 +20,6 @@ abstract class AbstractMessage implements ConsumeInterface
     }
 
     /**
-     * @return bool
      */
     public function isExpired(): bool
     {

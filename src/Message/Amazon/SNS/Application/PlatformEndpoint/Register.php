@@ -12,34 +12,33 @@ namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
 class Register implements RegisterMessageInterface
 {
+
     /**
      * Associative array of string keys mapping to values, they'll be the attributes
      * set for an endpoint and could vary depending on the platform application
      *
      * @var array
      */
-    protected $attributes;
+    protected array $attributes;
 
     /**
      * Unique identifier created by the notification service for an app on a device
      *
-     * @var string
      */
-    protected $token;
+    protected string $token;
 
     /**
      * Amazon Resource Identifier of the Platform application that an endpoint
      * will be registered in
      *
-     * @var string
      */
-    protected $applicationArn;
+    protected string $applicationArn;
 
     /**
      * Get the specific attributes to create endpoints
      * @return array
      */
-    public function getAttributes() : array
+    public function getAttributes(): array
     {
         return $this->attributes;
     }
@@ -49,16 +48,16 @@ class Register implements RegisterMessageInterface
      *
      * @param array $attrs
      */
-    public function setAttributes(array $attrs)
+    public function setAttributes(array $attrs): void
     {
         $this->attributes = $attrs;
     }
+
     /**
      * Get the resource name for the Application Platform where an endpoint
      * where an endpoint will be saved
-     * @return string
      */
-    public function getApplicationArn() : string
+    public function getApplicationArn(): string
     {
         return $this->applicationArn;
     }
@@ -67,16 +66,15 @@ class Register implements RegisterMessageInterface
      * Sets up the Resource Number for a Platform Application
      * @param $appArn
      */
-    public function setApplicationArn(string $appArn)
+    public function setApplicationArn(string $appArn): void
     {
         $this->applicationArn = $appArn;
     }
 
     /**
      * Gets the token or identifier for the device to register
-     * @return string
      */
-    public function getToken() : string
+    public function getToken(): string
     {
         return $this->token;
     }
@@ -85,7 +83,7 @@ class Register implements RegisterMessageInterface
      * Adds a unique identifier created by the notification service for the app on a device
      * @param $token
      */
-    public function addToken(string $token)
+    public function addToken(string $token): void
     {
         $this->token = $token;
     }

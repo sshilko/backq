@@ -1,9 +1,12 @@
 <?php
 
+use BackQ\Worker\Amazon\SNS\SnsClient;
+
 class endpoints
 {
-    /** @var \BackQ\Worker\Amazon\SNS\SnsClient */
-    private $snsClient;
+
+    private SnsClient $snsClient;
+
     private $platform = '';
 
     public function __construct(string $platform, array $auth)
@@ -11,7 +14,7 @@ class endpoints
         /**
          * Set dependencies for the workers (SNS Client)
          */
-        $client = new \BackQ\Worker\Amazon\SNS\SnsClient($auth);
+        $client = new SnsClient($auth);
         $this->snsClient = $client;
 
         /**
@@ -22,7 +25,6 @@ class endpoints
 
     /**
      * Get Platform that endpoints belong to
-     * @return string
      */
     public function getPlatform(): string
     {
@@ -31,9 +33,8 @@ class endpoints
 
     /**
      * Get Client/Service provider to perform operations with endpoints
-     * @return \BackQ\Worker\Amazon\SNS\SnsClient
      */
-    public function getClient(): \BackQ\Worker\Amazon\SNS\SnsClient
+    public function getClient(): SnsClient
     {
         return $this->snsClient;
     }

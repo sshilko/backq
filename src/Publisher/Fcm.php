@@ -12,5 +12,6 @@ namespace BackQ\Publisher;
 
 abstract class Fcm extends AbstractPublisher
 {
+
     protected $queueName = 'fcm';
 }

@@ -14,9 +14,9 @@ use BackQ\Publisher\AbstractPublisher;
 
 abstract class Publish extends AbstractPublisher
 {
+
     /**
      * The queue will be used to publish to Aws endpoints
-     * @var string
      */
-    protected $queueName = 'aws_sns_endpoints_publish_';
+    protected string $queueName = 'aws_sns_endpoints_publish_';
 }

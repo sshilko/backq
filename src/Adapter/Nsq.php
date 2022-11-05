@@ -12,6 +12,21 @@ namespace BackQ\Adapter;
 
 use Datetime;
 use RuntimeException;
+use Throwable;
+use function array_merge;
+use function floor;
+use function gethostname;
+use function getmypid;
+use function is_array;
+use function json_decode;
+use function json_encode;
+use function pack;
+use function round;
+use function sprintf;
+use function strlen;
+use function substr;
+use function trim;
+use function unpack;
 
 /**
  * Class Nsq
@@ -22,44 +37,46 @@ class Nsq extends AbstractAdapter
     /**
      * Request messages
      */
-    const PROTO_VERSION   = "  V2";
-    const PROTO_IDENTIFY  = "IDENTIFY";
-    const PROTO_PUBLISH   = "PUB %s";
-    const PROTO_PUBDELAY  = "DPUB %s %s";
-    const PROTO_SUBSCRIBE = "SUB %s %s";
-    const PROTO_READY     = "RDY %s";
-    const PROTO_REQUEUE   = "REQ %s %s";
-    const PROTO_FINISH    = "FIN %s";
-    const PROTO_NOOP      = "NOP";
-    const PROTO_AUTH      = "AUTH";
-    const PROTO_CLOSE     = "CLS";
+    protected const PROTO_VERSION   = "  V2";
+    protected const PROTO_IDENTIFY  = "IDENTIFY";
+    protected const PROTO_PUBLISH   = "PUB %s";
+    protected const PROTO_PUBDELAY  = "DPUB %s %s";
+    protected const PROTO_SUBSCRIBE = "SUB %s %s";
+    protected const PROTO_READY     = "RDY %s";
+    protected const PROTO_REQUEUE   = "REQ %s %s";
+    protected const PROTO_FINISH    = "FIN %s";
+    protected const PROTO_NOOP      = "NOP";
+    protected const PROTO_AUTH      = "AUTH";
+    protected const PROTO_CLOSE     = "CLS";
 
     /**
      * Responses expected from the server
      */
-    const RESPONSE_HEARTBEAT = "_heartbeat_";
-    const RESPONSE_SUCCESS   = "OK";
-    const RESPONSE_CLOSED    = "CLOSE_WAIT";
+    protected const RESPONSE_HEARTBEAT = "_heartbeat_";
+    protected const RESPONSE_SUCCESS   = "OK";
+    protected const RESPONSE_CLOSED    = "CLOSE_WAIT";
 
     /**
      * Reponse frame types defined in the protocol
      */
-    const FRAME_TYPE_RESPONSE = 0;
-    const FRAME_TYPE_ERROR    = 1;
-    const FRAME_TYPE_MESSAGE  = 2;
+    protected const FRAME_TYPE_RESPONSE = 0;
+    protected const FRAME_TYPE_ERROR    = 1;
+    protected const FRAME_TYPE_MESSAGE  = 2;
 
-    const HEARTBEAT_TTR_RATION = 1.5;
+    protected const HEARTBEAT_TTR_RATION = 1.5;
 
     /**
      * Client UserAgent
      */
-    const IDENTIFY_USER_AGENT = "BackQ\Nsq";
+    protected const IDENTIFY_USER_AGENT = "BackQ\Nsq";
 
-    /** @var string */
-    protected $host;
+    protected const STATE_BINDWRITE = 1;
+    protected const STATE_BINDREAD  = 2;
+    protected const STATE_NOTHING   = 0;
 
-    /** @var int */
-    protected $port;
+    protected string $host;
+
+    protected int $port;
 
     protected $config = [
         "auth" => "",
@@ -102,19 +119,13 @@ class Nsq extends AbstractAdapter
 
     protected $authentication = false;
 
-    const STATE_BINDWRITE = 1;
-    const STATE_BINDREAD  = 2;
-    const STATE_NOTHING   = 0;
+    private IO\StreamIO $_io;
 
-    /**
-     * @var IO\StreamIO
-     */
-    private $_io       = null;
     private $connected = false;
 
     private $state     = self::STATE_NOTHING;
-    private $stateData = [];
 
+    private $stateData = [];
 
     public function __construct(string $host = "127.0.0.1", int $port = 4150, array $config = [])
     {
@@ -131,7 +142,8 @@ class Nsq extends AbstractAdapter
      * @param $info
      * @deprecated
      */
-    public function info($info) {
+    public function info($info): void
+    {
         $this->logInfo($info);
     }
 
@@ -139,11 +151,13 @@ class Nsq extends AbstractAdapter
      * @param $msg
      * @deprecated
      */
-    public function error($msg) {
+    public function error($msg): void
+    {
         $this->logError($msg);
     }
 
-    public function setWorkTimeout(int $seconds = null) {
+    public function setWorkTimeout(?int $seconds = null): void
+    {
         if ($seconds >= 1) {
             /**
              * 1000ms is minimum hearbeat
@@ -159,7 +173,7 @@ class Nsq extends AbstractAdapter
     {
         if (true === $this->connected) {
             try {
-                if (self::STATE_BINDREAD == $this->state) {
+                if (self::STATE_BINDREAD === $this->state) {
                     /**
                      * When subscribed to receive new messages, nice way of closing the connection
                      * is "RDY 0" (pause messages) followed by "CLS" (cleanly close connection)
@@ -168,16 +182,18 @@ class Nsq extends AbstractAdapter
                     $this->readSuccessResponse(self::RESPONSE_CLOSED);
                 }
                 $this->_io->close();
-            } catch (\Exception $ex) {
-                $this->logError(__CLASS__ . ' ' . __FUNCTION__ . ': ' . $ex->getMessage());
+            } catch (Throwable $ex) {
+                $this->logError(self::class . ' ' . __FUNCTION__ . ': ' . $ex->getMessage());
             }
 
             $this->state     = self::STATE_NOTHING;
             $this->stateData = [];
             $this->connected = false;
             $this->_io       = null;
+
             return true;
         }
+
         return false;
     }
 
@@ -189,45 +205,47 @@ class Nsq extends AbstractAdapter
         if ($this->connected && $this->_io) {
             return $this->_io->isSocketReady();
         }
+
         return false;
     }
 
     /**
      * After failed work processing
      *
-     * @return bool
      */
-    public function afterWorkFailed($workId)
+    public function afterWorkFailed($workId): bool
     {
-        if ($this->connected && self::STATE_BINDREAD == $this->state) {
+        if ($this->connected && self::STATE_BINDREAD === $this->state) {
             $this->writeCommand(sprintf(self::PROTO_REQUEUE, $workId, 0));
+
             return true;
         }
+
         return false;
     }
 
     /**
      * After successful work processing
      *
-     * @return bool
      */
-    public function afterWorkSuccess($workId)
+    public function afterWorkSuccess($workId): bool
     {
-        if ($workId && $this->connected && self::STATE_BINDREAD == $this->state) {
+        if ($workId && $this->connected && self::STATE_BINDREAD === $this->state) {
             $this->writeCommand(sprintf(self::PROTO_FINISH, $workId));
+
             return true;
         }
-        return ($workId) ? false : true;
+
+        return (bool) $workId;
     }
 
     /**
      * Subscribe for new incoming data
      *
-     * @return bool
      */
-    public function bindRead($queue)
+    public function bindRead($queue): bool
     {
-        if ($this->connected && $this->state == self::STATE_NOTHING) {
+        if ($this->connected && self::STATE_NOTHING === $this->state) {
             /**
              * A channel can, and generally does, have multiple clients connected.
              * Assuming all connected clients are in a state where they are ready to receive messages,
@@ -238,25 +256,27 @@ class Nsq extends AbstractAdapter
 
             $this->state = self::STATE_BINDREAD;
             $this->stateData = ['queue' => $queue,
-                                'rdy'   => 0];
+                'rdy'   => 0];
+
             return true;
         }
-        return false;
 
+        return false;
     }
 
     /**
      * Prepare to write data into queue
      *
-     * @return bool
      */
-    public function bindWrite($queue)
+    public function bindWrite($queue): bool
     {
-        if ($this->connected && $this->state == self::STATE_NOTHING) {
+        if ($this->connected && self::STATE_NOTHING === $this->state) {
             $this->state = self::STATE_BINDWRITE;
             $this->stateData = ['queue' => $queue];
+
             return true;
         }
+
         return false;
     }
 
@@ -264,11 +284,11 @@ class Nsq extends AbstractAdapter
      * Checks (if possible) if there are workers to work immediately
      *
      * @deprecated
-     * @return null|int
      */
-    public function hasWorkers($queue = false)
+    public function hasWorkers($queue = false): ?int
     {
-        $this->logInfo(__CLASS__ . '.' . __FUNCTION__ . ' not supported');
+        $this->logInfo(self::class . '.' . __FUNCTION__ . ' not supported');
+
         return true;
     }
 
@@ -276,16 +296,16 @@ class Nsq extends AbstractAdapter
      * Pick task from queue
      *
      * @param $timeout integer $timeout If given specifies number of seconds to wait for a job, '0' returns immediately
-     * @return boolean|array [id, payload]
+     * @return bool|array [id, payload]
      */
     public function pickTask($timeout = null)
     {
         if ($timeout) {
-            $this->logInfo(__CLASS__ . '.' . __FUNCTION__ . ' arguments deprecated');
-            $timeout = null;
+            $this->logInfo(self::class . '.' . __FUNCTION__ . ' arguments deprecated');
+            //$timeout = null;
         }
 
-        if ($this->connected && self::STATE_BINDREAD == $this->state) {
+        if ($this->connected && self::STATE_BINDREAD === $this->state) {
             if ($this->stateData['rdy'] < 1) {
                 $this->writeReady(1);
                 $this->stateData['rdy'] = 1;
@@ -294,33 +314,37 @@ class Nsq extends AbstractAdapter
             /**
              * This should return task or return notning after timeout
              */
-            list($frameType, $messageFrame) = $this->readFrame(true);
+            [$frameType, $messageFrame] = $this->readFrame(true);
 
-            if ($frameType == self::RESPONSE_HEARTBEAT) {
+            if (self::RESPONSE_HEARTBEAT === $frameType) {
                 /**
                  * Manually handle heartbeats
                  * Hearbeats are breaks/timeouts in the pickTask cycle
                  */
                 $this->writeCommand(self::PROTO_NOOP);
+
                 return ['', '', []];
-            } else {
-
-                if ($frameType !== self::FRAME_TYPE_MESSAGE) {
-                    throw new RuntimeException(sprintf("was expecting a message frame, got '%s' with data '%s'",
-                                                       $frameType,
-                                                       $messageFrame));
-                }
-
-                $this->stateData['rdy'] = $this->stateData['rdy'] - 1;
-
-                $message = substr($messageFrame, 26);
-                $msgId   = substr($messageFrame, 10, 16);
-
-                $time = floor(unpack("J", substr($messageFrame, 0, 8))[1]/1000000000);
-                return [$msgId, $message, ['time' => DateTime::createFromFormat("U", $time)->format('c'),
-                                           'attempts' => unpack("n", substr($messageFrame, 8, 2))[1]]];
             }
+
+            if (self::FRAME_TYPE_MESSAGE !== $frameType) {
+                throw new RuntimeException(sprintf(
+                    "was expecting a message frame, got '%s' with data '%s'",
+                    $frameType,
+                    $messageFrame
+                ));
+            }
+
+            $this->stateData['rdy'] -= 1;
+
+            $message = substr($messageFrame, 26);
+            $msgId   = substr($messageFrame, 10, 16);
+
+            $time = floor(unpack("J", substr($messageFrame, 0, 8))[1]/1000000000);
+
+            return [$msgId, $message, ['time' => DateTime::createFromFormat("U", $time)->format('c'),
+                'attempts' => unpack("n", substr($messageFrame, 8, 2))[1]]];
         }
+
         return false;
     }
 
@@ -328,15 +352,13 @@ class Nsq extends AbstractAdapter
      * Put task into queue
      *
      * @param  string $data The job body.
-     * @return bool
      */
-    public function putTask($body, $params = array())
+    public function putTask($body, $params = []): bool
     {
         /**
          * @todo add support fot $params args
          */
-        if ($this->connected && self::STATE_BINDWRITE == $this->state) {
-
+        if ($this->connected && self::STATE_BINDWRITE === $this->state) {
             if (isset($params[self::PARAM_JOBTTR])) {
                 if ($params[self::PARAM_JOBTTR] > $this->config['msg_timeout']) {
                     /**
@@ -345,7 +367,7 @@ class Nsq extends AbstractAdapter
                      * @see http://nsq.io/clients/building_client_libraries.html
                      */
                     throw new RuntimeException('Desired ' . self::PARAM_JOBTTR .
-                                               ' param '  . $params[self::PARAM_JOBTTR] .
+                                               ' param ' . $params[self::PARAM_JOBTTR] .
                                                '> ' . $this->config['msg_timeout'] . ' msg_timeout, ' .
                                                'NSQ expects answer within ' . $this->config['msg_timeout'] . ' seconds');
                 }
@@ -356,9 +378,11 @@ class Nsq extends AbstractAdapter
                  * @see http://nsq.io/clients/building_client_libraries.html
                  */
                 if ($this->config['heartbeat_interval_ms'] &&
-                    (round($params[self::PARAM_JOBTTR] * 1000) > round($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION))) {
+                    (round($params[self::PARAM_JOBTTR] * 1000) > round(
+                        $this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION
+                    ))) {
                     throw new RuntimeException('Desired ' . self::PARAM_JOBTTR .
-                                               ' param '  . $params[self::PARAM_JOBTTR] .
+                                               ' param ' . $params[self::PARAM_JOBTTR] .
                                                's > ' . ($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION) . 'ms (x' . self::HEARTBEAT_TTR_RATION . ' heartbeat), ' .
                                                'NSQ expects answer within two hearbeats, but cannot guarantee that, ' .
                                                'please configure your heartbeat_interval_ms to extend heartbeat intervals');
@@ -366,30 +390,41 @@ class Nsq extends AbstractAdapter
             }
 
             if (isset($params[self::PARAM_READYWAIT])) {
-                if ($this->config['max_req_timeout'] && ($params[self::PARAM_READYWAIT] > $this->config['max_req_timeout'])) {
+                if ($this->config['max_req_timeout']
+                    && ($params[self::PARAM_READYWAIT] > $this->config['max_req_timeout'])
+                ) {
                     /**
                      * Too big delay value for this server, value is configured on server side
                      * Preemptively decline sending jobs that server will reject
                      */
                     throw new RuntimeException('Desired ' . self::PARAM_READYWAIT . ' of ' .
                                                $params[self::PARAM_READYWAIT] . ' seconds is longer ' .
-                                               'than specified server configured --max_req_timeout '  .
+                                               'than specified server configured --max_req_timeout ' .
                                                'of ' . $this->config['max_req_timeout']);
                 }
                 /**
                  * Delay ready state by N seconds
                  * maximum value is limited to `nsqd --max-req-timeout` value
                  */
-                $this->writeCommandWithBody(sprintf(self::PROTO_PUBDELAY, $this->stateData['queue'],
-                                                    $params[self::PARAM_READYWAIT] * 1000),
-                                            $body);
+                $this->writeCommandWithBody(
+                    sprintf(
+                        self::PROTO_PUBDELAY,
+                        $this->stateData['queue'],
+                        $params[self::PARAM_READYWAIT] * 1000
+                    ),
+                    $body
+                );
             } else {
-                $this->writeCommandWithBody(sprintf(self::PROTO_PUBLISH, $this->stateData['queue']),
-                                            $body);
+                $this->writeCommandWithBody(
+                    sprintf(self::PROTO_PUBLISH, $this->stateData['queue']),
+                    $body
+                );
             }
             $this->readSuccessResponse();
+
             return true;
         }
+
         return false;
     }
 
@@ -403,52 +438,60 @@ class Nsq extends AbstractAdapter
         }
 
         try {
-            $this->_io = new IO\StreamIO($this->config['host'],
-                                         $this->config['port'],
-                                         $this->config['connection_timeout'],
-                                         $this->config['stream_set_timeout'],
-                                         null,
-                                         true,
-                                         $this->config['persistent']);
+            $this->_io = new IO\StreamIO(
+                $this->config['host'],
+                $this->config['port'],
+                $this->config['connection_timeout'],
+                $this->config['stream_set_timeout'],
+                null,
+                true,
+                $this->config['persistent']
+            );
             $this->connected = true;
 
             $this->write(self::PROTO_VERSION);
             $this->writeIdentify();
-
-        } catch (\Exception $ex) {
+        } catch (Throwable $ex) {
             $this->logError($ex->getCode() . ': ' . $ex->getMessage());
         }
+
         return $this->connected;
     }
 
     /**
      * write the identify command to the connected socket, with out negotiate options
      */
-    private function writeIdentify()
+    private function writeIdentify(): void
     {
-        if ($this->state != self::STATE_NOTHING) {
+        if (self::STATE_NOTHING !== $this->state) {
             throw new RuntimeException('Incorrect protocol usage while ' . __FUNCTION__);
         }
 
         $identify = ["feature_negotiation" => true,
-                     "client_id"   => $this->config['clientId'],
-                     "hostname"    => gethostname(),
-                     "user_agent"  => self::IDENTIFY_USER_AGENT,
-                     'msg_timeout' => $this->config['msg_timeout'] * 1000];
+            "client_id"   => $this->config['clientId'],
+            "hostname"    => gethostname(),
+            "user_agent"  => self::IDENTIFY_USER_AGENT,
+            'msg_timeout' => $this->config['msg_timeout'] * 1000];
 
         $identify["heartbeat_interval"] = $this->config['heartbeat_interval_ms'];
 
-        $this->writeCommandWithBody(self::PROTO_IDENTIFY,
-                                    json_encode($identify));
+        $this->writeCommandWithBody(
+            self::PROTO_IDENTIFY,
+            json_encode($identify)
+        );
 
-        list($frameType, $response) = $this->readFrame();
-        if ($frameType !== self::FRAME_TYPE_RESPONSE) {
-            throw new RuntimeException(sprintf("was expecting feature list response, got '%s' with data '%s'", $frameType, $response));
+        [$frameType, $response] = $this->readFrame();
+        if (self::FRAME_TYPE_RESPONSE !== $frameType) {
+            throw new RuntimeException(
+                sprintf("was expecting feature list response, got '%s' with data '%s'", $frameType, $response)
+            );
         }
 
         $features = @json_decode($response, true);
         if (!is_array($features)) {
-            throw new RuntimeException(sprintf("was expecting feature list response, got '%s' with data '%s'", $frameType, $response));
+            throw new RuntimeException(
+                sprintf("was expecting feature list response, got '%s' with data '%s'", $frameType, $response)
+            );
         }
 
         if ($features['auth_required']) {
@@ -466,12 +509,14 @@ class Nsq extends AbstractAdapter
      *
      * @param int number of messages to batch up and send to this client at once
      */
-    private function writeReady($numberOfMessages) : bool
+    private function writeReady($numberOfMessages): bool
     {
-        if ($this->connected && $this->state == self::STATE_BINDREAD) {
+        if ($this->connected && self::STATE_BINDREAD === $this->state) {
             $this->writeCommand(sprintf(self::PROTO_READY, $numberOfMessages));
+
             return true;
         }
+
         return false;
     }
 
@@ -481,31 +526,35 @@ class Nsq extends AbstractAdapter
      *
      * @throws RuntimeException
      */
-    private function readSuccessResponse($expectedResponse = null)
+    private function readSuccessResponse($expectedResponse = null): void
     {
-        list($frameType, $response) = $this->readFrame();
-        if ($expectedResponse && $frameType === self::FRAME_TYPE_RESPONSE) {
+        [$frameType, $response] = $this->readFrame();
+        if ($expectedResponse && self::FRAME_TYPE_RESPONSE === $frameType) {
             if ($expectedResponse === $response) {
                 return;
             }
         }
 
-        if ($frameType !== self::FRAME_TYPE_RESPONSE || $response !== self::RESPONSE_SUCCESS) {
-            throw new RuntimeException(sprintf(__FUNCTION__ . " expecting Success, got '%s' with data '%s'", $frameType, $response));
+        if (self::FRAME_TYPE_RESPONSE !== $frameType || self::RESPONSE_SUCCESS !== $response) {
+            throw new RuntimeException(
+                sprintf(__FUNCTION__ . " expecting Success, got '%s' with data '%s'", $frameType, $response)
+            );
         }
     }
 
     private function readAuthenticationHeader()
     {
-        list($frameType, $response) = $this->readFrame();
+        [$frameType, $response] = $this->readFrame();
 
-        if ($frameType !== self::FRAME_TYPE_RESPONSE) {
-            throw new RuntimeException('Authentication Failure:'.$response);
+        if (self::FRAME_TYPE_RESPONSE !== $frameType) {
+            throw new RuntimeException('Authentication Failure:' . $response);
         }
 
         $authentication = @json_decode($response, true);
         if (!is_array($authentication)) {
-            throw new RuntimeException(sprintf("was expecting authentication response, got '%s' with data '%s'", $frameType, $response));
+            throw new RuntimeException(
+                sprintf("was expecting authentication response, got '%s' with data '%s'", $frameType, $response)
+            );
         }
 
         return $authentication;
@@ -517,19 +566,19 @@ class Nsq extends AbstractAdapter
      * @param string $command the command name
      * @param string $body the command body to be sent with the command
      */
-    private function writeCommandWithBody($command, $body)
+    private function writeCommandWithBody($command, $body): void
     {
         $length = pack("N", strlen($body));
 
         $this->writeCommand($command);
-        $this->write($length.$body);
+        $this->write($length . $body);
     }
 
     /**
      * write command w/o body
      * @param string $command
      */
-    private function writeCommand($cmd)
+    private function writeCommand($cmd): void
     {
         $this->write($cmd . "\n");
     }
@@ -539,7 +588,7 @@ class Nsq extends AbstractAdapter
      *
      * @param string $buffer the full buffer to write to the socket
      */
-    private function write($buffer)
+    private function write($buffer): void
     {
         $this->logInfo('--> writing ' . trim($buffer));
         $this->_io->write($buffer);
@@ -550,7 +599,7 @@ class Nsq extends AbstractAdapter
      *
      * @return array
      */
-    private function readFrame($raw = false)
+    private function readFrame($raw = false): array
     {
         /**
          * @see Data Format http://nsq.io/clients/tcp_protocol_spec.html
@@ -567,15 +616,15 @@ class Nsq extends AbstractAdapter
             $this->logInfo("received frameType=" . $frameType);
             if ($raw) {
                 break;
-
-            } else {
-                if ($frameData != self::RESPONSE_HEARTBEAT) {
-                    break;
-                } else {
-                    $this->writeCommand(self::PROTO_NOOP);
-                }
             }
+
+            if (self::RESPONSE_HEARTBEAT !== $frameData) {
+                break;
+            }
+
+            $this->writeCommand(self::PROTO_NOOP);
         }
+
         return [$frameType, $frameData];
     }
 
@@ -585,6 +634,7 @@ class Nsq extends AbstractAdapter
     private function readInt()
     {
         $bytes = $this->read(4);
+
         return unpack("N", $bytes)[1];
     }
 
@@ -595,10 +645,11 @@ class Nsq extends AbstractAdapter
     {
         $this->logInfo('--> reading ' . $size . ' bytes');
         $result = $this->_io->read($size);
-        if ($size != strlen($result)) {
-            throw new \RuntimeException('Failed to read ' . $size . ' bytes from IO');
+        if ($size !== strlen($result)) {
+            throw new RuntimeException('Failed to read ' . $size . ' bytes from IO');
         }
         $this->logInfo('<-- reading ' . $size . ' bytes');
+
         return $result;
     }
 }

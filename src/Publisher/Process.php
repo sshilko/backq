@@ -12,5 +12,6 @@ namespace BackQ\Publisher;
 
 abstract class Process extends AbstractPublisher
 {
+
     protected $queueName = 'process';
 }

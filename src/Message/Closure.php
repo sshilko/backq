@@ -10,14 +10,14 @@
 
 namespace BackQ\Message;
 
+use Opis\Closure\SerializableClosure;
+
 class Closure extends AbstractMessage
 {
-    /**
-     * @var \Opis\Closure\SerializableClosure
-     */
-    protected $function;
 
-    public function __construct(\Opis\Closure\SerializableClosure $function)
+    protected SerializableClosure $function;
+
+    public function __construct(SerializableClosure $function)
     {
         $this->function = $function;
     }
@@ -30,6 +30,7 @@ class Closure extends AbstractMessage
     public function execute()
     {
         $closure = $this->function->getClosure();
+
         return $closure();
     }
 }

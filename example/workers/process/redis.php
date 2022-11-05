@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -7,6 +8,10 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+use BackQ\Adapter\Redis;
+use BackQ\Worker\AProcess;
+use Symfony\Component\Console\Logger\ConsoleLogger;
+use Symfony\Component\Console\Output\ConsoleOutput;
 
 /**
  * Publisher
@@ -18,12 +23,12 @@ include_once '../../../../../../vendor/autoload.php';
 
 $command = 'echo $( date +%s ) >> /tmp/test';
 
-$adapter = new \BackQ\Adapter\Redis;
+$adapter = new Redis();
 
 /**
  * Optional adapter logger
  */
-$logger = new \Symfony\Component\Console\Logger\ConsoleLogger(new \Symfony\Component\Console\Output\ConsoleOutput(\Symfony\Component\Console\Output\ConsoleOutput::VERBOSITY_DEBUG));
+$logger = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
 $adapter->setLogger($logger);
 
 /**
@@ -32,7 +37,7 @@ $adapter->setLogger($logger);
  */
 #$adapter->retryJobAfter(30);
 
-$worker = new \BackQ\Worker\AProcess($adapter);
+$worker = new AProcess($adapter);
 $worker->setIdleTimeout(15);
 $worker->setRestartThreshold(10);
 $worker->run();

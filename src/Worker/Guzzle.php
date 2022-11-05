@@ -10,25 +10,40 @@
 
 namespace BackQ\Worker;
 
+use GuzzleHttp\Client;
+use Throwable;
+use function date;
+use function error_log;
+use function gettype;
+use function json_encode;
+use function unserialize;
+
 final class Guzzle extends AbstractWorker
 {
-    protected $queueName = 'guzzle';
+
     public $workTimeout  = 4;
 
-    public function run()
+    protected $queueName = 'guzzle';
+    
+    /**
+     * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
+     */
+    public function run(): void
     {
         $connected = $this->start();
         $this->logDebug('started');
-        $push = null;
         if ($connected) {
             try {
-                $client  = new \GuzzleHttp\Client();
+                $client  = new Client();
                 $this->logDebug('connected to queue');
 
                 $work = $this->work();
                 $this->logDebug('after init work generator');
 
-                foreach ($work as $taskId => $payload) {
+                /**
+                 * @phpcs:disable SlevomatCodingStandard.Variables.UnusedVariable.UnusedVariable
+                 */
+                foreach ($work as $_ => $payload) {
                     $this->logDebug('got some work: ' . ($payload ? 'yes' : 'no'));
 
                     if (!$payload && $this->workTimeout > 0) {
@@ -36,6 +51,7 @@ final class Guzzle extends AbstractWorker
                          * Just empty loop, no work fetched
                          */
                         $work->send(true);
+
                         continue;
                     }
 
@@ -48,6 +64,7 @@ final class Guzzle extends AbstractWorker
                          */
                         $work->send($processed);
                         $this->logDebug('Worker does not support payload of: ' . gettype($message));
+
                         continue;
                     }
 
@@ -56,11 +73,13 @@ final class Guzzle extends AbstractWorker
                          * Message should not be processed now
                          */
                         $work->send(false);
+
                         continue;
                     }
 
                     if ($message->isExpired()) {
                         $work->send(true);
+
                         continue;
                     }
 
@@ -69,18 +88,19 @@ final class Guzzle extends AbstractWorker
 
                         $request = $message->getRequest();
                         $promise = $client->sendAsync($request)->then(
-                            function ($fulfilledResponse) use ($me) {
+                            static function ($fulfilledResponse) use ($me): void {
                             /** @var $fulfilledResponse \GuzzleHttp\Psr7\Response */
-                            $me->logDebug('Request sent, got response ' . $fulfilledResponse->getStatusCode() .
+                                $me->logDebug('Request sent, got response ' . $fulfilledResponse->getStatusCode() .
                                          ' ' . json_encode((string)    $fulfilledResponse->getBody()));
                             },
-                            function ($rejectedResponse) use ($me) {
+                            static function ($rejectedResponse) use ($me): void {
                                 /** @var $rejectedResponse \GuzzleHttp\Exception\RequestException */
                                 $me->logDebug('Request sent, FAILED with ' . $rejectedResponse->getMessage());
-                            });
+                            }
+                        );
 
                         $promise->wait();
-                    } catch (\Exception $e) {
+                    } catch (Throwable $e) {
                         error_log('Error while sending FCM: ' . $e->getMessage());
                     } finally {
                         /**
@@ -90,7 +110,7 @@ final class Guzzle extends AbstractWorker
                         $work->send((true === $processed));
                     }
                 }
-            } catch (\Exception $e) {
+            } catch (Throwable $e) {
                 $this->logDebug('[' . date('Y-m-d H:i:s') . '] EXCEPTION: ' . $e->getMessage());
             }
         }

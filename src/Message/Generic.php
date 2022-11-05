@@ -10,23 +10,32 @@
 
 namespace BackQ\Message;
 
-class Generic extends AbstractMessage implements \Serializable
+use Serializable;
+use function serialize;
+use function unserialize;
+
+class Generic extends AbstractMessage implements Serializable
 {
+
     private $data;
 
-    public function __construct($data) {
+    public function __construct($data)
+    {
         $this->data = $data;
     }
 
-    public function serialize() {
+    public function serialize()
+    {
         return serialize($this->data);
     }
 
-    public function unserialize($data) {
+    public function unserialize($data): void
+    {
         $this->data = unserialize($data);
     }
 
-    public function getData() {
+    public function getData()
+    {
         return $this->data;
     }
 }

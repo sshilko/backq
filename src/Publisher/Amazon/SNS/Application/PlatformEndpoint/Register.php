@@ -14,9 +14,9 @@ use BackQ\Publisher\AbstractPublisher;
 
 abstract class Register extends AbstractPublisher
 {
+
     /**
      * The queue will be used to create AWS platform endpoints
-     * @var string
      */
-    protected $queueName = 'aws_sns_endpoints_register_';
+    protected string $queueName = 'aws_sns_endpoints_register_';
 }

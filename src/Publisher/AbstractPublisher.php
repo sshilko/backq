@@ -10,42 +10,45 @@
 
 namespace BackQ\Publisher;
 
+use Backq\Adapter\AbstractAdapter;
+use function array_keys;
+use function array_search;
+use function array_values;
+use function get_object_vars;
+use function serialize;
+
 abstract class AbstractPublisher
 {
-    private $adapter;
 
     protected $bind;
+
     protected $queueName;
+
+    private $adapter;
+
+    abstract protected function setupAdapter(): AbstractAdapter;
 
     protected function __construct()
     {
         $this->adapter = $this->setupAdapter();
     }
 
-    public function __sleep()
+    /**
+     * @param \BackQ\Adapter\AbstractAdapter $adapter
+     *
+     */
+    public static function getInstance(): AbstractPublisher
     {
-        if ($this->adapter) {
-            $this->adapter->disconnect();
-        }
+        $class = static::class;
 
-        $vars = array_keys(get_object_vars($this));
-        unset($vars[array_search('adapter', $vars, true)]);
-        return array_values($vars);
+        return new $class();
     }
-
-    public function __wakeup()
-    {
-        $this->adapter = $this->setupAdapter();
-    }
-
-    abstract protected function setupAdapter(): \Backq\Adapter\AbstractAdapter;
 
     /**
      * Specify worker queue to push job to
      *
-     * @return string
      */
-    public function getQueueName()
+    public function getQueueName(): string
     {
         return $this->queueName;
     }
@@ -55,28 +58,16 @@ abstract class AbstractPublisher
      *
      * @param $string
      */
-    public function setQueueName(string $string)
+    public function setQueueName(string $string): void
     {
         $this->queueName = (string) $string;
     }
 
     /**
-     * @param \BackQ\Adapter\AbstractAdapter $adapter
-     *
-     * @return AbstractPublisher
-     */
-    public static function getInstance()
-    {
-        $class = get_called_class();
-        return new $class();
-    }
-
-    /**
      * Initialize provided adapter
      *
-     * @return bool
      */
-    public function start()
+    public function start(): bool
     {
         if (true === $this->bind) {
             return true;
@@ -84,9 +75,11 @@ abstract class AbstractPublisher
         if (true === $this->adapter->connect()) {
             if ($this->adapter->bindWrite($this->getQueueName())) {
                 $this->bind = true;
+
                 return true;
             }
         }
+
         return false;
     }
 
@@ -103,9 +96,8 @@ abstract class AbstractPublisher
     /**
      * Checks (if possible) if there are workers to work immediately
      *
-     * @return null|int
      */
-    public function hasWorkers()
+    public function hasWorkers(): ?int
     {
         return $this->adapter->hasWorkers($this->getQueueName());
     }
@@ -118,17 +110,13 @@ abstract class AbstractPublisher
      *
      * @return string|false
      */
-    public function publish($serializable, $params = array())
+    public function publish($serializable, $params = [])
     {
         if (!$this->bind) {
             return false;
         }
-        return $this->adapter->putTask($this->serialize($serializable), $params);
-    }
 
-    protected function serialize($serializable): string
-    {
-        return serialize($serializable);
+        return $this->adapter->putTask($this->serialize($serializable), $params);
     }
 
     public function finish()
@@ -136,9 +124,32 @@ abstract class AbstractPublisher
         if ($this->bind) {
             $this->adapter->disconnect();
             $this->bind = false;
+
             return true;
         }
+
         return false;
     }
 
+    protected function serialize($serializable): string
+    {
+        return serialize($serializable);
+    }
+
+    public function __sleep()
+    {
+        if ($this->adapter) {
+            $this->adapter->disconnect();
+        }
+
+        $vars = array_keys(get_object_vars($this));
+        unset($vars[array_search('adapter', $vars, true)]);
+
+        return array_values($vars);
+    }
+
+    public function __wakeup(): void
+    {
+        $this->adapter = $this->setupAdapter();
+    }
 }

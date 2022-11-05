@@ -10,8 +10,11 @@
 
 namespace BackQ\Adapter\Redis;
 
-class Queue extends \Illuminate\Queue\RedisQueue
+use Illuminate\Queue\RedisQueue;
+
+class Queue extends RedisQueue
 {
+
     /**
      * The expiration time of a job.
      * This option specifies how many seconds the queue connection should wait before
@@ -21,21 +24,20 @@ class Queue extends \Illuminate\Queue\RedisQueue
      * been in processing for >=N seconds without being deleted (successful execution = delete())
      *
      * @see https://laravel.com/docs/5.7/queues#retrying-failed-jobs
-     * @var int|null
      */
-    protected $retryAfter = null;
+    protected ?int $retryAfter = null;
 
     /**
      * The maximum number of seconds to block for a job.
      *
-     * @var int|null
      */
-    protected $blockFor = null;
+    protected ?int $blockFor = null;
 
     /**
      * @param int|null $seconds
      */
-    public function setBlockFor(?int $seconds) {
+    public function setBlockFor(?int $seconds): void
+    {
         $this->blockFor = $seconds;
     }
 }

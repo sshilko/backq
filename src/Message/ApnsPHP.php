@@ -10,7 +10,9 @@
 
 namespace BackQ\Message;
 
-class ApnsPHP extends \ApnsPHP_Message_Custom
+use ApnsPHP_Message_Custom;
+
+class ApnsPHP extends ApnsPHP_Message_Custom
 {
     /**
      * Since iOS8 payload was increased from 256b to 2kb
@@ -19,5 +21,5 @@ class ApnsPHP extends \ApnsPHP_Message_Custom
      * Apple Push Notification service (APNs) refuses any notification that exceeds the maximum size.
      * @see https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/TheNotificationPayload.html#//apple_ref/doc/uid/TP40008194-CH107-SW1
      */
-    const PAYLOAD_MAXIMUM_SIZE = 2048;
+    public const PAYLOAD_MAXIMUM_SIZE = 2048;
 }

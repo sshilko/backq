@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -7,6 +8,9 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+use Backq\Adapter\AbstractAdapter;
+use BackQ\Adapter\Beanstalk;
+use BackQ\Publisher\Apnsd;
 
 /**
  * APNS Publisher
@@ -14,14 +18,14 @@
  */
 include_once '../../../../../vendor/autoload.php';
 
-class MyApnsdPublisher extends \BackQ\Publisher\Apnsd
+class MyApnsdPublisher extends Apnsd
 {
-    public const PARAM_JOBTTR    = \BackQ\Adapter\Beanstalk::PARAM_JOBTTR;
-    public const PARAM_READYWAIT = \BackQ\Adapter\Beanstalk::PARAM_READYWAIT;
+    public const PARAM_JOBTTR    = Beanstalk::PARAM_JOBTTR;
+    public const PARAM_READYWAIT = Beanstalk::PARAM_READYWAIT;
 
-    protected function setupAdapter(): \Backq\Adapter\AbstractAdapter
+    protected function setupAdapter(): AbstractAdapter
     {
-        return new \BackQ\Adapter\Beanstalk;
+        return new Beanstalk();
     }
 }
 
@@ -31,8 +35,8 @@ $message->setCustomIdentifier("Message-Badge-3");
 $message->setBadge(3);
 $message->setText('Hello APNs-enabled device!');
 $message->setSound();
-$message->setCustomProperty('acme2', array('bang', 'whiz'));
-$message->setCustomProperty('acme3', array('bing', 'bong'));
+$message->setCustomProperty('acme2', ['bang', 'whiz']);
+$message->setCustomProperty('acme3', ['bing', 'bong']);
 $message->setExpiry(30);
 
 $app       = '-myapp1';
@@ -46,7 +50,7 @@ $queueName = $publisher->getQueueName();
  * Delay each job by 1 second
  */
 $params = [MyApnsdPublisher::PARAM_JOBTTR    => 4,
-           MyApnsdPublisher::PARAM_READYWAIT => 1];
+    MyApnsdPublisher::PARAM_READYWAIT => 1];
 
 foreach ($messagesQ as $app => $messages) {
     echo 'Publishing message: ' . $message->getText() . "\n";
