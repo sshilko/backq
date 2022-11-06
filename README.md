@@ -12,10 +12,10 @@ Background **queue processing** - publish tasks and process with workers, simpli
 * Extendable - write your own worker and use existing adapters out of the box ...
 
 #### Installation
+
 ```
 #composer self-update && composer clear-cache && composer diagnose
 composer require sshilko/backq:^3.0
-
 ```
 
 #### Example with Redis adapter and `process` worker

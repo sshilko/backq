@@ -26,7 +26,7 @@ class Client extends \Beanstalk\Client
 
     protected const IO_TIMEOUT = 2;
 
-    private IO\StreamIO $_io = null;
+    private IO\StreamIO $_io;
 
     public function __construct(array $config = [])
     {
