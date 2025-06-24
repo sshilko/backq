@@ -32,7 +32,7 @@
     "keywords": ["queue", "worker", "apns", "push", "ios", "fcm", "apple", "guzzle", "process", "notification", "sqs", "dynamodb", "send", "background", "async"],
     "homepage": "https://github.com/sshilko/backq",
     "require": {
-        "php": ">=7.2",
+        "php": ">=7.4",
         "ext-redis": "*",
         "davidpersson/beanstalk": "^2.0",
         "symfony/process": ">=4",
