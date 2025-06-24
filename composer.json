@@ -37,9 +37,10 @@
         "davidpersson/beanstalk": "^2.0",
         "symfony/process": ">=4",
         "duccio/apns-php": "=1.0.1",
+        "guzzlehttp/psr7": "^1.9",
         "illuminate/queue": ">=5",
         "illuminate/redis": ">=5",
-        "aws/aws-sdk-php": "^3.133",
+        "aws/aws-sdk-php": "^3",
         "opis/closure": "^3.6",
         "psr/log":"^1.1"
     },
