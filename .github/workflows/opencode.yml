@@ -19,9 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write # Allows OpenCode to commit code changes & create branches
+      pull-requests: write # Allows OpenCode to open PRs and post PR review comments
+      issues: write # Allows OpenCode to post comment replies on issues
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
