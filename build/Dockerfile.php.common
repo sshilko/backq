@@ -14,40 +14,45 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN mkdir -p /usr/share/man/man1
 
 # https://wiki.ubuntu.com/ReducingDiskFootprint
-RUN set -eux; \
-echo '\n\
-path-exclude /usr/share/doc/*                       \n\
-path-include /usr/share/doc/*/copyright             \n\
-path-exclude /usr/share/man/*                       \n\
-path-exclude /usr/share/groff/*                     \n\
-path-exclude /usr/share/info/*                      \n\
-path-exclude /usr/share/locale/*                    \n\
-path-exclude /usr/share/lintian/*                   \n\
-path-exclude /usr/share/linda/*                     \n\
-' >> /etc/dpkg/dpkg.cfg.d/01_excludes                                         && \
-    cat  /etc/dpkg/dpkg.cfg.d/01_excludes                                     && \
-    echo 'APT::Install-Recommends "0";' > /etc/apt/apt.conf.d/no-recommends   && \
-    find /usr/share/locale -maxdepth 1 -mindepth 1 ! -name 'en' |xargs rm -rf && \
-    apt-get update                                           && \
-    docker-php-ext-install -j$(nproc) mysqli                 && \
-    docker-php-ext-install -j$(nproc) pcntl                  && \
-    apt-get install -y --no-install-recommends                  \
-    unzip                                                       \
-    python3-pip                                                 \
-    pre-commit                                                  \
-    locales                                                     \
-    netcat                                                      \
-    git                                                      && \
-    apt-get clean                                            && \
-    apt-get -y autoremove                                    && \
-    rm -rf /var/lib/{apt,cache,log}/                         && \
-    rm -rf /tmp/* /var/tmp/*                                 && \
-    echo "* hard nofile 524280" >> /etc/security/limits.conf && \
-    echo "* soft nofile 262140" >> /etc/security/limits.conf && \
-    echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen               && \
-    /usr/sbin/locale-gen                                     && \
-    echo "TZ=Etc/UTC" >> /etc/environment                    && \
-    echo 'Done'
+# Configure dpkg excludes
+RUN echo 'path-exclude /usr/share/doc/*' >> /etc/dpkg/dpkg.cfg.d/01_excludes
+RUN echo 'path-include /usr/share/doc/*/copyright' >> /etc/dpkg/dpkg.cfg.d/01_excludes
+RUN echo 'path-exclude /usr/share/man/*' >> /etc/dpkg/dpkg.cfg.d/01_excludes
+RUN echo 'path-exclude /usr/share/groff/*' >> /etc/dpkg/dpkg.cfg.d/01_excludes
+RUN echo 'path-exclude /usr/share/info/*' >> /etc/dpkg/dpkg.cfg.d/01_excludes
+RUN echo 'path-exclude /usr/share/locale/*' >> /etc/dpkg/dpkg.cfg.d/01_excludes
+RUN echo 'path-exclude /usr/share/lintian/*' >> /etc/dpkg/dpkg.cfg.d/01_excludes
+RUN echo 'path-exclude /usr/share/linda/*' >> /etc/dpkg/dpkg.cfg.d/01_excludes
+RUN cat /etc/dpkg/dpkg.cfg.d/01_excludes
+
+# Configure APT recommendations and clean up existing locales
+RUN echo 'APT::Install-Recommends "0";' > /etc/apt/apt.conf.d/no-recommends
+RUN find /usr/share/locale -maxdepth 1 -mindepth 1 ! -name 'en' | xargs rm -rf
+
+# Package installation and PHP extension setup
+RUN apt-get update
+RUN docker-php-ext-install -j$(nproc) mysqli
+RUN docker-php-ext-install -j$(nproc) pcntl
+RUN apt-get install -y --no-install-recommends \
+    unzip \
+    python3-pip \
+    pre-commit \
+    locales \
+    netcat-traditional \
+    git
+
+# Package manager cleanup
+RUN apt-get clean
+RUN apt-get -y autoremove
+RUN rm -rf /var/lib/{apt,cache,log}/
+RUN rm -rf /tmp/* /var/tmp/*
+
+# System configuration (Limits, Locales, Timezone)
+RUN echo "* hard nofile 524280" >> /etc/security/limits.conf
+RUN echo "* soft nofile 262140" >> /etc/security/limits.conf
+RUN echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen
+RUN /usr/sbin/locale-gen
+RUN echo "TZ=Etc/UTC" >> /etc/environment
 
 ENV LANG "en_US.UTF-8"
 ENV LC_ALL "en_US.UTF-8"

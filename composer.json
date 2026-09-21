@@ -10,6 +10,9 @@
         }
     ],
     "config": {
+        "platform": {
+            "php": "8.1"
+        },
         "vendor-dir": "vendor",
         "preferred-install": {
             "*": "dist"
@@ -29,7 +32,23 @@
     "support": {
         "issues": "https://github.com/sshilko/backq/issues"
     },
-    "keywords": ["queue", "worker", "apns", "push", "ios", "fcm", "apple", "guzzle", "process", "notification", "sqs", "dynamodb", "send", "background", "async"],
+    "keywords": [
+        "queue",
+        "worker",
+        "apns",
+        "push",
+        "ios",
+        "fcm",
+        "apple",
+        "guzzle",
+        "process",
+        "notification",
+        "sqs",
+        "dynamodb",
+        "send",
+        "background",
+        "async"
+    ],
     "homepage": "https://github.com/sshilko/backq",
     "require": {
         "php": ">=7.4",
@@ -37,12 +56,12 @@
         "davidpersson/beanstalk": "^2.0",
         "symfony/process": ">=4",
         "duccio/apns-php": "=1.0.1",
-        "guzzlehttp/psr7": "^1.9",
+        "guzzlehttp/psr7": "^1",
         "illuminate/queue": ">=5",
         "illuminate/redis": ">=5",
         "aws/aws-sdk-php": "^3",
         "opis/closure": "^3.6",
-        "psr/log":"^1.1"
+        "psr/log": "^1.1"
     },
     "require-dev": {
         "ext-posix": "*",
@@ -57,7 +76,9 @@
         "squizlabs/php_codesniffer": "^3.7"
     },
     "autoload": {
-        "psr-4": { "BackQ\\": "src/" }
+        "psr-4": {
+            "BackQ\\": "src/"
+        }
     },
     "scripts": {
         "app-code-quality": [
@@ -71,11 +92,11 @@
             "@app-psalm",
             "@app-phan"
         ],
-        "app-psalm":[
+        "app-psalm": [
             "@putenv XDEBUG_MODE=off",
             "php ./vendor/bin/psalm.phar --php-version=$(php -r 'echo PHP_VERSION;') --config build/psalm.xml --memory-limit=-1 --no-diff --show-info=true --long-progress --stats --disable-extension=xdebug"
         ],
-        "app-psalm-shepherd":[
+        "app-psalm-shepherd": [
             "@putenv XDEBUG_MODE=off",
             "php ./vendor/bin/psalm.phar --php-version=$(php -r 'echo PHP_VERSION;') --config build/psalm.xml --shepherd --long-progress --memory-limit=-1 --no-diff --disable-extension=xdebug"
         ],
@@ -87,15 +108,15 @@
             "@putenv XDEBUG_MODE=off",
             "php ./vendor/bin/psalm.phar --php-version=$(php -r 'echo PHP_VERSION;') --config build/psalm.xml --taint-analysis --long-progress --disable-extension=xdebug"
         ],
-        "app-phpcbf":[
+        "app-phpcbf": [
             "@putenv XDEBUG_MODE=off",
             "pre-commit run --all-files --config build/.pre-commit-config.yaml php-code-phpcbf"
         ],
-        "app-phpcs":[
+        "app-phpcs": [
             "@putenv XDEBUG_MODE=off",
             "pre-commit run --all-files --config build/.pre-commit-config.yaml php-code-phpcs"
         ],
-        "app-phpstan":[
+        "app-phpstan": [
             "@putenv XDEBUG_MODE=off",
             "pre-commit run --all-files --config build/.pre-commit-config.yaml php-code-phpstan"
         ],

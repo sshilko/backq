@@ -14,10 +14,10 @@ x-app: &app
     options:
       max-size: "1m"
       max-file: "2"
-#  healthcheck:
-#    test: ["CMD", "nc", "-w1", "-zv", "mysql", "3306"]
-#    timeout: 2s
-#    start_period: 10s
+  #  healthcheck:
+  #    test: ["CMD", "nc", "-w1", "-zv", "mysql", "3306"]
+  #    timeout: 2s
+  #    start_period: 10s
   ulimits:
     nproc: 65535
     nofile:
@@ -40,20 +40,6 @@ x-app: &app
 
 version: "3.7"
 services:
-  app.php:
-    <<: *app
-    image: app/php
-    container_name: backq.php
-    build:
-      context: .
-      dockerfile: Dockerfile.php74
-  app.php80:
-    <<: *app
-    image: app/php80
-    container_name: backq.php80
-    build:
-      context: .
-      dockerfile: Dockerfile.php80
   app.php81:
     <<: *app
     image: app/php81
@@ -61,4 +47,3 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.php81
-
