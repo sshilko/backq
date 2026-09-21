@@ -22,6 +22,11 @@ jobs:
       contents: write # Allows OpenCode to commit code changes & create branches
       pull-requests: write # Allows OpenCode to open PRs and post PR review comments
       issues: write # Allows OpenCode to post comment replies on issues
+      actions: write # Save dependency/build caches, rerun failed jobs
+      checks: write # Create check runs, report test/lint results
+      statuses: write # Update commit build statuses (pass/fail indicators)
+      security-events: write # Create/modify SARIF security scan results (Dependabot/CodeQL)
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
