@@ -1,4 +1,30 @@
 -------------------------------------------------------------------------------
+4.x -> 5.x (PHP 8.3 modernization)
+
+1. Backward Incompatible Changes
+2. New Features
+
+========================================
+1. Backward Incompatible Changes
+========================================
+
+- PHP: minimum supported version is now `>= 8.3` (was `>= 8.1`).
+- `BackQ\Message\Generic` keeps `Serializable` for backward compatibility but
+  now also implements the native `__serialize()`/`__unserialize()` magic
+  methods (removing the PHP 8.1+ interface deprecation). The legacy
+  `serialize()`/`unserialize()` methods are `@deprecated`. Payloads produced by
+  4.x (`C:` capsules) are still read back; new payloads serialize in the native
+  `O:` format.
+- Dependency floors raised (see `composer.json`): `symfony/console` is now a
+  declared runtime dependency (was a transitive, undeclared one).
+
+========================================
+2. New Features
+========================================
+
+- `BackQ\Message\Generic::$data` and `getData()` are typed (`mixed`).
+
+------------------------------------------------------------------------------
 3.x -> 4.x (PHP 8.1 modernization)
 
 1. Backward Incompatible Changes
