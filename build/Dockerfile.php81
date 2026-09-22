@@ -75,8 +75,8 @@ COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr
 RUN install-php-extensions ast redis
 
 #phpunit coverage requirement
-#RUN mkdir /root/tmp && pear config-set temp_dir /root/tmp && install-php-extensions xdebug
-#ENV XDEBUG_MODE "coverage"
+RUN mkdir /root/tmp && pear config-set temp_dir /root/tmp && install-php-extensions xdebug
+ENV XDEBUG_MODE "coverage"
 
 RUN docker-php-ext-enable opcache
 
