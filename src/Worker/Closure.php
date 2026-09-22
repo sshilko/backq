@@ -11,6 +11,7 @@
 namespace BackQ\Worker;
 
 use BackQ\Worker\Closure\RecoverableException;
+use Override;
 use Throwable;
 use function gettype;
 use function time;
@@ -19,13 +20,14 @@ use function unserialize;
 class Closure extends AbstractWorker
 {
 
-    public $workTimeout = 5;
+    public ?int $workTimeout = 5;
 
     protected $queueName = 'closure';
 
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
+    #[Override]
     public function run(): void
     {
         $connected = $this->start();

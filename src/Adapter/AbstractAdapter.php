@@ -83,9 +83,9 @@ abstract class AbstractAdapter
     /**
      * Is there workers ready for job immediately
      *
-     * @return bool|int|null
+     * @return bool
      */
-    abstract public function hasWorkers($queue);
+    abstract public function hasWorkers($queue): bool;
 
     /**
      * Preffered limit of one work cycle

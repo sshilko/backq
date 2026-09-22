@@ -11,6 +11,7 @@
 namespace BackQ\Worker;
 
 use GuzzleHttp\Client;
+use Override;
 use Throwable;
 use function date;
 use function error_log;
@@ -21,13 +22,14 @@ use function unserialize;
 final class Guzzle extends AbstractWorker
 {
 
-    public $workTimeout  = 4;
+    public ?int $workTimeout = 4;
 
     protected $queueName = 'guzzle';
     
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
+    #[Override]
     public function run(): void
     {
         $connected = $this->start();

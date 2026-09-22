@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  dockerized-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Build and start the php83 dockerized app
+        run: docker compose -f build/docker-compose.yaml up -d --wait redis nsq app.php83
+
+      - name: Install dependencies inside the container
+        run: docker compose -f build/docker-compose.yaml exec -T app.php83 composer install --no-interaction --prefer-dist
+
+      - name: Run the PHPUnit suite (Redis + NSQ integration)
+        run: docker compose -f build/docker-compose.yaml exec -T app.php83 php ./vendor/bin/phpunit --configuration=phpunit.xml
+
+      - name: Run the code quality suite
+        run: docker compose -f build/docker-compose.yaml exec -T app.php83 composer app-code-quality
+
+      - name: Stop services
+        if: always()
+        run: docker compose -f build/docker-compose.yaml down -v

@@ -10,7 +10,7 @@
  @license https://opensource.org/licenses/mit-license.php MIT
 -->
 <psalm
-    phpVersion="8.1"
+    phpVersion="8.3"
     threads="1"
     findUnusedCode="false"
     findUnusedVariablesAndParams="true"
@@ -32,6 +32,6 @@
         </ignoreFiles>
     </projectFiles>
     <extraFiles>
-        <directory name="../test" />
+        <directory name="../tests" />
     </extraFiles>
 </psalm>

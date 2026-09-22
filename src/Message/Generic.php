@@ -11,6 +11,7 @@
 namespace BackQ\Message;
 
 use Serializable;
+use Override;
 use function serialize;
 use function unserialize;
 
@@ -37,6 +38,7 @@ class Generic extends AbstractMessage implements Serializable
     /**
      * @deprecated use native __serialize()/__unserialize() instead
      */
+    #[Override]
     public function serialize(): string
     {
         return serialize($this->data);
@@ -45,6 +47,7 @@ class Generic extends AbstractMessage implements Serializable
     /**
      * @deprecated use native __serialize()/__unserialize() instead
      */
+    #[Override]
     public function unserialize(string $data): void
     {
         $this->data = unserialize($data);

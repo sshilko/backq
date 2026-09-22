@@ -10,10 +10,11 @@
 
 namespace BackQ\Worker;
 
+use RuntimeException;
 use Symfony\Component\Process\Exception\ProcessSignaledException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
-use RuntimeException;
+use Override;
 use Throwable;
 use function assert;
 use function error_log;
@@ -32,13 +33,14 @@ use const SIGKILL;
 final class AProcess extends AbstractWorker
 {
 
-    public $workTimeout  = 5;
+    public ?int $workTimeout = 5;
 
     protected $queueName = 'process';
 
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
+    #[Override]
     public function run(): void
     {
         $connected = $this->start();

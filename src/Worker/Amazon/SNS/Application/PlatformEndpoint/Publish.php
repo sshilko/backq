@@ -13,14 +13,14 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\PublishMessageInterface;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
+use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+use Override;
 use Throwable;
 
 use function date;
 use function error_log;
-use function get_class;
 use function gettype;
-use function is_subclass_of;
 use function trigger_error;
 use function unserialize;
 
@@ -28,8 +28,9 @@ use const E_USER_WARNING;
 
 class Publish extends PlatformEndpoint
 {
-    public $workTimeout = 5;
+    public ?int $workTimeout = 5;
 
+    #[Override]
     public function run(): void
     {
         $this->logDebug('Started');
@@ -86,17 +87,12 @@ class Publish extends PlatformEndpoint
                         $this->snsClient->publish($payload);
 
                         $this->logDebug('SNS Client delivered message to endpoint');
+                        $work->send(true);
                     } catch (Throwable $e) {
-                        if (
-                            is_subclass_of(
-                                '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
-                                $e::class
-                            )
-                        ) {
+                        if ($e instanceof SnsException) {
 
                             /**
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_Publish.html#API_Publish_Errors
-                             * @var $e SnsException
                              */
                             $this->logDebug('Could not publish to endpoint with error ' . $e->getAwsErrorCode());
 
@@ -119,10 +115,7 @@ class Publish extends PlatformEndpoint
                              */
                             if (
                                 SnsException::INTERNAL === $e->getAwsErrorCode() ||
-                                is_subclass_of(
-                                    '\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
-                                    $e->getPrevious()::class
-                                )
+                                $e->getPrevious() instanceof NetworkException
                             ) {
                                 /**
                                  * Only retry if the max threshold has not been reached
@@ -152,12 +145,16 @@ class Publish extends PlatformEndpoint
 
                                 continue;
                             }
+
+                            /**
+                             * Any other SNS error marks the job as processed
+                             */
+                            $work->send(true);
                         } else {
                             $this->logDebug('Hard error: ' . $e->getMessage());
                             trigger_error(self::class . ' ' . $e->getMessage(), E_USER_WARNING);
+                            $work->send(true);
                         }
-                    } finally {
-                        $work->send(true);
                     }
                 }
             } catch (Throwable $e) {

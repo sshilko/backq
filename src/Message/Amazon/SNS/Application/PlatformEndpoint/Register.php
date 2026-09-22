@@ -10,6 +10,8 @@
 
 namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
+use Override;
+
 class Register implements RegisterMessageInterface
 {
 
@@ -19,25 +21,26 @@ class Register implements RegisterMessageInterface
      *
      * @var array
      */
-    protected array $attributes;
+    protected array $attributes = [];
 
     /**
      * Unique identifier created by the notification service for an app on a device
      *
      */
-    protected string $token;
+    protected string $token = '';
 
     /**
      * Amazon Resource Identifier of the Platform application that an endpoint
      * will be registered in
      *
      */
-    protected string $applicationArn;
+    protected string $applicationArn = '';
 
     /**
      * Get the specific attributes to create endpoints
      * @return array
      */
+    #[Override]
     public function getAttributes(): array
     {
         return $this->attributes;
@@ -48,6 +51,7 @@ class Register implements RegisterMessageInterface
      *
      * @param array $attrs
      */
+    #[Override]
     public function setAttributes(array $attrs): void
     {
         $this->attributes = $attrs;
@@ -57,6 +61,7 @@ class Register implements RegisterMessageInterface
      * Get the resource name for the Application Platform where an endpoint
      * where an endpoint will be saved
      */
+    #[Override]
     public function getApplicationArn(): string
     {
         return $this->applicationArn;
@@ -66,6 +71,7 @@ class Register implements RegisterMessageInterface
      * Sets up the Resource Number for a Platform Application
      * @param $appArn
      */
+    #[Override]
     public function setApplicationArn(string $appArn): void
     {
         $this->applicationArn = $appArn;
@@ -74,6 +80,7 @@ class Register implements RegisterMessageInterface
     /**
      * Gets the token or identifier for the device to register
      */
+    #[Override]
     public function getToken(): string
     {
         return $this->token;
@@ -83,6 +90,7 @@ class Register implements RegisterMessageInterface
      * Adds a unique identifier created by the notification service for the app on a device
      * @param $token
      */
+    #[Override]
     public function addToken(string $token): void
     {
         $this->token = $token;

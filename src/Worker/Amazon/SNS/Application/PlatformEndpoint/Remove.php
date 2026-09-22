@@ -13,24 +13,25 @@ namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RemoveMessageInterface;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
+use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+use Override;
 use Throwable;
 
 use function date;
 use function error_log;
-use function get_class;
 use function gettype;
 use function in_array;
-use function is_subclass_of;
 use function unserialize;
 
 class Remove extends PlatformEndpoint
 {
-    public $workTimeout = 5;
+    public ?int $workTimeout = 5;
 
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
+    #[Override]
     public function run(): void
     {
         $this->logDebug('started');
@@ -81,16 +82,10 @@ class Remove extends PlatformEndpoint
                          */
                         $this->snsClient->deleteEndpoint(['EndpointArn' => $message->getEndpointArn()]);
                     } catch (Throwable $e) {
-                        if (
-                            is_subclass_of(
-                                '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
-                                $e::class
-                            )
-                        ) {
+                        if ($e instanceof SnsException) {
 
                             /**
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html#API_DeleteEndpoint_Errors
-                             * @var $e SnsException
                              */
                             $this->logDebug('Could not delete endpoint with error: ' . $e->getAwsErrorCode());
 
@@ -114,10 +109,7 @@ class Remove extends PlatformEndpoint
                              */
                             if (
                                 SnsException::INTERNAL === $e->getAwsErrorCode() ||
-                                is_subclass_of(
-                                    '\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
-                                    $e->getPrevious()::class
-                                )
+                                $e->getPrevious() instanceof NetworkException
                             ) {
                                 /**
                                  * Only retry if the max threshold has not been reached

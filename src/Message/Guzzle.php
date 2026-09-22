@@ -31,7 +31,6 @@ class Guzzle extends AbstractMessage
     {
         if ($request) {
             if ('https' === $request->getUri()->getScheme()) {
-                $request->withRequestTarget('absolute-form');
                 /**
                  * Preserver HTTPS schema correctly
                  */

@@ -3,10 +3,12 @@
 namespace BackQ\Tests\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use Aws\Command;
-use Aws\Sns\Exception\SnsException;
 use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register as RegisterMessage;
 use BackQ\Tests\Support\TestAdapter;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint\Register;
+use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
+use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+use GuzzleHttp\Psr7\Request;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -102,6 +104,27 @@ class RegisterWorkerTest extends TestCase
         $this->assertContains(['afterWorkFailed', 23], $this->adapter->calls);
     }
 
+    public function testRetriesOnNetworkError(): void
+    {
+        $this->client = new class {
+            public function createPlatformEndpoint(array $payload): array
+            {
+                throw new SnsException(
+                    'Service Unavailable',
+                    new Command('CreatePlatformEndpoint'),
+                    [],
+                    new NetworkException('network error', new Request('POST', 'https://sns.example.com'))
+                );
+            }
+        };
+        $this->adapter->pickTaskResult = [23, serialize($this->makeMessage())];
+
+        $this->makeWorker()->run();
+
+        $this->assertContains(['afterWorkFailed', 23], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkSuccess', 23], $this->adapter->calls);
+    }
+
     public function testMarksProcessedOnAuthorizationError(): void
     {
         $this->client = new class {
@@ -119,6 +142,7 @@ class RegisterWorkerTest extends TestCase
         $this->makeWorker()->run();
 
         $this->assertContains(['afterWorkSuccess', 24], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkFailed', 24], $this->adapter->calls);
     }
 
     public function testOnSuccessFailureAbandonsJobWithoutAck(): void

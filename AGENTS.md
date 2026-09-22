@@ -24,21 +24,24 @@ and runs OS processes via `symfony/process`.
 
 ## Environment
 
-- PHP >= 8.1 (see `plans/php-8.1-modernization.md`); `vendor/` and `composer.lock`
-  are gitignored; install and verify via composer
+- PHP >= 8.3 (see `plans/php-8.3-and-repository-review-improvement-plan.md`, the current
+  top-level modernization plan; `plans/php-8.1-modernization.md` records the 4.0 work);
+  `vendor/` and `composer.lock` are gitignored; install and verify via composer
 - Changes are made on dedicated branches and land as pull requests
 - Integration tests for the `Redis` and `Nsq` adapters (`tests/Adapter/RedisAdapterTest.php`,
   `tests/Adapter/NsqAdapterTest.php`) require running services; they are exercised via the
   dockerized app in `build/` and skip themselves when the services are unreachable
+- CI: `.github/workflows/ci.yml` builds the php83 dockerized app and runs
+  `app-tests` + `app-code-quality` on every PR and merge to master
 
 ## Commands
 
 - `composer install` — install dependencies
-- `composer app-tests` — run the PHPUnit suite inside the dockerized app (`build/Dockerfile.php81`)
+- `composer app-tests` — run the PHPUnit suite inside the dockerized app (`build/Dockerfile.php83`)
   with `redis` + `nsq` services from `build/docker-compose.yaml`; requires Docker
 - `composer app-tests-local` — run the PHPUnit suite on the host (Redis/Nsq integration
   tests skip without the services)
-- `docker compose -f build/docker-compose.yaml up -d --build` — build and start app.php81,
+- `docker compose -f build/docker-compose.yaml up -d --build` — build and start app.php83,
   redis, nsq containers
 - `composer app-code-quality` — run the full quality suite (phpcs, phpcbf, phpstan, psalm,
   phan, phpmd, pdepend)

@@ -34,7 +34,7 @@ abstract class AbstractWorker
      * Work timeout value
      *
      */
-    public $workTimeout = null;
+    public ?int $workTimeout = null;
 
     /**
      * Whether syscalls should be delayed
@@ -150,15 +150,6 @@ abstract class AbstractWorker
         if (isset($this->logger)) {
             $this->logger->info($message);
         }
-    }
-
-    /**
-     * @param string $message
-     * @deprecated
-     */
-    public function debug(string $message): void
-    {
-        $this->logDebug($message);
     }
 
     /**

@@ -12,6 +12,7 @@
 namespace BackQ\Adapter;
 
 use Datetime;
+use Override;
 use RuntimeException;
 use Throwable;
 
@@ -111,7 +112,7 @@ class Nsq extends AbstractAdapter
 
     private $connected = false;
 
-    private $state     = self::STATE_NOTHING;
+    private ConnectionState $state = ConnectionState::Nothing;
 
     private $stateData = [];
 
@@ -126,24 +127,7 @@ class Nsq extends AbstractAdapter
         }
     }
 
-    /**
-     * @param $info
-     * @deprecated
-     */
-    public function info($info): void
-    {
-        $this->logInfo($info);
-    }
-
-    /**
-     * @param $msg
-     * @deprecated
-     */
-    public function error($msg): void
-    {
-        $this->logError($msg);
-    }
-
+    #[Override]
     public function setWorkTimeout(?int $seconds = null): void
     {
         if ($seconds >= 1) {
@@ -157,11 +141,12 @@ class Nsq extends AbstractAdapter
     /**
      * Disconnects from queue
      */
+    #[Override]
     public function disconnect(): bool
     {
         if (true === $this->connected) {
             try {
-                if (self::STATE_BINDREAD === $this->state) {
+                if (ConnectionState::BindRead === $this->state) {
                     /**
                      * When subscribed to receive new messages, nice way of closing the connection
                      * is "RDY 0" (pause messages) followed by "CLS" (cleanly close connection)
@@ -174,7 +159,7 @@ class Nsq extends AbstractAdapter
                 $this->logError(self::class . ' ' . __FUNCTION__ . ': ' . $ex->getMessage());
             }
 
-            $this->state     = self::STATE_NOTHING;
+            $this->state     = ConnectionState::Nothing;
             $this->stateData = [];
             $this->connected = false;
             $this->_io       = null;
@@ -188,6 +173,7 @@ class Nsq extends AbstractAdapter
     /**
      * Returns TRUE if connection is alive
      */
+    #[Override]
     public function ping($reconnect = true): bool
     {
         if ($this->connected && $this->_io) {
@@ -201,9 +187,10 @@ class Nsq extends AbstractAdapter
      * After failed work processing
      *
      */
+    #[Override]
     public function afterWorkFailed($workId): bool
     {
-        if ($this->connected && self::STATE_BINDREAD === $this->state) {
+        if ($this->connected && ConnectionState::BindRead === $this->state) {
             $this->writeCommand(sprintf(self::PROTO_REQUEUE, $workId, 0));
 
             return true;
@@ -216,9 +203,10 @@ class Nsq extends AbstractAdapter
      * After successful work processing
      *
      */
+    #[Override]
     public function afterWorkSuccess($workId): bool
     {
-        if ($workId && $this->connected && self::STATE_BINDREAD === $this->state) {
+        if ($workId && $this->connected && ConnectionState::BindRead === $this->state) {
             $this->writeCommand(sprintf(self::PROTO_FINISH, $workId));
 
             return true;
@@ -231,9 +219,10 @@ class Nsq extends AbstractAdapter
      * Subscribe for new incoming data
      *
      */
+    #[Override]
     public function bindRead($queue): bool
     {
-        if ($this->connected && self::STATE_NOTHING === $this->state) {
+        if ($this->connected && ConnectionState::Nothing === $this->state) {
             /**
              * A channel can, and generally does, have multiple clients connected.
              * Assuming all connected clients are in a state where they are ready to receive messages,
@@ -242,7 +231,7 @@ class Nsq extends AbstractAdapter
             $this->writeCommand(sprintf(self::PROTO_SUBSCRIBE, $queue, $queue));
             $this->readSuccessResponse();
 
-            $this->state = self::STATE_BINDREAD;
+            $this->state = ConnectionState::BindRead;
             $this->stateData = ['queue' => $queue,
                 'rdy'   => 0];
 
@@ -256,10 +245,11 @@ class Nsq extends AbstractAdapter
      * Prepare to write data into queue
      *
      */
+    #[Override]
     public function bindWrite($queue): bool
     {
-        if ($this->connected && self::STATE_NOTHING === $this->state) {
-            $this->state = self::STATE_BINDWRITE;
+        if ($this->connected && ConnectionState::Nothing === $this->state) {
+            $this->state = ConnectionState::BindWrite;
             $this->stateData = ['queue' => $queue];
 
             return true;
@@ -271,13 +261,15 @@ class Nsq extends AbstractAdapter
     /**
      * Checks (if possible) if there are workers to work immediately
      *
-     * @deprecated
+     * NSQ has no concept of "worker availability" for a topic when the client
+     * is connected directly to nsqd, so this always reports "no workers".
      */
-    public function hasWorkers($queue = false): ?int
+    #[Override]
+    public function hasWorkers($queue = false): bool
     {
-        $this->logInfo(self::class . '.' . __FUNCTION__ . ' not supported');
+        $this->logInfo(self::class . '.' . __FUNCTION__ . ' not supported, reporting no workers');
 
-        return true;
+        return false;
     }
 
     /**
@@ -286,6 +278,7 @@ class Nsq extends AbstractAdapter
      * @param $timeout integer $timeout If given specifies number of seconds to wait for a job, '0' returns immediately
      * @return bool|array [id, payload]
      */
+    #[Override]
     public function pickTask($timeout = null): bool|array
     {
         if ($timeout) {
@@ -293,7 +286,7 @@ class Nsq extends AbstractAdapter
             //$timeout = null;
         }
 
-        if ($this->connected && self::STATE_BINDREAD === $this->state) {
+        if ($this->connected && ConnectionState::BindRead === $this->state) {
             if ($this->stateData['rdy'] < 1) {
                 $this->writeReady(1);
                 $this->stateData['rdy'] = 1;
@@ -304,14 +297,14 @@ class Nsq extends AbstractAdapter
              */
             [$frameType, $messageFrame] = $this->readFrame(true);
 
-            if (self::RESPONSE_HEARTBEAT === $frameType) {
+            if (self::RESPONSE_HEARTBEAT === $messageFrame) {
                 /**
                  * Manually handle heartbeats
-                 * Hearbeats are breaks/timeouts in the pickTask cycle
+                 * Heartbeats are breaks/timeouts in the pickTask cycle
                  */
                 $this->writeCommand(self::PROTO_NOOP);
 
-                return ['', '', []];
+                return false;
             }
 
             if (self::FRAME_TYPE_MESSAGE !== $frameType) {
@@ -341,12 +334,13 @@ class Nsq extends AbstractAdapter
      *
      * @param  string $data The job body.
      */
+    #[Override]
     public function putTask($body, $params = []): bool
     {
         /**
          * @todo add support fot $params args
          */
-        if ($this->connected && self::STATE_BINDWRITE === $this->state) {
+        if ($this->connected && ConnectionState::BindWrite === $this->state) {
             if (isset($params[self::PARAM_JOBTTR])) {
                 if ($params[self::PARAM_JOBTTR] > $this->config['msg_timeout']) {
                     /**
@@ -422,6 +416,7 @@ class Nsq extends AbstractAdapter
     /**
      * connect and negotiate protocol
      */
+    #[Override]
     public function connect(): bool
     {
         if (isset($this->_io) || $this->connected) {
@@ -454,7 +449,7 @@ class Nsq extends AbstractAdapter
      */
     private function writeIdentify(): void
     {
-        if (self::STATE_NOTHING !== $this->state) {
+        if (ConnectionState::Nothing !== $this->state) {
             throw new RuntimeException('Incorrect protocol usage while ' . __FUNCTION__);
         }
 
@@ -478,7 +473,11 @@ class Nsq extends AbstractAdapter
             );
         }
 
-        $features = @json_decode($response, true);
+        $features = [];
+        if (is_string($response) && json_validate($response)) {
+            $features = json_decode($response, true);
+        }
+
         if (!is_array($features)) {
             throw new RuntimeException(
                 sprintf("was expecting feature list response, got '%s' with data '%s'", $frameType, $response)
@@ -502,7 +501,7 @@ class Nsq extends AbstractAdapter
      */
     private function writeReady($numberOfMessages): bool
     {
-        if ($this->connected && self::STATE_BINDREAD === $this->state) {
+        if ($this->connected && ConnectionState::BindRead === $this->state) {
             $this->writeCommand(sprintf(self::PROTO_READY, $numberOfMessages));
 
             return true;

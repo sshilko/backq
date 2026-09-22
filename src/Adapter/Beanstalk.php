@@ -11,6 +11,7 @@
 namespace BackQ\Adapter;
 
 use BackQ\Adapter\Beanstalk\Client;
+use Override;
 use RuntimeException;
 use Throwable;
 use function is_array;
@@ -42,6 +43,7 @@ class Beanstalk extends AbstractAdapter
      * Connects adapter
      *
      */
+    #[Override]
     public function connect($host = '127.0.0.1', $port = 11300, $timeout = 1, $persistent = false, $logger = null): bool
     {
         if (true === $this->connected && $this->client) {
@@ -70,6 +72,7 @@ class Beanstalk extends AbstractAdapter
         return false;
     }
 
+    #[Override]
     public function setWorkTimeout(?int $seconds = null): void
     {
         $this->workTimeout = $seconds;
@@ -89,7 +92,8 @@ class Beanstalk extends AbstractAdapter
      * Checks (if possible) if there are workers to work immediately
      *
      */
-    public function hasWorkers($queue = false): ?int
+    #[Override]
+    public function hasWorkers($queue = false): bool
     {
         if ($this->connected) {
             try {
@@ -106,7 +110,7 @@ class Beanstalk extends AbstractAdapter
                      */
                     $result = $this->client->statsTube($queue);
                     if ($result && is_array($result) && isset($result['current-watching'])) {
-                        return $result['current-watching'];
+                        return $result['current-watching'] > 0;
                     }
                 } else {
                     /**
@@ -114,7 +118,7 @@ class Beanstalk extends AbstractAdapter
                      */
                     $result = $this->client->stats();
                     if ($result && is_array($result) && isset($result['current-workers'])) {
-                        return $result['current-workers'];
+                        return $result['current-workers'] > 0;
                     }
                 }
             } catch (RuntimeException $e) {
@@ -122,12 +126,13 @@ class Beanstalk extends AbstractAdapter
             }
         }
 
-        return null;
+        return false;
     }
 
     /**
      * Returns TRUE if connection is alive
      */
+    #[Override]
     public function ping($reconnect = true): bool
     {
         try {
@@ -155,6 +160,7 @@ class Beanstalk extends AbstractAdapter
      * Subscribe for new incoming data
      *
      */
+    #[Override]
     public function bindRead($queue): bool
     {
         if ($this->connected) {
@@ -174,6 +180,7 @@ class Beanstalk extends AbstractAdapter
      * Prepare to write data into queue
      *
      */
+    #[Override]
     public function bindWrite($queue): bool
     {
         if ($this->connected) {
@@ -195,6 +202,7 @@ class Beanstalk extends AbstractAdapter
      * @param $timeout integer $timeout If given specifies number of seconds to wait for a job, '0' returns immediately
      * @return bool|array [id, payload]
      */
+    #[Override]
     public function pickTask($timeout = null): bool|array
     {
         if ($this->connected) {
@@ -212,46 +220,13 @@ class Beanstalk extends AbstractAdapter
     }
 
     /**
-     * Pick many tasks from queue
-     *
-     * @param int $max maximum number of tasks to reserve
-     * @param int $waitForJob should we try and wait for N seconds for job to be available, default not to wait
-     *
-     * @return bool|array of [id, payload]
-     */
-    public function pickTasks($max, $waitForJob = 0)
-    {
-        if ($this->connected) {
-            try {
-                $result = [];
-                for ($i = 0; $i < $max; $i++) {
-                    /**
-                     * Pick a task or return immediattely if no (more) tasks available
-                     */
-                    $taskreserve = $this->client->reserve($waitForJob);
-                    if (is_array($taskreserve)) {
-                        $result[] = [$taskreserve['id'], $taskreserve['body']];
-                    } else {
-                        break;
-                    }
-                }
-
-                return $result;
-            } catch (Throwable $e) {
-                $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Put task into queue
      *
      * @param  string $data The job body.
      * @return int|bool `false` on  otherwise an integer indicating
  * the job id.
      */
+    #[Override]
     public function putTask($body, $params = []): string|bool
     {
         if ($this->connected) {
@@ -289,6 +264,7 @@ class Beanstalk extends AbstractAdapter
      * After failed work processing
      *
      */
+    #[Override]
     public function afterWorkFailed($workId): bool
     {
         if ($this->connected) {
@@ -311,6 +287,7 @@ class Beanstalk extends AbstractAdapter
      * After successful work processing
      *
      */
+    #[Override]
     public function afterWorkSuccess($workId): bool
     {
         if ($this->connected) {
@@ -330,6 +307,7 @@ class Beanstalk extends AbstractAdapter
      * Disconnects from queue
      *
      */
+    #[Override]
     public function disconnect(): bool
     {
         if (true === $this->connected) {

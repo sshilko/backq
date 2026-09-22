@@ -75,9 +75,9 @@ class AbstractPublisherTest extends TestCase
 
     public function testHasWorkersDelegatesToAdapter(): void
     {
-        $this->adapter->hasWorkersResult = 3;
+        $this->adapter->hasWorkersResult = true;
 
-        $this->assertSame(3, $this->publisher->hasWorkers());
+        $this->assertTrue($this->publisher->hasWorkers());
         $this->assertContains(['hasWorkers', 'testqueue'], $this->adapter->calls);
     }
 

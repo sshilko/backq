@@ -24,7 +24,7 @@ require_once __DIR__ . '/../publishers/lib/myprocesspublisher.php';
 $worker = new Serialized(new Beanstalk());
 $logger = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
 $worker->setLogger($logger);
-$worker->setQueueName('123');
+$worker->setQueueName('serialized');
 $worker->setWorkTimeout(1);
 $worker->setRestartThreshold(100);
 $worker->setIdleTimeout(100);

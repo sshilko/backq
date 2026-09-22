@@ -20,6 +20,7 @@ use Illuminate\Queue\Capsule\Manager;
 use Illuminate\Queue\Jobs\RedisJob;
 use Illuminate\Redis\RedisManager;
 use InvalidArgumentException;
+use Override;
 use RuntimeException;
 use Throwable;
 
@@ -64,7 +65,7 @@ class Redis extends AbstractAdapter
      */
     private $reservedJobs = [];
 
-    private $state     = self::STATE_NOTHING;
+    private ConnectionState $state = ConnectionState::Nothing;
 
     private array $stateData = [];
 
@@ -150,6 +151,7 @@ class Redis extends AbstractAdapter
         $this->retryAfter = $seconds;
     }
 
+    #[Override]
     public function setWorkTimeout(?int $seconds = null): void
     {
         /**
@@ -182,6 +184,7 @@ class Redis extends AbstractAdapter
     /**
      * Disconnects from queue
      */
+    #[Override]
     public function disconnect(): bool
     {
         $this->logDebug('Disconnecting');
@@ -189,7 +192,7 @@ class Redis extends AbstractAdapter
             $this->logDebug('Disconnecting, previously connected');
 
             try {
-                if (self::STATE_BINDREAD === $this->state || self::STATE_BINDWRITE === $this->state) {
+                if (ConnectionState::BindRead === $this->state || ConnectionState::BindWrite === $this->state) {
                     $this->logDebug('Disconnecting, state detected');
 
                     /** @var Queue $redisQueue */
@@ -226,7 +229,7 @@ class Redis extends AbstractAdapter
                 $this->logError($errmsg);
             }
 
-            $this->state     = self::STATE_NOTHING;
+            $this->state     = ConnectionState::Nothing;
             $this->stateData = [];
             $this->connected = false;
             $this->logDebug('Disconnecting, successful');
@@ -244,6 +247,7 @@ class Redis extends AbstractAdapter
     /**
      * Returns TRUE if connection is alive
      */
+    #[Override]
     public function ping($reconnect = true): bool
     {
         if ($this->connected && $this->queue) {
@@ -268,13 +272,14 @@ class Redis extends AbstractAdapter
      * After failed work processing
      *
      */
+    #[Override]
     public function afterWorkFailed($workId): bool
     {
         $this->logDebug(__FUNCTION__);
 
         if (
-            $this->connected && (self::STATE_BINDREAD === $this->state ||
-                                 self::STATE_BINDWRITE === $this->state)
+            $this->connected && (ConnectionState::BindRead === $this->state ||
+                                 ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
 
@@ -303,13 +308,14 @@ class Redis extends AbstractAdapter
      * After successful work processing
      *
      */
+    #[Override]
     public function afterWorkSuccess($workId): bool
     {
         $this->logDebug(__FUNCTION__);
 
         if (
-            $this->connected && (self::STATE_BINDREAD === $this->state ||
-                                 self::STATE_BINDWRITE === $this->state)
+            $this->connected && (ConnectionState::BindRead === $this->state ||
+                                 ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
 
@@ -338,10 +344,11 @@ class Redis extends AbstractAdapter
      * Prepare to write data into queue
      *
      */
+    #[Override]
     public function bindWrite($queue): bool
     {
-        if ($this->connected && self::STATE_NOTHING === $this->state) {
-            $this->state = self::STATE_BINDWRITE;
+        if ($this->connected && ConnectionState::Nothing === $this->state) {
+            $this->state = ConnectionState::BindWrite;
             $this->queueName = $queue;
             $this->_connect();
 
@@ -355,10 +362,11 @@ class Redis extends AbstractAdapter
      * Subscribe for new incoming data
      *
      */
+    #[Override]
     public function bindRead($queue): bool
     {
-        if ($this->connected && self::STATE_NOTHING === $this->state) {
-            $this->state = self::STATE_BINDREAD;
+        if ($this->connected && ConnectionState::Nothing === $this->state) {
+            $this->state = ConnectionState::BindRead;
             $this->queueName = $queue;
             $this->_connect();
 
@@ -371,11 +379,15 @@ class Redis extends AbstractAdapter
     /**
      * Checks (if possible) if there are workers to work immediately
      *
-     * @deprecated
+     * Redis has no concept of "worker availability" for a queue when using the
+     * underlying list-based jobs, so this always reports "no workers".
      */
-    public function hasWorkers($queue = false): ?int
+    #[Override]
+    public function hasWorkers($queue = false): bool
     {
-        return true;
+        $this->logInfo(self::class . '.' . __FUNCTION__ . ' not supported, reporting no workers');
+
+        return false;
     }
 
     /**
@@ -384,6 +396,7 @@ class Redis extends AbstractAdapter
      * @param $timeout integer $timeout If given specifies number of seconds to wait for a job, '0' returns immediately
      * @return bool|array [id, payload]
      */
+    #[Override]
     public function pickTask($timeout = null): bool|array
     {
         /**
@@ -396,8 +409,8 @@ class Redis extends AbstractAdapter
         }
 
         if (
-            $this->connected && (self::STATE_BINDREAD === $this->state ||
-                                 self::STATE_BINDWRITE === $this->state)
+            $this->connected && (ConnectionState::BindRead === $this->state ||
+                                 ConnectionState::BindWrite === $this->state)
         ) {
             $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
             assert($redisQueue instanceof Queue);
@@ -475,16 +488,17 @@ class Redis extends AbstractAdapter
      * @param  string $data The job body.
      * @return string|false job-id on success
      */
+    #[Override]
     public function putTask($body, $params = []): string|int|bool
     {
         $this->logDebug(__FUNCTION__);
 
         if (
-            $this->connected && (self::STATE_BINDREAD === $this->state ||
-                                 self::STATE_BINDWRITE === $this->state)
+            $this->connected && (ConnectionState::BindRead === $this->state ||
+                                 ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(
-                __FUNCTION__ . ' is connected and ready to: ' . (self::STATE_BINDREAD === $this->state ? 'read' : 'write')
+                __FUNCTION__ . ' is connected and ready to: ' . (ConnectionState::BindRead === $this->state ? 'read' : 'write')
             );
             $instance = $this->queue->getConnection(self::CONNECTION_NAME);
             assert($instance instanceof Queue);
@@ -541,6 +555,7 @@ class Redis extends AbstractAdapter
     /**
      * connect and negotiate protocol
      */
+    #[Override]
     public function connect(): bool
     {
         $this->logDebug(__FUNCTION__);

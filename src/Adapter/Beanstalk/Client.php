@@ -12,6 +12,7 @@ namespace BackQ\Adapter\Beanstalk;
 
 use BackQ\Adapter\IO;
 use BackQ\Adapter\IO\Exception\RuntimeException;
+use Override;
 use Throwable;
 use function array_merge;
 use function intval;
@@ -40,6 +41,7 @@ class Client extends \Beanstalk\Client
         $this->_config = array_merge($defaults, $config);
     }
 
+    #[Override]
     public function __destruct()
     {
         if (!empty($this->_config)) {
@@ -60,6 +62,7 @@ class Client extends \Beanstalk\Client
      * @see \Beanstalk\Client::reserve()
      * @return bool `true` if the connection was established, `false` otherwise.
      */
+    #[Override]
     public function connect(): bool
     {
         if (isset($this->_io)) {
@@ -94,6 +97,7 @@ class Client extends \Beanstalk\Client
      *
      * @return array|false
      */
+    #[Override]
     public function reserve($timeout = null)
     {
         /**
@@ -181,6 +185,7 @@ class Client extends \Beanstalk\Client
         }
     }
 
+    #[Override]
     public function disconnect()
     {
         if ($this->connected) {
@@ -203,6 +208,7 @@ class Client extends \Beanstalk\Client
      * @param string $tube Name of the tube.
      * @return string|bool `false` on error otherwise a string with a yaml formatted dictionary.
      */
+    #[Override]
     public function statsTube($tube)
     {
         $cmd = sprintf('stats-tube %s', $tube);
@@ -211,6 +217,7 @@ class Client extends \Beanstalk\Client
         return $this->_statsRead($cmd);
     }
 
+    #[Override]
     protected function _write($data)
     {
         if (!$this->connected) {
@@ -226,6 +233,7 @@ class Client extends \Beanstalk\Client
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
+    #[Override]
     protected function _read($length = null)
     {
         if (!$this->connected) {
@@ -272,6 +280,7 @@ class Client extends \Beanstalk\Client
         return $packet;
     }
 
+    #[Override]
     protected function _statsRead($readWhat = '')
     {
         $status = strtok($this->_read(), ' ');

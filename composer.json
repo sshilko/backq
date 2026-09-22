@@ -11,7 +11,7 @@
     ],
     "config": {
         "platform": {
-            "php": "8.1"
+            "php": "8.3"
         },
         "vendor-dir": "vendor",
         "preferred-install": {
@@ -28,7 +28,8 @@
     },
     "description": "Background jobs processing with queue, workers & publishers",
     "type": "library",
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
+    "prefer-stable": true,
     "support": {
         "issues": "https://github.com/sshilko/backq/issues"
     },
@@ -51,7 +52,7 @@
     ],
     "homepage": "https://github.com/sshilko/backq",
     "require": {
-        "php": ">=8.1",
+        "php": ">=8.3",
         "ext-redis": "*",
         "davidpersson/beanstalk": "^2.0",
         "symfony/console": "^5.4 | ^6.4 | ^7.0",
@@ -71,7 +72,7 @@
         "phpstan/phpstan": "^1.8",
         "phpunit/phpunit": "^10.5",
         "psalm/phar": "*",
-        "slevomat/coding-standard": "^8.4",
+        "slevomat/coding-standard": "^8",
         "squizlabs/php_codesniffer": "^3.7"
     },
     "autoload": {
@@ -86,8 +87,8 @@
     },
     "scripts": {
         "app-tests": [
-            "docker compose -f build/docker-compose.yaml up -d --wait redis nsq app.php81",
-            "docker compose -f build/docker-compose.yaml exec -T app.php81 php ./vendor/bin/phpunit --configuration=phpunit.xml"
+            "docker compose -f build/docker-compose.yaml up -d --wait redis nsq app.php83",
+            "docker compose -f build/docker-compose.yaml exec -T app.php83 php ./vendor/bin/phpunit --configuration=phpunit.xml"
         ],
         "app-tests-local": [
             "@putenv XDEBUG_MODE=off",

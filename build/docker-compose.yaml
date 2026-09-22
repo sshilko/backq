@@ -39,13 +39,13 @@ x-app: &app
   restart: on-failure:2
 
 services:
-  app.php81:
+  app.php83:
     <<: *app
-    image: app/php81
-    container_name: backq.php81
+    image: app/php83
+    container_name: backq.php83
     build:
       context: .
-      dockerfile: Dockerfile.php81
+      dockerfile: Dockerfile.php83
     depends_on:
       redis:
         condition: service_healthy

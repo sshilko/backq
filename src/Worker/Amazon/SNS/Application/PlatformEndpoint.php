@@ -12,6 +12,7 @@ namespace BackQ\Worker\Amazon\SNS\Application;
 
 use BackQ\Adapter\AbstractAdapter;
 use BackQ\Worker\Amazon\SNS\Application;
+use Override;
 use function end;
 use function explode;
 use function strrpos;

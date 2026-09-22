@@ -12,6 +12,7 @@ namespace BackQ\Worker;
 
 use BackQ\Message\AbstractMessage;
 use BackQ\Publisher\AbstractPublisher;
+use Override;
 use Throwable;
 use function gettype;
 use function time;
@@ -20,11 +21,12 @@ use function unserialize;
 class Serialized extends AbstractWorker
 {
 
-    public $workTimeout = 5;
+    public ?int $workTimeout = 5;
 
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
+    #[Override]
     public function run(): void
     {
         $connected = $this->start();

@@ -12,7 +12,9 @@
 namespace BackQ\Adapter\Amazon\DynamoDb;
 
 use function crc32;
+use function is_array;
 use function json_decode;
+use function json_validate;
 use function json_encode;
 use function uniqid;
 
@@ -43,8 +45,16 @@ class QueueTableRow
             return null;
         }
 
+        if (!is_string($array['metadata']) || !json_validate($array['metadata'])) {
+            return null;
+        }
+
         $item     = new self($array['payload'], $array['time_ready']);
         $metadata = json_decode($array['metadata'], true);
+
+        if (!is_array($metadata) || !isset($metadata['payload_checksum'])) {
+            return null;
+        }
 
         /**
          * Verify that the payload checksum corresponds to the payload

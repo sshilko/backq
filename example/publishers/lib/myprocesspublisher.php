@@ -19,7 +19,7 @@ final class MyProcessPublisher extends Process
     public const PARAM_JOBTTR    = Beanstalk::PARAM_JOBTTR;
     public const PARAM_READYWAIT = Beanstalk::PARAM_READYWAIT;
 
-    protected $queueName = '456';
+    protected $queueName = 'process';
 
     protected function setupAdapter(): AbstractAdapter
     {

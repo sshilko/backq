@@ -10,6 +10,8 @@
 
 namespace BackQ\Worker\Amazon\SNS\Client\Exception;
 
+use Override;
+
 /**
  * Class SnsException
  * @package BackQ\Worker\Amazon\SNS\Client\Exception
@@ -43,6 +45,7 @@ class SnsException extends \Aws\Sns\Exception\SnsException
      * @see http://docs.aws.amazon.com/aws-sdk-php/v3/api/class-Aws.Exception.AwsException.html#_getAwsErrorCode
      *
      */
+    #[Override]
     public function getAwsErrorCode(): ?string
     {
         return parent::getAwsErrorCode();
@@ -52,6 +55,7 @@ class SnsException extends \Aws\Sns\Exception\SnsException
      * @see http://docs.aws.amazon.com/aws-sdk-php/v3/api/class-Aws.Exception.AwsException.html#_getAwsErrorType
      *
      */
+    #[Override]
     public function getAwsErrorType(): ?string
     {
         return parent::getAwsErrorType();

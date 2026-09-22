@@ -3,10 +3,12 @@
 namespace BackQ\Tests\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use Aws\Command;
-use Aws\Sns\Exception\SnsException;
 use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove as RemoveMessage;
 use BackQ\Tests\Support\TestAdapter;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint\Remove;
+use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
+use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+use GuzzleHttp\Psr7\Request;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -109,5 +111,27 @@ class RemoveWorkerTest extends TestCase
         $this->makeWorker()->run();
 
         $this->assertContains(['afterWorkFailed', 24], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkSuccess', 24], $this->adapter->calls);
+    }
+
+    public function testRetriesOnNetworkError(): void
+    {
+        $this->client = new class {
+            public function deleteEndpoint(array $payload): array
+            {
+                throw new SnsException(
+                    'Service Unavailable',
+                    new Command('DeleteEndpoint'),
+                    [],
+                    new NetworkException('network error', new Request('POST', 'https://sns.example.com'))
+                );
+            }
+        };
+        $this->adapter->pickTaskResult = [24, serialize($this->makeMessage())];
+
+        $this->makeWorker()->run();
+
+        $this->assertContains(['afterWorkFailed', 24], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkSuccess', 24], $this->adapter->calls);
     }
 }

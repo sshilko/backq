@@ -4,13 +4,14 @@ namespace BackQ\Tests\Support;
 
 use BackQ\Adapter\AbstractAdapter;
 use BackQ\Worker\AbstractWorker;
+use Override;
 
 /**
  * Bounded worker used to exercise AbstractWorker::work() as a generator.
  */
 class TestWorker extends AbstractWorker
 {
-    public $workTimeout = 5;
+    public ?int $workTimeout = 5;
 
     protected $queueName = 'testqueue';
 
@@ -34,6 +35,7 @@ class TestWorker extends AbstractWorker
         return $this->finish();
     }
 
+    #[Override]
     public function run(): void
     {
         $connected = $this->start();

@@ -97,7 +97,7 @@ abstract class AbstractPublisher
      * Checks (if possible) if there are workers to work immediately
      *
      */
-    public function hasWorkers(): ?int
+    public function hasWorkers(): bool
     {
         return $this->adapter->hasWorkers($this->getQueueName());
     }

@@ -6,39 +6,27 @@ use BackQ\Adapter\IO\Exception\RuntimeException;
 use BackQ\Adapter\IO\Exception\TimeoutException;
 use BackQ\Adapter\IO\StreamIO;
 use PHPUnit\Framework\TestCase;
+use function fclose;
+use function fread;
+use function fwrite;
+use function is_resource;
+use function stream_set_timeout;
+use function stream_socket_accept;
+use function stream_socket_get_name;
+use function stream_socket_server;
+use function strrpos;
+use function substr;
 
 class StreamIOTest extends TestCase
 {
+
     private $server;
+
     private $port;
+
     private $accepted;
+
     private StreamIO $io;
-
-    protected function setUp(): void
-    {
-        $this->server = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
-        $this->assertNotFalse($this->server);
-        stream_set_timeout($this->server, 2);
-        $name       = stream_socket_get_name($this->server, false);
-        $this->port = (int) substr((string) $name, (int) strrpos((string) $name, ':') + 1);
-
-        $this->io = new StreamIO('127.0.0.1', $this->port, 1, 1);
-        $this->accepted = stream_socket_accept($this->server, 2);
-        $this->assertNotFalse($this->accepted);
-    }
-
-    protected function tearDown(): void
-    {
-        if (isset($this->io)) {
-            $this->io->close();
-        }
-        if (is_resource($this->accepted)) {
-            fclose($this->accepted);
-        }
-        if (is_resource($this->server)) {
-            fclose($this->server);
-        }
-    }
 
     public function testWrite(): void
     {
@@ -117,5 +105,31 @@ class StreamIOTest extends TestCase
 
         $io = new StreamIO('127.0.0.1', $this->port, 1);
         $io->close();
+    }
+
+    protected function setUp(): void
+    {
+        $this->server = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
+        $this->assertNotFalse($this->server);
+        stream_set_timeout($this->server, 2);
+        $name       = stream_socket_get_name($this->server, false);
+        $this->port = (int) substr((string) $name, (int) strrpos((string) $name, ':') + 1);
+
+        $this->io = new StreamIO('127.0.0.1', $this->port, 1, 1);
+        $this->accepted = stream_socket_accept($this->server, 2);
+        $this->assertNotFalse($this->accepted);
+    }
+
+    protected function tearDown(): void
+    {
+        if (isset($this->io)) {
+            $this->io->close();
+        }
+        if (is_resource($this->accepted)) {
+            fclose($this->accepted);
+        }
+        if (is_resource($this->server)) {
+            fclose($this->server);
+        }
     }
 }

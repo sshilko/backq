@@ -14,6 +14,7 @@ namespace BackQ\Adapter\IO;
 use BackQ\Adapter\IO\Exception\RuntimeException;
 use BackQ\Adapter\IO\Exception\TimeoutException;
 use Exception;
+use Override;
 use Throwable;
 
 use function error_reporting;
@@ -173,6 +174,7 @@ class StreamIO extends AbstractIO
         stream_set_chunk_size($this->sock, 1024);
     }
 
+    #[Override]
     public function read($n)
     {
         $info = stream_get_meta_data($this->sock);
@@ -216,6 +218,7 @@ class StreamIO extends AbstractIO
         return $fread_result;
     }
 
+    #[Override]
     public function stream_set_timeout($read_write_timeout): void
     {
         if (!stream_set_timeout($this->sock, $read_write_timeout)) {
@@ -223,6 +226,7 @@ class StreamIO extends AbstractIO
         }
     }
 
+    #[Override]
     public function write($data): void
     {
         // get status of socket to determine whether or not it has timed out
@@ -301,6 +305,7 @@ class StreamIO extends AbstractIO
         }
     }
 
+    #[Override]
     public function close(): void
     {
         if (is_resource($this->sock)) {
@@ -319,6 +324,7 @@ class StreamIO extends AbstractIO
      * @throws TimeoutException
      * @return string|false
      */
+    #[Override]
     public function stream_get_line(int $length, string $delimiter = "\r\n")
     {
         $info = stream_get_meta_data($this->sock);
@@ -351,6 +357,7 @@ class StreamIO extends AbstractIO
      * @throws TimeoutException
      * @return string|false
      */
+    #[Override]
     public function stream_get_contents(int $length)
     {
         $info = stream_get_meta_data($this->sock);
@@ -366,6 +373,7 @@ class StreamIO extends AbstractIO
         return stream_get_contents($this->sock, $length);
     }
 
+    #[Override]
     public function selectWrite($sec, $usec)
     {
         $read   = null;
@@ -375,6 +383,7 @@ class StreamIO extends AbstractIO
         return stream_select($read, $write, $except, $sec, $usec);
     }
 
+    #[Override]
     public function selectRead($sec, $usec)
     {
         $read   = [$this->sock];

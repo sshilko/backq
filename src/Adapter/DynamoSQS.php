@@ -16,6 +16,7 @@ use Aws\Exception\AwsException;
 use Aws\Sqs\SqsClient;
 use BackQ\Adapter\Amazon\DynamoDb\QueueTableRow;
 use InvalidArgumentException;
+use Override;
 use function assert;
 use function count;
 use function crc32;
@@ -104,6 +105,7 @@ class DynamoSQS extends AbstractAdapter
 
     /**
      */
+    #[Override]
     public function connect(): bool
     {
         $arguments = ['version'     => self::API_VERSION_DYNAMODB,
@@ -121,6 +123,7 @@ class DynamoSQS extends AbstractAdapter
 
     /**
      */
+    #[Override]
     public function disconnect(): bool
     {
         $this->dynamoDBClient    = null;
@@ -134,6 +137,7 @@ class DynamoSQS extends AbstractAdapter
     /**
      * @param string $queue
      */
+    #[Override]
     public function bindRead($queue): bool
     {
         $this->sqsQueueURL = $this->generateSqsEndpointUrl($queue);
@@ -144,6 +148,7 @@ class DynamoSQS extends AbstractAdapter
     /**
      * @param string $sqsURL
      */
+    #[Override]
     public function bindWrite($queue): bool
     {
         $this->dynamoDbTableName = $queue;
@@ -151,6 +156,7 @@ class DynamoSQS extends AbstractAdapter
         return true;
     }
 
+    #[Override]
     public function pickTask($timeout = null): bool|array
     {
         $this->logDebug(__FUNCTION__);
@@ -179,9 +185,13 @@ class DynamoSQS extends AbstractAdapter
         if ($result && $result->hasKey('Messages') && count($result->get('Messages')) > 0) {
             $messagePayload = ($result->get('Messages')[0]);
 
-            $messageBody = @json_decode($messagePayload['Body'], true);
+            $messageBody = null;
             $itemPayload = null;
-            if (is_array($messageBody)) {
+            if (
+                is_string($messagePayload['Body']) &&
+                json_validate($messagePayload['Body']) &&
+                is_array($messageBody = json_decode($messagePayload['Body'], true))
+            ) {
                 $item = QueueTableRow::fromArray($messageBody);
 
                 if ($item) {
@@ -201,6 +211,7 @@ class DynamoSQS extends AbstractAdapter
         return false;
     }
 
+    #[Override]
     public function putTask($body, $params = []): bool
     {
         $this->logDebug(__FUNCTION__);
@@ -248,6 +259,7 @@ class DynamoSQS extends AbstractAdapter
     /**
      * @param $workId
      */
+    #[Override]
     public function afterWorkSuccess($workId): bool
     {
         if ($this->sqsClient) {
@@ -268,6 +280,7 @@ class DynamoSQS extends AbstractAdapter
     /**
      * @phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
      */
+    #[Override]
     public function afterWorkFailed($workId): bool
     {
         /**
@@ -277,6 +290,7 @@ class DynamoSQS extends AbstractAdapter
         return true;
     }
 
+    #[Override]
     public function ping($reconnect = true): bool
     {
         return true;
@@ -285,12 +299,16 @@ class DynamoSQS extends AbstractAdapter
     /**
      * @phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
      */
+    #[Override]
     public function hasWorkers($queue): bool
     {
         /**
-         * @todo implement using SQS or DynamoDB as separate table/lock
+         * @todo implement using SQS GetQueueAttributes (ApproximateNumberOfMessages)
+         * or DynamoDB as separate table/lock
          */
-        return true;
+        $this->logInfo(self::class . '.' . __FUNCTION__ . ' not supported, reporting no workers');
+
+        return false;
     }
 
     /**
@@ -302,6 +320,7 @@ class DynamoSQS extends AbstractAdapter
      * @param int|null $seconds
      * @return null
      */
+    #[Override]
     public function setWorkTimeout(?int $seconds = null): void
     {
         $this->workTimeout = $seconds;
