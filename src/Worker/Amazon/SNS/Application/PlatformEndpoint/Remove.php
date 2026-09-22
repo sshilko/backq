@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -14,6 +15,7 @@ use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RemoveMessageInterface
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
 use Throwable;
+
 use function date;
 use function error_log;
 use function get_class;
@@ -24,7 +26,6 @@ use function unserialize;
 
 class Remove extends PlatformEndpoint
 {
-
     public $workTimeout = 5;
 
     /**
@@ -80,10 +81,12 @@ class Remove extends PlatformEndpoint
                          */
                         $this->snsClient->deleteEndpoint(['EndpointArn' => $message->getEndpointArn()]);
                     } catch (Throwable $e) {
-                        if (is_subclass_of(
-                            '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
-                            get_class($e)
-                        )) {
+                        if (
+                            is_subclass_of(
+                                '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
+                                $e::class
+                            )
+                        ) {
 
                             /**
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html#API_DeleteEndpoint_Errors
@@ -95,9 +98,11 @@ class Remove extends PlatformEndpoint
                              * With issues regarding Authorization or parameters, nothing
                              * can be done, mark as processed
                              */
-                            if (in_array($e->getAwsErrorCode(), [SnsException::AUTHERROR,
+                            if (
+                                in_array($e->getAwsErrorCode(), [SnsException::AUTHERROR,
                                 SnsException::INVALID_PARAM,
-                                SnsException::NOTFOUND])) {
+                                SnsException::NOTFOUND])
+                            ) {
                                 $work->send(true);
 
                                 continue;
@@ -107,11 +112,13 @@ class Remove extends PlatformEndpoint
                              * Retry deletion on Internal Server error from Service
                              * or general network exceptions
                              */
-                            if (SnsException::INTERNAL === $e->getAwsErrorCode() ||
+                            if (
+                                SnsException::INTERNAL === $e->getAwsErrorCode() ||
                                 is_subclass_of(
                                     '\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
-                                    get_class($e->getPrevious())
-                                )) {
+                                    $e->getPrevious()::class
+                                )
+                            ) {
                                 /**
                                  * Only retry if the max threshold has not been reached
                                  */

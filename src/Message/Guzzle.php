@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -10,15 +11,13 @@
 
 namespace BackQ\Message;
 
+use GuzzleHttp\Psr7\Message;
 use GuzzleHttp\Psr7\Request;
 use LogicException;
-use function GuzzleHttp\Psr7\parse_request;
-use function GuzzleHttp\Psr7\str;
 
 class Guzzle extends AbstractMessage
 {
-
-    private Request $request;
+    private $request;
 
     private $scheme = null;
 
@@ -38,7 +37,7 @@ class Guzzle extends AbstractMessage
                  */
                 $this->scheme = 'https';
             }
-            $this->request = str($request);
+            $this->request = Message::toString($request);
         } else {
             $this->request = $rawRequest;
         }
@@ -51,7 +50,7 @@ class Guzzle extends AbstractMessage
      */
     public function getRequest(): Request
     {
-        $request = parse_request($this->request);
+        $request = Message::parseRequest($this->request);
         if (!empty($this->scheme)) {
             $uri    = $request->getUri();
             $newuri = $uri->withScheme($this->scheme);

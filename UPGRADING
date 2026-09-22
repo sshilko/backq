@@ -1,4 +1,87 @@
 -------------------------------------------------------------------------------
+3.x -> 4.x (PHP 8.1 modernization)
+
+1. Backward Incompatible Changes
+2. New Features
+
+========================================
+1. Backward Incompatible Changes
+========================================
+
+- PHP: minimum supported version is now `>= 8.1` (was `>= 7.4`).
+- Adapter contract (`BackQ\Adapter\AbstractAdapter`):
+  - Methods now declare return types. Subclasses/consumers overriding any of
+    `connect`, `disconnect`, `bindRead`, `bindWrite`, `pickTask`, `putTask`,
+    `ping`, `hasWorkers`, `setWorkTimeout`, `afterWorkSuccess`,
+    `afterWorkFailed` must declare compatible (covariant) return types.
+  - `pickTask($timeout = null): bool|array` (was untyped)
+  - `putTask($body, $params = []): string|int|bool` (was untyped)
+  - `ping($reconnect = true): bool` (was untyped)
+  - `hasWorkers($queue): bool|int|null` (was untyped; the `$queue` argument is
+    now required by the contract, children may keep a default)
+  - `connect(): bool`, `disconnect(): bool`, `bindRead($queue): bool`,
+    `bindWrite($queue): bool`, `afterWorkSuccess($workId): bool`,
+    `afterWorkFailed($workId): bool` (were declared `: void` and contradicted
+    every concrete implementation — this previously failed to load on PHP 8)
+  - `setWorkTimeout(?int $seconds = null): void` (was untyped)
+- `BackQ\Worker\AbstractWorker::$workTimeout` is no longer typed `int` (it is
+  plain untyped, default `null`). Child classes must not declare an `int`
+  (or `?int`) type for a property they inherit.
+- `BackQ\Adapter\Redis\Queue::$retryAfter` / `$blockFor` are untyped (matched
+  to the vendored `Illuminate\Queue\RedisQueue` parent).
+- `BackQ\Message\Guzzle::$request` is untyped (holds the string form; a psr7 v1
+  `Request` object has no `__toString`).
+- `BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\PublishMessageInterface::getMessage()`
+  is now `: string`.
+- `BackQ\Message\Guzzle` now serializes requests via
+  `GuzzleHttp\Psr7\Message::toString()` and parses with
+  `Message::parseRequest()` (psr7 &ge; 2.7; the `str()`/`parse_request()`
+  function shims were removed in psr7 v2).
+- Dependency floors raised: `symfony/process` `^5.4 | ^6.4 | ^7.0`,
+  `guzzlehttp/psr7` `^2.7`, `psr/log` `^1.1 | ^2.0 | ^3.0`,
+  `illuminate/queue`/`illuminate/redis` `^10`. `opis/closure` stays `^3.6`
+  (4.x removes the public `SerializableClosure` constructor that
+  `BackQ\Message\Closure` relies on).
+- Legacy APNs binary protocol support is **removed** (Apple deprecated the
+  protocol long ago; APNs stopped supporting the legacy binary interface on
+  port 2195). The following classes are deleted, as is the entire
+  `duccio/apns-php` dependency:
+  - `BackQ\Adapter\ApnsdPush`
+  - `BackQ\Worker\Apnsd`
+  - `BackQ\Publisher\Apnsd`
+  - `BackQ\Message\ApnsPHP`
+  - `BackQ\Logger` no longer implements `ApnsPHP_Log_Interface` (its
+    `log($sMessage, $debug = false)` API is unchanged).
+  - The `example/workers/apnsd.php` and `example/publishers/apnsd.php` examples
+    are removed.
+  - Replacement: the APNs HTTP/2 provider API, or AWS SNS via
+    `BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint\Publish` /
+    `BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint\Publish`.
+- Legacy GCM/FCM push support is **removed** (Google shut down GCM in 2019; the
+  code built on the ZF1 `Zend_Mobile_Push_*` classes, which are no longer
+  shipped). The `Zend_Mobile_Push` dependency is dropped and the following
+  classes are deleted:
+  - `BackQ\Adapter\Fcm`
+  - `BackQ\Message\Fcm`
+  - `BackQ\Worker\Fcm`
+  - `BackQ\Publisher\Fcm`
+  - Replacement: the FCM HTTP v1 API, or AWS SNS FCM platform endpoints via
+    `BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint\Publish` /
+    `BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint\Publish`.
+
+========================================
+2. New Features
+========================================
+
+- Test suite added under `tests/` (PHPUnit 10, `composer app-tests`), with
+  coverage of adapters, workers, publishers and messages.
+- Constructor property promotion: `BackQ\Adapter\Redis`, `BackQ\Message\Process`,
+  `BackQ\Adapter\Amazon\DynamoDb\QueueTableRow` (first param renamed `$payload`),
+  `BackQ\Adapter\IO\StreamIO`.
+- `str_contains` / `$e::class` / `final` class constants applied throughout
+  (`BackQ\Logger`, SNS platform-endpoint workers, `BackQ\Adapter\Nsq`).
+
+-------------------------------------------------------------------------------
 2.0.6
 
 1. Backward Incompatible Changes

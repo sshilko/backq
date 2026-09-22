@@ -8,7 +8,7 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
-use Backq\Adapter\AbstractAdapter;
+use BackQ\Adapter\AbstractAdapter;
 use BackQ\Adapter\Beanstalk;
 use BackQ\Adapter\Redis;
 use BackQ\Publisher\Process;
@@ -22,7 +22,7 @@ use Symfony\Component\Console\Output\ConsoleOutput;
  * Publishes a job into default queue="process"
  */
 
-include_once '../../../../../vendor/autoload.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
 
 final class MyProcessPublisher extends Process
 {

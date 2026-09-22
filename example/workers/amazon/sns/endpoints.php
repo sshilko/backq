@@ -7,7 +7,7 @@ class endpoints
 
     private SnsClient $snsClient;
 
-    private $platform = '';
+    private string $platform = '';
 
     public function __construct(string $platform, array $auth)
     {

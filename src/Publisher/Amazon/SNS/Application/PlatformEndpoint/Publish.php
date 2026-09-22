@@ -18,5 +18,5 @@ abstract class Publish extends AbstractPublisher
     /**
      * The queue will be used to publish to Aws endpoints
      */
-    protected string $queueName = 'aws_sns_endpoints_publish_';
+    protected $queueName = 'aws_sns_endpoints_publish_';
 }

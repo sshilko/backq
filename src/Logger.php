@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -10,19 +11,16 @@
 
 namespace BackQ;
 
-use ApnsPHP_Log_Interface;
 use function date;
 use function fclose;
 use function fopen;
 use function fwrite;
 use function getmypid;
-use function strpos;
-use function strstr;
+use function str_contains;
 use function trim;
 
-class Logger implements ApnsPHP_Log_Interface
+class Logger
 {
-
     protected $logFile;
 
     public function __construct($logFile)
@@ -32,7 +30,7 @@ class Logger implements ApnsPHP_Log_Interface
 
     public function log($sMessage, $debug = false): void
     {
-        if (!$debug && (false !== strpos($sMessage, 'INFO:') || false !== strstr($sMessage, 'STATUS:'))) {
+        if (!$debug && (false !== str_contains($sMessage, 'INFO:') || str_contains($sMessage, 'STATUS:'))) {
             return;
         }
 

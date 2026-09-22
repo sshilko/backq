@@ -14,7 +14,7 @@ use BackQ\Worker\AProcess;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
-include_once '../../../../../vendor/autoload.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
 
 /**
  * Worker

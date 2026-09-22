@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -13,6 +14,7 @@ namespace BackQ\Adapter;
 use Datetime;
 use RuntimeException;
 use Throwable;
+
 use function array_merge;
 use function floor;
 use function gethostname;
@@ -37,42 +39,28 @@ class Nsq extends AbstractAdapter
     /**
      * Request messages
      */
-    protected const PROTO_VERSION   = "  V2";
-    protected const PROTO_IDENTIFY  = "IDENTIFY";
-    protected const PROTO_PUBLISH   = "PUB %s";
-    protected const PROTO_PUBDELAY  = "DPUB %s %s";
-    protected const PROTO_SUBSCRIBE = "SUB %s %s";
-    protected const PROTO_READY     = "RDY %s";
-    protected const PROTO_REQUEUE   = "REQ %s %s";
-    protected const PROTO_FINISH    = "FIN %s";
-    protected const PROTO_NOOP      = "NOP";
-    protected const PROTO_AUTH      = "AUTH";
-    protected const PROTO_CLOSE     = "CLS";
-
-    /**
-     * Responses expected from the server
-     */
-    protected const RESPONSE_HEARTBEAT = "_heartbeat_";
-    protected const RESPONSE_SUCCESS   = "OK";
-    protected const RESPONSE_CLOSED    = "CLOSE_WAIT";
-
-    /**
-     * Reponse frame types defined in the protocol
-     */
-    protected const FRAME_TYPE_RESPONSE = 0;
-    protected const FRAME_TYPE_ERROR    = 1;
-    protected const FRAME_TYPE_MESSAGE  = 2;
-
-    protected const HEARTBEAT_TTR_RATION = 1.5;
-
-    /**
-     * Client UserAgent
-     */
-    protected const IDENTIFY_USER_AGENT = "BackQ\Nsq";
-
-    protected const STATE_BINDWRITE = 1;
-    protected const STATE_BINDREAD  = 2;
-    protected const STATE_NOTHING   = 0;
+    protected final const PROTO_VERSION   = "  V2";
+    protected final const PROTO_IDENTIFY  = "IDENTIFY";
+    protected final const PROTO_PUBLISH   = "PUB %s";
+    protected final const PROTO_PUBDELAY  = "DPUB %s %s";
+    protected final const PROTO_SUBSCRIBE = "SUB %s %s";
+    protected final const PROTO_READY     = "RDY %s";
+    protected final const PROTO_REQUEUE   = "REQ %s %s";
+    protected final const PROTO_FINISH    = "FIN %s";
+    protected final const PROTO_NOOP      = "NOP";
+    protected final const PROTO_AUTH      = "AUTH";
+    protected final const PROTO_CLOSE     = "CLS";
+    protected final const RESPONSE_HEARTBEAT = "_heartbeat_";
+    protected final const RESPONSE_SUCCESS   = "OK";
+    protected final const RESPONSE_CLOSED    = "CLOSE_WAIT";
+    protected final const FRAME_TYPE_RESPONSE = 0;
+    protected final const FRAME_TYPE_ERROR    = 1;
+    protected final const FRAME_TYPE_MESSAGE  = 2;
+    protected final const HEARTBEAT_TTR_RATION = 1.5;
+    protected final const IDENTIFY_USER_AGENT = "BackQ\Nsq";
+    protected final const STATE_BINDWRITE = 1;
+    protected final const STATE_BINDREAD  = 2;
+    protected final const STATE_NOTHING   = 0;
 
     protected string $host;
 
@@ -119,7 +107,7 @@ class Nsq extends AbstractAdapter
 
     protected $authentication = false;
 
-    private IO\StreamIO $_io;
+    private ?IO\StreamIO $_io = null;
 
     private $connected = false;
 
@@ -169,7 +157,7 @@ class Nsq extends AbstractAdapter
     /**
      * Disconnects from queue
      */
-    public function disconnect()
+    public function disconnect(): bool
     {
         if (true === $this->connected) {
             try {
@@ -200,7 +188,7 @@ class Nsq extends AbstractAdapter
     /**
      * Returns TRUE if connection is alive
      */
-    public function ping($reconnect = true)
+    public function ping($reconnect = true): bool
     {
         if ($this->connected && $this->_io) {
             return $this->_io->isSocketReady();
@@ -298,7 +286,7 @@ class Nsq extends AbstractAdapter
      * @param $timeout integer $timeout If given specifies number of seconds to wait for a job, '0' returns immediately
      * @return bool|array [id, payload]
      */
-    public function pickTask($timeout = null)
+    public function pickTask($timeout = null): bool|array
     {
         if ($timeout) {
             $this->logInfo(self::class . '.' . __FUNCTION__ . ' arguments deprecated');
@@ -339,7 +327,7 @@ class Nsq extends AbstractAdapter
             $message = substr($messageFrame, 26);
             $msgId   = substr($messageFrame, 10, 16);
 
-            $time = floor(unpack("J", substr($messageFrame, 0, 8))[1]/1000000000);
+            $time = floor(unpack("J", substr($messageFrame, 0, 8))[1] / 1000000000);
 
             return [$msgId, $message, ['time' => DateTime::createFromFormat("U", $time)->format('c'),
                 'attempts' => unpack("n", substr($messageFrame, 8, 2))[1]]];
@@ -377,10 +365,12 @@ class Nsq extends AbstractAdapter
                  * nsqd will timeout and forcefully close a client connection that it has not heard from
                  * @see http://nsq.io/clients/building_client_libraries.html
                  */
-                if ($this->config['heartbeat_interval_ms'] &&
+                if (
+                    $this->config['heartbeat_interval_ms'] &&
                     (round($params[self::PARAM_JOBTTR] * 1000) > round(
                         $this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION
-                    ))) {
+                    ))
+                ) {
                     throw new RuntimeException('Desired ' . self::PARAM_JOBTTR .
                                                ' param ' . $params[self::PARAM_JOBTTR] .
                                                's > ' . ($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION) . 'ms (x' . self::HEARTBEAT_TTR_RATION . ' heartbeat), ' .
@@ -390,7 +380,8 @@ class Nsq extends AbstractAdapter
             }
 
             if (isset($params[self::PARAM_READYWAIT])) {
-                if ($this->config['max_req_timeout']
+                if (
+                    $this->config['max_req_timeout']
                     && ($params[self::PARAM_READYWAIT] > $this->config['max_req_timeout'])
                 ) {
                     /**
@@ -431,7 +422,7 @@ class Nsq extends AbstractAdapter
     /**
      * connect and negotiate protocol
      */
-    public function connect()
+    public function connect(): bool
     {
         if (isset($this->_io) || $this->connected) {
             $this->disconnect();

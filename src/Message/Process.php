@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -12,17 +13,6 @@ namespace BackQ\Message;
 
 class Process extends AbstractMessage
 {
-
-    private $commandline;
-
-    private $cwd;
-
-    private $env;
-
-    private $input;
-
-    private $timeout;
-
     /**
      * Timestamp until has to be done, otherwise ignored
      */
@@ -37,17 +27,12 @@ class Process extends AbstractMessage
      * @param float $timeout
      */
     public function __construct(
-        $commandline,
-        ?string $cwd = null,
-        ?array $env = null,
-        $input = null,
-        ?float $timeout = 60
+        private $commandline,
+        private ?string $cwd = null,
+        private ?array $env = null,
+        private $input = null,
+        private ?float $timeout = 60
     ) {
-        $this->commandline = $commandline;
-        $this->cwd = $cwd;
-        $this->env = $env;
-        $this->input = $input;
-        $this->timeout = $timeout;
     }
 
     public function getDeadline()

@@ -25,13 +25,13 @@ class Queue extends RedisQueue
      *
      * @see https://laravel.com/docs/5.7/queues#retrying-failed-jobs
      */
-    protected ?int $retryAfter = null;
+    protected $retryAfter = null;
 
     /**
      * The maximum number of seconds to block for a job.
      *
      */
-    protected ?int $blockFor = null;
+    protected $blockFor = null;
 
     /**
      * @param int|null $seconds

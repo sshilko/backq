@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -14,6 +15,7 @@ use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RegisterMessageInterfa
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
 use Throwable;
+
 use function date;
 use function error_log;
 use function get_class;
@@ -24,7 +26,6 @@ use function unserialize;
 
 class Register extends PlatformEndpoint
 {
-
     public $workTimeout = 5;
 
     public function run(): void
@@ -73,21 +74,25 @@ class Register extends PlatformEndpoint
                             'Attributes'             => $message->getAttributes(),
                         ]);
                     } catch (Throwable $e) {
-                        if (is_subclass_of(
-                            '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
-                            get_class($e)
-                        )) {
+                        if (
+                            is_subclass_of(
+                                '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
+                                $e::class
+                            )
+                        ) {
                             /**
                              * We can't do anything on specific errors and then the job is marked as processed
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html#API_CreatePlatformEndpoint_Errors
                              * @var $e SnsException
                              */
-                            if (in_array(
-                                $e->getAwsErrorCode(),
-                                [SnsException::AUTHERROR,
+                            if (
+                                in_array(
+                                    $e->getAwsErrorCode(),
+                                    [SnsException::AUTHERROR,
                                     SnsException::INVALID_PARAM,
                                     SnsException::NOTFOUND]
-                            )) {
+                                )
+                            ) {
                                 $work->send(true);
 
                                 continue;
@@ -98,11 +103,13 @@ class Register extends PlatformEndpoint
                              * temporary issue and we can retry creating the endpoint
                              * Same process for general network issues
                              */
-                            if (SnsException::INTERNAL === $e->getAwsErrorCode() ||
+                            if (
+                                SnsException::INTERNAL === $e->getAwsErrorCode() ||
                                 is_subclass_of(
                                     '\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
-                                    get_class($e->getPrevious())
-                                )) {
+                                    $e->getPrevious()::class
+                                )
+                            ) {
                                 /**
                                  * Only retry if the max threshold has not been reached
                                  */

@@ -14,10 +14,6 @@ x-app: &app
     options:
       max-size: "1m"
       max-file: "2"
-  #  healthcheck:
-  #    test: ["CMD", "nc", "-w1", "-zv", "mysql", "3306"]
-  #    timeout: 2s
-  #    start_period: 10s
   ulimits:
     nproc: 65535
     nofile:
@@ -34,11 +30,14 @@ x-app: &app
     COMPOSER_PROCESS_TIMEOUT: 300
     COMPOSER_NO_INTERACTION: "1"
     COMPOSER_DISABLE_XDEBUG_WARN: "1"
+    BACKQ_REDIS_HOST: "redis"
+    BACKQ_REDIS_PORT: "6379"
+    BACKQ_NSQD_HOST: "nsq"
+    BACKQ_NSQD_PORT: "4150"
   extra_hosts:
     - "host.docker.internal:host-gateway"
   restart: on-failure:2
 
-version: "3.7"
 services:
   app.php81:
     <<: *app
@@ -47,3 +46,54 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.php81
+    depends_on:
+      redis:
+        condition: service_healthy
+      nsq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "-v"]
+      interval: 10s
+      timeout: 1s
+      retries: 2
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    container_name: backq-redis
+    platform: linux/amd64
+    logging:
+      options:
+        max-size: "1m"
+        max-file: "2"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    ports:
+      - "127.0.0.1:16379:6379"
+
+  nsq:
+    image: nsqio/nsq:v1.3.0
+    container_name: backq-nsq
+    command: ["/nsqd", "--broadcast-address=nsq", "--data-path=/data"]
+    platform: linux/amd64
+    logging:
+      options:
+        max-size: "1m"
+        max-file: "2"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4151/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    ports:
+      - "127.0.0.1:14150:4150"
+      - "127.0.0.1:14151:4151"

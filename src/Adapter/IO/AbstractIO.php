@@ -12,22 +12,22 @@ namespace BackQ\Adapter\IO;
 
 abstract class AbstractIO
 {
-    abstract public function read($n): void;
+    abstract public function read($n);
 
     abstract public function write($data): void;
 
     abstract public function close(): void;
 
-    abstract public function selectRead($sec, $usec): void;
+    abstract public function selectRead($sec, $usec);
 
-    abstract public function selectWrite($sec, $usec): void;
+    abstract public function selectWrite($sec, $usec);
 
     /**
      * Advanced functions -->
      */
-    abstract public function stream_get_contents(int $length): void;
+    abstract public function stream_get_contents(int $length);
 
-    abstract public function stream_get_line(int $length, string $delimiter): void;
+    abstract public function stream_get_line(int $length, string $delimiter);
 
     abstract public function stream_set_timeout($read_write_timeout): void;
     /**

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -14,6 +15,7 @@ use BackQ\Adapter\IO\Exception\RuntimeException;
 use BackQ\Adapter\IO\Exception\TimeoutException;
 use Exception;
 use Throwable;
+
 use function error_reporting;
 use function fclose;
 use function feof;
@@ -40,6 +42,7 @@ use function strlen;
 use function strval;
 use function substr;
 use function usleep;
+
 use const E_ALL;
 use const STREAM_CLIENT_CONNECT;
 use const STREAM_CLIENT_PERSISTENT;
@@ -64,9 +67,7 @@ class StreamIO extends AbstractIO
      */
     public int $connRetryIntervalMs = 50;
 
-    private $sock       = null;
-
-    private $persistent = null;
+    private $sock = null;
 
     /**
      * StreamIO constructor.
@@ -89,17 +90,16 @@ class StreamIO extends AbstractIO
         $read_write_timeout = null,
         $context = null,
         $blocking = false,
-        string $persistent = ''
+        private string $persistent = ''
     ) {
         $errstr = $errno  = null;
         $this->sock       = null;
-        $this->persistent = (bool) $persistent;
         $triesLeft        = $this->connAttempts;
 
         while (!$this->sock && $triesLeft > 0) {
             if ($context) {
-                $remote = sprintf('tls://%s:%s/%s', $host, $port, strval($persistent));
-                $this->sock = $persistent ? @stream_socket_client(
+                $remote = sprintf('tls://%s:%s/%s', $host, $port, strval($this->persistent));
+                $this->sock = $this->persistent ? @stream_socket_client(
                     $remote,
                     $errno,
                     $errstr,
@@ -115,8 +115,8 @@ class StreamIO extends AbstractIO
                     $context
                 );
             } else {
-                $remote = sprintf('tcp://%s:%s/%s', $host, $port, strval($persistent));
-                $this->sock = $persistent ? @stream_socket_client(
+                $remote = sprintf('tcp://%s:%s/%s', $host, $port, strval($this->persistent));
+                $this->sock = $this->persistent ? @stream_socket_client(
                     $remote,
                     $errno,
                     $errstr,
@@ -129,7 +129,7 @@ class StreamIO extends AbstractIO
                 usleep($this->connRetryIntervalMs * 1000);
             }
         }
-    
+
         if (!$this->sock) {
             throw new RuntimeException("Error Connecting to server($errno): $errstr ");
         }

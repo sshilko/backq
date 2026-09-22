@@ -10,7 +10,7 @@
 
 namespace BackQ\Publisher;
 
-use Backq\Adapter\AbstractAdapter;
+use BackQ\Adapter\AbstractAdapter;
 use function array_keys;
 use function array_search;
 use function array_values;

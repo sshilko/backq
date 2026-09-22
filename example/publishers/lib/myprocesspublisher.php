@@ -8,7 +8,7 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
-use Backq\Adapter\AbstractAdapter;
+use BackQ\Adapter\AbstractAdapter;
 use BackQ\Adapter\Beanstalk;
 use BackQ\Publisher\Process;
 use Symfony\Component\Console\Logger\ConsoleLogger;

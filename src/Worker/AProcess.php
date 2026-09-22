@@ -13,6 +13,7 @@ namespace BackQ\Worker;
 use Symfony\Component\Process\Exception\ProcessSignaledException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
+use RuntimeException;
 use Throwable;
 use function assert;
 use function error_log;

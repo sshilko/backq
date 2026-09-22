@@ -31,61 +31,67 @@ abstract class AbstractAdapter
     /**
      * Connect to server
      */
-    abstract public function connect(): void;
+    abstract public function connect(): bool;
 
     /**
      * Disconnect from server
      */
-    abstract public function disconnect(): void;
+    abstract public function disconnect(): bool;
 
     /**
      * Subscribe to server queue
      */
-    abstract public function bindRead($queue): void;
+    abstract public function bindRead($queue): bool;
 
     /**
      * Prepare to write to server queue
      */
-    abstract public function bindWrite($queue): void;
+    abstract public function bindWrite($queue): bool;
 
     /**
      * Get job to process
-     * @param int $timeout seconds
+     * @param int|null $timeout seconds
+     *
+     * @return bool|array [id, payload]
      */
-    abstract public function pickTask(): void;
+    abstract public function pickTask($timeout = null);
 
     /**
      * Put job to process
+     *
+     * @return bool|string|int job id or false on failure
      */
-    abstract public function putTask($body, $params = []): void;
+    abstract public function putTask($body, $params = []);
 
     /**
      * Acknowledge server: callback after successfully processing job
      */
-    abstract public function afterWorkSuccess($workId): void;
+    abstract public function afterWorkSuccess($workId): bool;
 
     /**
      * Acknowledge server: callback after failing to process job
      */
-    abstract public function afterWorkFailed($workId): void;
+    abstract public function afterWorkFailed($workId): bool;
 
     /**
      * Ping if still has alive connection to server
+     *
+     * @param bool $reconnect
      */
-    abstract public function ping(): void;
+    abstract public function ping($reconnect = true): bool;
 
     /**
      * Is there workers ready for job immediately
+     *
+     * @return bool|int|null
      */
-    abstract public function hasWorkers($queue): void;
+    abstract public function hasWorkers($queue);
 
     /**
      * Preffered limit of one work cycle
      * @param int|null $seconds
-     *
-     * @return null
      */
-    abstract public function setWorkTimeout(?int $seconds = null);
+    abstract public function setWorkTimeout(?int $seconds = null): void;
 
     /**
      * @param LoggerInterface $logger
@@ -108,7 +114,7 @@ abstract class AbstractAdapter
      */
     public function logInfo(string $message): void
     {
-        if ($this->logger) {
+        if (isset($this->logger)) {
             $this->logger->info($message);
         }
     }
@@ -118,7 +124,7 @@ abstract class AbstractAdapter
      */
     public function logDebug(string $message): void
     {
-        if ($this->logger) {
+        if (isset($this->logger)) {
             $this->logger->debug($message);
         }
     }
@@ -128,7 +134,7 @@ abstract class AbstractAdapter
      */
     public function logError(string $message): void
     {
-        if ($this->logger) {
+        if (isset($this->logger)) {
             $this->logger->error($message);
         }
 

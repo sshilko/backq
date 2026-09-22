@@ -34,7 +34,7 @@ abstract class AbstractWorker
      * Work timeout value
      *
      */
-    public int $workTimeout = null;
+    public $workTimeout = null;
 
     /**
      * Whether syscalls should be delayed
@@ -147,7 +147,7 @@ abstract class AbstractWorker
      */
     public function logInfo(string $message): void
     {
-        if ($this->logger) {
+        if (isset($this->logger)) {
             $this->logger->info($message);
         }
     }
@@ -166,7 +166,7 @@ abstract class AbstractWorker
      */
     public function logDebug(string $message): void
     {
-        if ($this->logger) {
+        if (isset($this->logger)) {
             $this->logger->debug($message);
         }
     }
@@ -176,7 +176,7 @@ abstract class AbstractWorker
      */
     public function logError(string $message): void
     {
-        if ($this->logger) {
+        if (isset($this->logger)) {
             $this->logger->error($message);
         }
 

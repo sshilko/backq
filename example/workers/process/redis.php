@@ -19,7 +19,7 @@ use Symfony\Component\Console\Output\ConsoleOutput;
  * Queues a process execution
  * Publishes a job into default queue="process"
  */
-include_once '../../../../../../vendor/autoload.php';
+require_once __DIR__ . '/../../../vendor/autoload.php';
 
 $command = 'echo $( date +%s ) >> /tmp/test';
 

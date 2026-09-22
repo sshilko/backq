@@ -18,5 +18,5 @@ abstract class Register extends AbstractPublisher
     /**
      * The queue will be used to create AWS platform endpoints
      */
-    protected string $queueName = 'aws_sns_endpoints_register_';
+    protected $queueName = 'aws_sns_endpoints_register_';
 }

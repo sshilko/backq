@@ -8,7 +8,7 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
-use Backq\Adapter\AbstractAdapter;
+use BackQ\Adapter\AbstractAdapter;
 use BackQ\Adapter\Beanstalk;
 use BackQ\Message\Process;
 use BackQ\Publisher\Serialized;
@@ -20,8 +20,8 @@ use Symfony\Component\Console\Output\ConsoleOutput;
  * Delays `Process` message execution via Serialized worker
  */
 
-include_once '../../../../../vendor/autoload.php';
-include_once 'lib/myprocesspublisher.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/lib/myprocesspublisher.php';
 
 final class MySerializedPublisher extends Serialized
 {

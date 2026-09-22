@@ -9,14 +9,11 @@ parameters:
     level: 0
     tmpDir: tmp
     paths:
-        - src
+        - ../src
     bootstrapFiles:
         - ../vendor/autoload.php
-        - ../src/Zend/Http/Client/Adapter/Psr7.php
     excludePaths:
         - ../example/*
-    ignoreErrors:
-        - '#not covariant#'
     parallel:
         maximumNumberOfProcesses: 4
         processTimeout: 300.0

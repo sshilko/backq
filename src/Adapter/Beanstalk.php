@@ -70,11 +70,9 @@ class Beanstalk extends AbstractAdapter
         return false;
     }
 
-    public function setWorkTimeout(?int $seconds = null)
+    public function setWorkTimeout(?int $seconds = null): void
     {
         $this->workTimeout = $seconds;
-
-        return null;
     }
 
     /**
@@ -130,7 +128,7 @@ class Beanstalk extends AbstractAdapter
     /**
      * Returns TRUE if connection is alive
      */
-    public function ping($reconnect = true)
+    public function ping($reconnect = true): bool
     {
         try {
             /**
@@ -149,6 +147,8 @@ class Beanstalk extends AbstractAdapter
         } catch (RuntimeException $e) {
             $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
         }
+
+        return false;
     }
 
     /**
@@ -195,7 +195,7 @@ class Beanstalk extends AbstractAdapter
      * @param $timeout integer $timeout If given specifies number of seconds to wait for a job, '0' returns immediately
      * @return bool|array [id, payload]
      */
-    public function pickTask()
+    public function pickTask($timeout = null): bool|array
     {
         if ($this->connected) {
             try {
@@ -252,7 +252,7 @@ class Beanstalk extends AbstractAdapter
      * @return int|bool `false` on  otherwise an integer indicating
  * the job id.
      */
-    public function putTask($body, $params = [])
+    public function putTask($body, $params = []): string|bool
     {
         if ($this->connected) {
             try {

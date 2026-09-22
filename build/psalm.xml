@@ -10,7 +10,7 @@
  @license https://opensource.org/licenses/mit-license.php MIT
 -->
 <psalm
-    phpVersion="7.4"
+    phpVersion="8.1"
     threads="1"
     findUnusedCode="false"
     findUnusedVariablesAndParams="true"

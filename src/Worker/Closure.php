@@ -19,9 +19,9 @@ use function unserialize;
 class Closure extends AbstractWorker
 {
 
-    public int $workTimeout = 5;
+    public $workTimeout = 5;
 
-    protected string $queueName = 'closure';
+    protected $queueName = 'closure';
 
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh

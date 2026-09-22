@@ -17,7 +17,6 @@
 <!-- https://github.com/slevomat/coding-standard -->
 <!-- https://github.com/symplify/easy-coding-standard#ignore-what-you-cant-fix -->
     <exclude-pattern>*/vendor/*</exclude-pattern>
-    <exclude-pattern>*/Zend/*</exclude-pattern>
     <exclude-pattern>*/example/*</exclude-pattern>
 
     <arg name="error-severity" value="1" />

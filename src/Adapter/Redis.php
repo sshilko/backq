@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2021 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
@@ -19,14 +20,15 @@ use Illuminate\Queue\Capsule\Manager;
 use Illuminate\Queue\Jobs\RedisJob;
 use Illuminate\Redis\RedisManager;
 use InvalidArgumentException;
-use Predis\ClientInterface;
 use RuntimeException;
 use Throwable;
+
 use function assert;
 use function count;
 use function sleep;
 use function trigger_error;
 use function var_export;
+
 use const E_USER_WARNING;
 
 /**
@@ -49,32 +51,11 @@ class Redis extends AbstractAdapter
     private const REDIS_DRIVER     = 'phpredis';
     private const REDIS_DRIVER_OWN = 'redis-backq';
 
-    protected string $host = 'localhost';
-
-    protected int $port = 6379;
-
     private $connected = false;
 
     private Container $app;
 
-    private string $prefix = '';
-
-    /**
-     * @see Redis::OPT_READ_TIMEOUT
-     */
-    private int $read_timeout;
-
-    private int $timeout;
-
-    private int $database_id = 0;
-
     private Manager $queue;
-
-    private bool $persistent;
-
-    private int $persistent_id;
-
-    private string $auth_password;
 
     private string $queueName;
 
@@ -84,6 +65,8 @@ class Redis extends AbstractAdapter
     private $reservedJobs = [];
 
     private $state     = self::STATE_NOTHING;
+
+    private array $stateData = [];
 
     /**
      * Since Laravel 5.8 safe
@@ -119,27 +102,17 @@ class Redis extends AbstractAdapter
     private $retryAfter = null;
 
     public function __construct(
-        string $host = '127.0.0.1',
-        int $port = 6379,
-        bool $persistent = false,
-        ?int $persistent_id = null,
-        ?string $prefix = null,
-        int $timeout = 10,
-        int $read_timeout = 10,
-        int $database_id = 0,
-        ?string $auth_password = null
+        protected string $host = '127.0.0.1',
+        protected int $port = 6379,
+        private bool $persistent = false,
+        private ?int $persistent_id = null,
+        private ?string $prefix = null,
+        private int $timeout = 10,
+        private int $read_timeout = 10,
+        private int $database_id = 0,
+        private ?string $auth_password = null
     ) {
-        $this->host    = $host;
-        $this->port    = $port;
-        $this->prefix  = $prefix;
-        $this->timeout = $timeout;
-        $this->read_timeout  = $read_timeout;
-        $this->auth_password = $auth_password;
-        $this->persistent    = $persistent;
-        $this->persistent_id = $persistent_id;
-        $this->database_id   = $database_id;
-
-        $this->app  = new Redis\App();
+        $this->app = new Redis\App();
 
         $this->app->bind('exception.handler', static function () {
             return new class implements ExceptionHandler
@@ -209,7 +182,7 @@ class Redis extends AbstractAdapter
     /**
      * Disconnects from queue
      */
-    public function disconnect()
+    public function disconnect(): bool
     {
         $this->logDebug('Disconnecting');
         if (true === $this->connected) {
@@ -271,13 +244,13 @@ class Redis extends AbstractAdapter
     /**
      * Returns TRUE if connection is alive
      */
-    public function ping($reconnect = true)
+    public function ping($reconnect = true): bool
     {
         if ($this->connected && $this->queue) {
             $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
             assert($redisQueue instanceof Queue);
             $redis = $redisQueue->getRedis();
-            assert($redis instanceof ClientInterface);
+            assert($redis instanceof \Redis);
             $pong  = $redis->ping();
 
             if (true === $pong || '+PONG' === $pong) {
@@ -299,8 +272,10 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if ($this->connected && (self::STATE_BINDREAD === $this->state ||
-                                 self::STATE_BINDWRITE === $this->state)) {
+        if (
+            $this->connected && (self::STATE_BINDREAD === $this->state ||
+                                 self::STATE_BINDWRITE === $this->state)
+        ) {
             $this->logDebug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
 
             /** @var RedisJob $redisJob */
@@ -332,8 +307,10 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if ($this->connected && (self::STATE_BINDREAD === $this->state ||
-                                 self::STATE_BINDWRITE === $this->state)) {
+        if (
+            $this->connected && (self::STATE_BINDREAD === $this->state ||
+                                 self::STATE_BINDWRITE === $this->state)
+        ) {
             $this->logDebug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
 
             /** @var RedisJob $redisJob */
@@ -407,7 +384,7 @@ class Redis extends AbstractAdapter
      * @param $timeout integer $timeout If given specifies number of seconds to wait for a job, '0' returns immediately
      * @return bool|array [id, payload]
      */
-    public function pickTask($timeout = null)
+    public function pickTask($timeout = null): bool|array
     {
         /**
          * @todo deny picking task if already picked ?
@@ -418,8 +395,10 @@ class Redis extends AbstractAdapter
             $this->blockFor = $timeout;
         }
 
-        if ($this->connected && (self::STATE_BINDREAD === $this->state ||
-                                 self::STATE_BINDWRITE === $this->state)) {
+        if (
+            $this->connected && (self::STATE_BINDREAD === $this->state ||
+                                 self::STATE_BINDWRITE === $this->state)
+        ) {
             $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
             assert($redisQueue instanceof Queue);
             if ($this->blockFor) {
@@ -496,12 +475,14 @@ class Redis extends AbstractAdapter
      * @param  string $data The job body.
      * @return string|false job-id on success
      */
-    public function putTask($body, $params = [])
+    public function putTask($body, $params = []): string|int|bool
     {
         $this->logDebug(__FUNCTION__);
 
-        if ($this->connected && (self::STATE_BINDREAD === $this->state ||
-                                 self::STATE_BINDWRITE === $this->state)) {
+        if (
+            $this->connected && (self::STATE_BINDREAD === $this->state ||
+                                 self::STATE_BINDWRITE === $this->state)
+        ) {
             $this->logDebug(
                 __FUNCTION__ . ' is connected and ready to: ' . (self::STATE_BINDREAD === $this->state ? 'read' : 'write')
             );
@@ -560,7 +541,7 @@ class Redis extends AbstractAdapter
     /**
      * connect and negotiate protocol
      */
-    public function connect()
+    public function connect(): bool
     {
         $this->logDebug(__FUNCTION__);
 
@@ -612,7 +593,7 @@ class Redis extends AbstractAdapter
             ['driver'     => self::REDIS_DRIVER_OWN,
                 'connection' => 'default',
                 'block_for'  => (self::BLOCKFOR_EMULATE > 0 ? null : $this->blockFor),
-                'retry_after'=> ($this->retryAfter ?: null),
+                'retry_after' => ($this->retryAfter ?: null),
                 'queue'      => $this->queueName],
             self::CONNECTION_NAME
         );

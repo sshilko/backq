@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -14,6 +15,7 @@ use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\PublishMessageInterfac
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
 use Throwable;
+
 use function date;
 use function error_log;
 use function get_class;
@@ -21,11 +23,11 @@ use function gettype;
 use function is_subclass_of;
 use function trigger_error;
 use function unserialize;
+
 use const E_USER_WARNING;
 
 class Publish extends PlatformEndpoint
 {
-
     public $workTimeout = 5;
 
     public function run(): void
@@ -85,10 +87,12 @@ class Publish extends PlatformEndpoint
 
                         $this->logDebug('SNS Client delivered message to endpoint');
                     } catch (Throwable $e) {
-                        if (is_subclass_of(
-                            '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
-                            get_class($e)
-                        )) {
+                        if (
+                            is_subclass_of(
+                                '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
+                                $e::class
+                            )
+                        ) {
 
                             /**
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_Publish.html#API_Publish_Errors
@@ -113,11 +117,13 @@ class Publish extends PlatformEndpoint
                              * Aws Internal errors and general network error
                              * will cause the job to be sent back to queue
                              */
-                            if (SnsException::INTERNAL === $e->getAwsErrorCode() ||
+                            if (
+                                SnsException::INTERNAL === $e->getAwsErrorCode() ||
                                 is_subclass_of(
                                     '\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
-                                    get_class($e->getPrevious())
-                                )) {
+                                    $e->getPrevious()::class
+                                )
+                            ) {
                                 /**
                                  * Only retry if the max threshold has not been reached
                                  */

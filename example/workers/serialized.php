@@ -13,8 +13,8 @@ use BackQ\Worker\Serialized;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
-include_once '../../../../../vendor/autoload.php';
-include_once '../publishers/lib/myprocesspublisher.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../publishers/lib/myprocesspublisher.php';
 
 /**
  * Worker

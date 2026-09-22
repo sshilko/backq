@@ -151,7 +151,7 @@ class DynamoSQS extends AbstractAdapter
         return true;
     }
 
-    public function pickTask()
+    public function pickTask($timeout = null): bool|array
     {
         $this->logDebug(__FUNCTION__);
 
@@ -201,7 +201,7 @@ class DynamoSQS extends AbstractAdapter
         return false;
     }
 
-    public function putTask($body, $params = [])
+    public function putTask($body, $params = []): bool
     {
         $this->logDebug(__FUNCTION__);
 
@@ -277,7 +277,7 @@ class DynamoSQS extends AbstractAdapter
         return true;
     }
 
-    public function ping(): bool
+    public function ping($reconnect = true): bool
     {
         return true;
     }
@@ -302,11 +302,9 @@ class DynamoSQS extends AbstractAdapter
      * @param int|null $seconds
      * @return null
      */
-    public function setWorkTimeout(?int $seconds = null)
+    public function setWorkTimeout(?int $seconds = null): void
     {
         $this->workTimeout = $seconds;
-
-        return null;
     }
 
     /**

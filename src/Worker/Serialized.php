@@ -20,7 +20,7 @@ use function unserialize;
 class Serialized extends AbstractWorker
 {
 
-    public int $workTimeout = 5;
+    public $workTimeout = 5;
 
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh

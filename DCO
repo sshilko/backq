@@ -1,3 +1,21 @@
+BackQ - Developer Certificate of Origin
+========================================
+
+This project (BackQ, maintained by sshilko) uses the Developer Certificate of
+Origin with respect to all inbound contributions. Contributors to this
+repository agree to the Developer's Certificate of Origin 1.1 below by adding
+a `Signed-off-by:` line to their commits, e.g.:
+
+    Signed-off-by: Name <email>
+
+The canonical text of the Developer Certificate of Origin 1.1 is reproduced
+below, unmodified, as published by the Linux Foundation (the copyright note is
+a required attribution for that verbatim text and does not indicate ownership
+of this project; neither the Linux Foundation nor any other third party owns
+the BackQ codebase).
+
+---------------------------------
+
 Developer Certificate of Origin
 Version 1.1
 
