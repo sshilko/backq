@@ -327,8 +327,9 @@ class StreamIO extends AbstractIO
     public function close(): void
     {
         if (is_resource($this->sock)) {
-            stream_socket_shutdown($this->sock, STREAM_SHUT_RDWR);
-            fclose($this->sock);
+            $resource = $this->sock;
+            stream_socket_shutdown($resource, STREAM_SHUT_RDWR);
+            fclose($resource);
         }
         $this->sock = null;
     }
@@ -450,6 +451,6 @@ class StreamIO extends AbstractIO
 
         $info = stream_get_meta_data($sock);
 
-        return (bool) $info['eof'] || feof($sock) || (bool) $info['timed_out'];
+        return $info['eof'] || feof($sock) || $info['timed_out'];
     }
 }

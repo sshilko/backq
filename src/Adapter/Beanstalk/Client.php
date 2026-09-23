@@ -259,7 +259,7 @@ class Client extends \Beanstalk\Client
                 /**
                  * +2 for trailing "\r\n"
                  */
-                $packet = $io->stream_get_contents((int) $length + 2);
+                $packet = $io->stream_get_contents($length + 2);
                 if (false === $packet) {
                     /**
                      * stream_get_contents returns false on failure
@@ -274,7 +274,7 @@ class Client extends \Beanstalk\Client
                     return false;
                 }
 
-                throw new RuntimeException($ex->getMessage(), (int) $ex->getCode());
+                throw new RuntimeException($ex->getMessage(), $ex->getCode());
             }
         } else {
             /**
