@@ -17,7 +17,6 @@ use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
 use Override;
 use Throwable;
-
 use function date;
 use function error_log;
 use function gettype;
@@ -26,6 +25,7 @@ use function unserialize;
 
 class Register extends PlatformEndpoint
 {
+
     public ?int $workTimeout = 5;
 
     #[Override]
@@ -70,9 +70,9 @@ class Register extends PlatformEndpoint
 
                     try {
                         $endpointResult = $this->snsClient->createPlatformEndpoint([
+                            'Attributes'             => $message->getAttributes(),
                             'PlatformApplicationArn' => $message->getApplicationArn(),
                             'Token'                  => $message->getToken(),
-                            'Attributes'             => $message->getAttributes(),
                         ]);
                     } catch (Throwable $e) {
                         if ($e instanceof SnsException) {
@@ -80,13 +80,12 @@ class Register extends PlatformEndpoint
                              * We can't do anything on specific errors and then the job is marked as processed
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html#API_CreatePlatformEndpoint_Errors
                              */
-                            if (
-                                in_array(
-                                    $e->getAwsErrorCode(),
-                                    [SnsException::AUTHERROR,
+                            if (in_array(
+                                $e->getAwsErrorCode(),
+                                [SnsException::AUTHERROR,
                                     SnsException::INVALID_PARAM,
                                     SnsException::NOTFOUND]
-                                )
+                            )
                             ) {
                                 $work->send(true);
 
@@ -98,8 +97,7 @@ class Register extends PlatformEndpoint
                              * temporary issue and we can retry creating the endpoint
                              * Same process for general network issues
                              */
-                            if (
-                                SnsException::INTERNAL === $e->getAwsErrorCode() ||
+                            if (SnsException::INTERNAL === $e->getAwsErrorCode() ||
                                 $e->getPrevious() instanceof NetworkException
                             ) {
                                 /**
@@ -163,7 +161,7 @@ class Register extends PlatformEndpoint
      */
     protected function onSuccess(
         string $endpointArn,
-        \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register $message
+        \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register $message,
     ): bool {
         return true;
     }

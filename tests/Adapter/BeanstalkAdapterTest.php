@@ -7,29 +7,14 @@ use BackQ\Adapter\Beanstalk\Client;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use RuntimeException;
-
+use function fclose;
 use function stream_socket_get_name;
 use function stream_socket_server;
 use function strrpos;
 use function substr;
-use function fclose;
 
 class BeanstalkAdapterTest extends TestCase
 {
-    private function adapterWithConnectedClient(): array
-    {
-        $adapter = new Beanstalk();
-        $client  = $this->createMock(Client::class);
-
-        $clientProp  = new ReflectionProperty(Beanstalk::class, 'client');
-        $clientProp->setValue($adapter, $client);
-
-        $connectedProp = new ReflectionProperty(Beanstalk::class, 'connected');
-        $connectedProp->setValue($adapter, true);
-
-        return [$adapter, $client];
-    }
-
     public function testConnectWhenAlreadyConnectedReturnsTrue(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
@@ -73,9 +58,9 @@ class BeanstalkAdapterTest extends TestCase
             ->willReturn(42);
 
         $params = [
+            Beanstalk::PARAM_JOBTTR    => 3,
             Beanstalk::PARAM_PRIORITY  => 1,
             Beanstalk::PARAM_READYWAIT => 2,
-            Beanstalk::PARAM_JOBTTR    => 3,
         ];
         $result = $adapter->putTask('body', $params);
         $this->assertSame('42', $result);
@@ -219,5 +204,19 @@ class BeanstalkAdapterTest extends TestCase
             ->willThrowException(new RuntimeException('boom'));
 
         $this->assertFalse($adapter->hasWorkers('tube'));
+    }
+
+    private function adapterWithConnectedClient(): array
+    {
+        $adapter = new Beanstalk();
+        $client  = $this->createMock(Client::class);
+
+        $clientProp  = new ReflectionProperty(Beanstalk::class, 'client');
+        $clientProp->setValue($adapter, $client);
+
+        $connectedProp = new ReflectionProperty(Beanstalk::class, 'connected');
+        $connectedProp->setValue($adapter, true);
+
+        return [$adapter, $client];
     }
 }

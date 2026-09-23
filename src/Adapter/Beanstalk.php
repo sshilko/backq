@@ -18,6 +18,7 @@ use function is_array;
 
 /**
  * Beanstalk protocol adapter
+ * @phpcs:disable
  *
  * @see https://raw.githubusercontent.com/kr/beanstalkd/master/doc/protocol.txt
  */
@@ -83,7 +84,7 @@ class Beanstalk extends AbstractAdapter
      * @see \Beanstalk\Client._error()
      * @param $msg
      */
-    public function error($msg): void
+    public function error(string $msg): void
     {
         $this->logError($msg);
     }
@@ -101,7 +102,7 @@ class Beanstalk extends AbstractAdapter
                     # $definedtubes = $this->client->listTubes();
                     # if (!empty($definedtubes) && in_array($queue, $definedtubes)) {
                     # Because we already binded to a queue, it will be always shown in list
-                    
+
                     /**
                      * Workers watching queue
                      *
@@ -222,12 +223,12 @@ class Beanstalk extends AbstractAdapter
     /**
      * Put task into queue
      *
-     * @param  string $data The job body.
-     * @return int|bool `false` on  otherwise an integer indicating
- * the job id.
+     * @param string $data The job body.
+     *
+     * @return false|numeric-string `false` on otherwise an integer indicating the job id.
      */
     #[Override]
-    public function putTask($body, $params = []): string|bool
+    public function putTask($body, $params = []): string|false
     {
         if ($this->connected) {
             try {

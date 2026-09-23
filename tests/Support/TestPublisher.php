@@ -13,19 +13,21 @@ use BackQ\Publisher\AbstractPublisher;
  */
 class TestPublisher extends AbstractPublisher
 {
+
     public AbstractAdapter $testAdapter;
 
     private static ?AbstractAdapter $sharedAdapter = null;
 
-    public static function bindShared(?AbstractAdapter $adapter): void
-    {
-        self::$sharedAdapter = $adapter;
-    }
-
     public function __construct(AbstractAdapter $adapter)
     {
         $this->testAdapter = $adapter;
+
         parent::__construct();
+    }
+
+    public static function bindShared(?AbstractAdapter $adapter): void
+    {
+        self::$sharedAdapter = $adapter;
     }
 
     protected function setupAdapter(): AbstractAdapter

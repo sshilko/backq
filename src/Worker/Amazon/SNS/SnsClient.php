@@ -21,9 +21,8 @@ class SnsClient extends \Aws\Sns\SnsClient
      * @see http://docs.aws.amazon.com/aws-sdk-php/v3/api/api-sns-2010-03-31.html#publish
      *
      * @param array $data
-     * @return mixed
      */
-    public function publish(array $data)
+    public function publish(array $data): mixed
     {
         return parent::publish($data);
     }
@@ -36,9 +35,8 @@ class SnsClient extends \Aws\Sns\SnsClient
      * @see http://docs.aws.amazon.com/sns/latest/api/API_DeleteEndpoint.html#API_DeleteEndpoint_Errors
      *
      * @param array $data
-     * @return mixed
      */
-    public function deleteEndpoint(array $data)
+    public function deleteEndpoint(array $data): mixed
     {
         return parent::deleteEndpoint($data);
     }
@@ -57,9 +55,8 @@ class SnsClient extends \Aws\Sns\SnsClient
      * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html
      * @param array $data
      *
-     * @return mixed
      */
-    public function createPlatformEndpoint(array $data)
+    public function createPlatformEndpoint(array $data): mixed
     {
         return parent::createPlatformEndpoint($data);
     }

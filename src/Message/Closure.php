@@ -15,19 +15,15 @@ use Opis\Closure\SerializableClosure;
 class Closure extends AbstractMessage
 {
 
-    protected SerializableClosure $function;
-
-    public function __construct(SerializableClosure $function)
+    public function __construct(protected SerializableClosure $function)
     {
-        $this->function = $function;
     }
 
     /**
      * Executes the closure for this message
      *
-     * @return mixed
      */
-    public function execute()
+    public function execute(): mixed
     {
         $closure = $this->function->getClosure();
 

@@ -12,12 +12,8 @@ use Psr\Log\NullLogger;
 
 class SerializedWorkerTest extends TestCase
 {
-    private TestAdapter $adapter;
 
-    protected function setUp(): void
-    {
-        $this->adapter = new TestAdapter();
-    }
+    private TestAdapter $adapter;
 
     public function testRepublishesOriginalMessage(): void
     {
@@ -62,5 +58,10 @@ class SerializedWorkerTest extends TestCase
         $worker->run();
 
         $this->assertContains(['afterWorkSuccess', 4], $this->adapter->calls);
+    }
+
+    protected function setUp(): void
+    {
+        $this->adapter = new TestAdapter();
     }
 }

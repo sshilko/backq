@@ -4,6 +4,7 @@ namespace BackQ\Tests\Worker\Closure;
 
 use BackQ\Worker\Closure\RecoverableException;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use Throwable;
 
 class RecoverableExceptionTest extends TestCase
@@ -19,6 +20,6 @@ class RecoverableExceptionTest extends TestCase
 
     public function testCannotBeExtended(): void
     {
-        $this->assertTrue((new \ReflectionClass(RecoverableException::class))->isFinal());
+        $this->assertTrue((new ReflectionClass(RecoverableException::class))->isFinal());
     }
 }

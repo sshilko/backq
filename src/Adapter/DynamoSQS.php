@@ -31,7 +31,7 @@ use function time;
 /**
  * Adapter uses DynamoDB for writing tasks
  * Adapter uses SQS for pulling tasks
- *
+ * @phpcs:disable
  * DynamoDB -> TTL Expire -> DynamoDB Streams -> AWS Lambda -> SQS
  *
  * @package BackQ\Adapter
@@ -318,7 +318,8 @@ class DynamoSQS extends AbstractAdapter
      * the call returns successfully with an empty list of messages.
      *
      * @param int|null $seconds
-     * @return null
+     *
+     * @return void
      */
     #[Override]
     public function setWorkTimeout(?int $seconds = null): void

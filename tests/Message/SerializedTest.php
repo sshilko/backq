@@ -5,8 +5,8 @@ namespace BackQ\Tests\Message;
 use BackQ\Message\Generic;
 use BackQ\Message\Serialized;
 use BackQ\Tests\Support\NoopMessage;
-use BackQ\Tests\Support\TestPublisher;
 use BackQ\Tests\Support\TestAdapter;
+use BackQ\Tests\Support\TestPublisher;
 use PHPUnit\Framework\TestCase;
 
 class SerializedTest extends TestCase

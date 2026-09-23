@@ -13,7 +13,6 @@ use BackQ\Adapter\DynamoSQS;
 use BackQ\Tests\Support\TestDynamoSQS;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
-
 use function crc32;
 use function json_decode;
 use function json_encode;
@@ -21,48 +20,13 @@ use function time;
 
 class DynamoSQSAdapterTest extends TestCase
 {
-    private const ACCOUNT_ID = '123456789012';
+    private const string ACCOUNT_ID = '123456789012';
 
-    private const REGION = 'us-east-1';
+    private const string REGION = 'us-east-1';
 
-    private const QUEUE = 'workqueue';
+    private const string QUEUE = 'workqueue';
 
-    private const TABLE = 'jobstable';
-
-    private function makeAdapter(MockHandler $dynamo, MockHandler $sqs): TestDynamoSQS
-    {
-        $adapter = new TestDynamoSQS(self::ACCOUNT_ID, 'key', 'secret', self::REGION);
-        $adapter->installClients(
-            new DynamoDbClient(['version'     => '2012-08-10',
-                'region'      => self::REGION,
-                'credentials' => ['key'    => 'key',
-                    'secret' => 'secret'],
-                'handler'     => $dynamo]),
-            new SqsClient(['version'     => '2012-11-05',
-                'region'      => self::REGION,
-                'credentials' => ['key'    => 'key',
-                    'secret' => 'secret'],
-                'handler'     => $sqs])
-        );
-        $adapter->connect();
-        $adapter->bindRead(self::QUEUE);
-        $adapter->bindWrite(self::TABLE);
-
-        return $adapter;
-    }
-
-    private function rowPayload(string $payload, int $checksum): string
-    {
-        return (string) json_encode(['id'         => 'q1.abc',
-            'metadata'   => json_encode(['payload_checksum' => $checksum]),
-            'payload'    => $payload,
-            'time_ready' => 60]);
-    }
-
-    private function sqsEndpointUrl(): string
-    {
-        return 'https://sqs.' . self::REGION . '.amazonaws.com/' . self::ACCOUNT_ID . '/' . self::QUEUE;
-    }
+    private const string TABLE = 'jobstable';
 
     public function testPutTaskWritesExpectedItem(): void
     {
@@ -254,5 +218,42 @@ class DynamoSQSAdapterTest extends TestCase
         $adapter = $this->makeAdapter(new MockHandler([]), new MockHandler([]));
 
         $this->assertTrue($adapter->afterWorkFailed('rh-1'));
+    }
+
+    private function makeAdapter(MockHandler $dynamo, MockHandler $sqs): TestDynamoSQS
+    {
+        $adapter = new TestDynamoSQS(self::ACCOUNT_ID, 'key', 'secret', self::REGION);
+        $adapter->installClients(
+            new DynamoDbClient([                'credentials' => ['key'    => 'key',
+                'secret' => 'secret'],
+                'handler'     => $dynamo,
+                'region'      => self::REGION,
+                'version'     => '2012-08-10',
+            ]),
+            new SqsClient([             'credentials' => ['key'    => 'key',
+                'secret' => 'secret'],
+                'handler'     => $sqs,
+                'region'      => self::REGION,
+                'version'     => '2012-11-05',
+            ])
+        );
+        $adapter->connect();
+        $adapter->bindRead(self::QUEUE);
+        $adapter->bindWrite(self::TABLE);
+
+        return $adapter;
+    }
+
+    private function rowPayload(string $payload, int $checksum): string
+    {
+        return (string) json_encode(['id'         => 'q1.abc',
+            'metadata'   => json_encode(['payload_checksum' => $checksum]),
+            'payload'    => $payload,
+            'time_ready' => 60]);
+    }
+
+    private function sqsEndpointUrl(): string
+    {
+        return 'https://sqs.' . self::REGION . '.amazonaws.com/' . self::ACCOUNT_ID . '/' . self::QUEUE;
     }
 }

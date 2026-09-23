@@ -12,7 +12,6 @@ namespace BackQ\Worker\Amazon\SNS\Application;
 
 use BackQ\Adapter\AbstractAdapter;
 use BackQ\Worker\Amazon\SNS\Application;
-use Override;
 use function end;
 use function explode;
 use function strrpos;
@@ -25,7 +24,7 @@ abstract class PlatformEndpoint extends Application
      * Maximum number of times that the same Job can attempt to be reprocessed
      * after an error that it could be recovered from in a next iteration
      */
-    public const RETRY_MAX = 3;
+    public const int RETRY_MAX = 3;
 
     protected $queueName = 'aws_sns_endpoints_';
 

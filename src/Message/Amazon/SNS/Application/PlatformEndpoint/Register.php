@@ -19,7 +19,6 @@ class Register implements RegisterMessageInterface
      * Associative array of string keys mapping to values, they'll be the attributes
      * set for an endpoint and could vary depending on the platform application
      *
-     * @var array
      */
     protected array $attributes = [];
 
@@ -38,7 +37,6 @@ class Register implements RegisterMessageInterface
 
     /**
      * Get the specific attributes to create endpoints
-     * @return array
      */
     #[Override]
     public function getAttributes(): array

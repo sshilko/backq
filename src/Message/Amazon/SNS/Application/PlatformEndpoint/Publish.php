@@ -28,7 +28,6 @@ class Publish implements PublishMessageInterface
      * Message payload
      * @see http://docs.aws.amazon.com/sns/latest/dg/mobile-push-send-custommessage.html
      *
-     * @var array
      */
     protected array $message = [];
 
@@ -51,7 +50,7 @@ class Publish implements PublishMessageInterface
      *
      */
     #[Override]
-    public function getMessage(): string
+    public function getMessage(): string|false
     {
         return json_encode($this->message);
     }
@@ -80,7 +79,6 @@ class Publish implements PublishMessageInterface
     /**
      * Gets specific attributes to complete a Publish operation to an endpoint
      *
-     * @return array
      */
     #[Override]
     public function getAttributes(): array

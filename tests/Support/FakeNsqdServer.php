@@ -33,7 +33,7 @@ $parts = explode(':', stream_socket_get_name($server, false));
 fwrite(STDOUT, 'PORT=' . end($parts) . PHP_EOL);
 fflush(STDOUT);
 
-$readN = static function ($sock, int $n) use (&$readN): string {
+$readN = static function ($sock, int $n): string {
     $data     = '';
     $deadline = microtime(true) + 10;
 
@@ -51,7 +51,7 @@ $readN = static function ($sock, int $n) use (&$readN): string {
     return $data;
 };
 
-$readCmd = static function ($sock) use (&$readCmd): string {
+$readCmd = static function ($sock): string {
     $data     = '';
     $deadline = microtime(true) + 10;
 

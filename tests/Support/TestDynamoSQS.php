@@ -12,6 +12,7 @@ use BackQ\Adapter\DynamoSQS;
  */
 class TestDynamoSQS extends DynamoSQS
 {
+
     private DynamoDbClient $dynamo;
 
     private SqsClient $sqs;

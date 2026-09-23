@@ -11,17 +11,17 @@ use Override;
  */
 class TestWorker extends AbstractWorker
 {
+
     public ?int $workTimeout = 5;
+
+    public array $yields   = [];
 
     protected $queueName = 'testqueue';
 
-    public array $yields   = [];
-    public array $responses;
     private int $index = 0;
 
-    public function __construct(AbstractAdapter $adapter, array $responses = [true])
+    public function __construct(AbstractAdapter $adapter, public array $responses = [true])
     {
-        $this->responses = $responses;
         parent::__construct($adapter);
     }
 

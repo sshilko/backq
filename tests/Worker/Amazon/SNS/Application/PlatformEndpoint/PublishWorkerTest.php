@@ -12,6 +12,9 @@ use GuzzleHttp\Psr7\Request;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
+/**
+ * @phpcs:disable
+ */
 class PublishWorkerTest extends TestCase
 {
     private TestAdapter $adapter;
@@ -150,9 +153,11 @@ class PublishWorkerTest extends TestCase
 
             protected function onFailure(
                 \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message,
-                string $getAwsErrorCode
-            ) {
+                string $getAwsErrorCode,
+            ): null {
                 $this->failures[] = [$message, $getAwsErrorCode];
+
+                return null;
             }
         };
         $worker->setClient($this->client);

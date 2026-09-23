@@ -15,12 +15,6 @@ use ReflectionProperty;
  */
 class RedisAdapterCoreTest extends TestCase
 {
-    private function setState(Redis $redis, bool $connected, ConnectionState $state): void
-    {
-        (new ReflectionProperty(Redis::class, 'connected'))->setValue($redis, $connected);
-        (new ReflectionProperty(Redis::class, 'state'))->setValue($redis, $state);
-    }
-
     public function testConstructAppliesConfig(): void
     {
         $redis = new Redis('redis.example', 6380);
@@ -123,5 +117,11 @@ class RedisAdapterCoreTest extends TestCase
         $redis->setWorkTimeout(15);
 
         $this->assertSame(9, (new ReflectionProperty(Redis::class, 'blockFor'))->getValue($redis));
+    }
+
+    private function setState(Redis $redis, bool $connected, ConnectionState $state): void
+    {
+        (new ReflectionProperty(Redis::class, 'connected'))->setValue($redis, $connected);
+        (new ReflectionProperty(Redis::class, 'state'))->setValue($redis, $state);
     }
 }

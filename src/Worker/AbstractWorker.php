@@ -245,8 +245,11 @@ abstract class AbstractWorker
 
     /**
      * Process data,
+     *
+     *
+     * @psalm-return \Generator<int|mixed, mixed|null, mixed, null>
      */
-    protected function work()
+    protected function work(): \Generator
     {
         if (!$this->bind) {
             return;

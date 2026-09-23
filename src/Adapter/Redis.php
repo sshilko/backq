@@ -23,13 +23,11 @@ use InvalidArgumentException;
 use Override;
 use RuntimeException;
 use Throwable;
-
 use function assert;
 use function count;
 use function sleep;
 use function trigger_error;
 use function var_export;
-
 use const E_USER_WARNING;
 
 /**
@@ -38,19 +36,19 @@ use const E_USER_WARNING;
  */
 class Redis extends AbstractAdapter
 {
-    public const STATE_BINDWRITE = 1;
-    public const STATE_BINDREAD  = 2;
-    public const STATE_NOTHING   = 0;
+    public const int STATE_BINDWRITE = 1;
+    public const int STATE_BINDREAD  = 2;
+    public const int STATE_NOTHING   = 0;
 
     /**
      * Whether to emulate blockFor behaviour, if >0 the amount of seconds sleep between polls
      * if not emulated uses .blpop redis implementation, if emulated uses .pop and sleep loop
      */
-    public const BLOCKFOR_EMULATE = 0;
+    public const int BLOCKFOR_EMULATE = 0;
 
-    private const CONNECTION_NAME  = 'redis1';
-    private const REDIS_DRIVER     = 'phpredis';
-    private const REDIS_DRIVER_OWN = 'redis-backq';
+    private const string CONNECTION_NAME  = 'redis1';
+    private const string REDIS_DRIVER     = 'phpredis';
+    private const string REDIS_DRIVER_OWN = 'redis-backq';
 
     private $connected = false;
 
@@ -111,7 +109,7 @@ class Redis extends AbstractAdapter
         private int $timeout = 10,
         private int $read_timeout = 10,
         private int $database_id = 0,
-        private ?string $auth_password = null
+        private ?string $auth_password = null,
     ) {
         $this->app = new Redis\App();
 
@@ -235,9 +233,9 @@ class Redis extends AbstractAdapter
             $this->logDebug('Disconnecting, successful');
 
             return true;
-        } else {
-            $this->logDebug('Disconnecting, previously not connected');
         }
+
+        $this->logDebug('Disconnecting, previously not connected');
 
         $this->logDebug('Disconnecting, failed');
 
@@ -277,8 +275,7 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if (
-            $this->connected && (ConnectionState::BindRead === $this->state ||
+        if ($this->connected && (ConnectionState::BindRead === $this->state ||
                                  ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
@@ -313,8 +310,7 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if (
-            $this->connected && (ConnectionState::BindRead === $this->state ||
+        if ($this->connected && (ConnectionState::BindRead === $this->state ||
                                  ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(__FUNCTION__ . ' currently ' . (int) $this->reservedJobs . ' reserved job(s)');
@@ -408,8 +404,7 @@ class Redis extends AbstractAdapter
             $this->blockFor = $timeout;
         }
 
-        if (
-            $this->connected && (ConnectionState::BindRead === $this->state ||
+        if ($this->connected && (ConnectionState::BindRead === $this->state ||
                                  ConnectionState::BindWrite === $this->state)
         ) {
             $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
@@ -493,8 +488,7 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if (
-            $this->connected && (ConnectionState::BindRead === $this->state ||
+        if ($this->connected && (ConnectionState::BindRead === $this->state ||
                                  ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(
@@ -605,11 +599,13 @@ class Redis extends AbstractAdapter
         });
 
         $queue->addConnection(
-            ['driver'     => self::REDIS_DRIVER_OWN,
-                'connection' => 'default',
-                'block_for'  => (self::BLOCKFOR_EMULATE > 0 ? null : $this->blockFor),
+            [
+                'block_for'   => (self::BLOCKFOR_EMULATE > 0 ? null : $this->blockFor),
+                'connection'  => 'default',
+                'driver'      => self::REDIS_DRIVER_OWN,
+                'queue'       => $this->queueName,
                 'retry_after' => ($this->retryAfter ?: null),
-                'queue'      => $this->queueName],
+            ],
             self::CONNECTION_NAME
         );
         $this->queue = $queue;

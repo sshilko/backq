@@ -15,7 +15,6 @@ use Datetime;
 use Override;
 use RuntimeException;
 use Throwable;
-
 use function array_merge;
 use function floor;
 use function gethostname;
@@ -40,28 +39,28 @@ class Nsq extends AbstractAdapter
     /**
      * Request messages
      */
-    protected final const PROTO_VERSION   = "  V2";
-    protected final const PROTO_IDENTIFY  = "IDENTIFY";
-    protected final const PROTO_PUBLISH   = "PUB %s";
-    protected final const PROTO_PUBDELAY  = "DPUB %s %s";
-    protected final const PROTO_SUBSCRIBE = "SUB %s %s";
-    protected final const PROTO_READY     = "RDY %s";
-    protected final const PROTO_REQUEUE   = "REQ %s %s";
-    protected final const PROTO_FINISH    = "FIN %s";
-    protected final const PROTO_NOOP      = "NOP";
-    protected final const PROTO_AUTH      = "AUTH";
-    protected final const PROTO_CLOSE     = "CLS";
-    protected final const RESPONSE_HEARTBEAT = "_heartbeat_";
-    protected final const RESPONSE_SUCCESS   = "OK";
-    protected final const RESPONSE_CLOSED    = "CLOSE_WAIT";
-    protected final const FRAME_TYPE_RESPONSE = 0;
-    protected final const FRAME_TYPE_ERROR    = 1;
-    protected final const FRAME_TYPE_MESSAGE  = 2;
-    protected final const HEARTBEAT_TTR_RATION = 1.5;
-    protected final const IDENTIFY_USER_AGENT = "BackQ\Nsq";
-    protected final const STATE_BINDWRITE = 1;
-    protected final const STATE_BINDREAD  = 2;
-    protected final const STATE_NOTHING   = 0;
+    protected final const string PROTO_VERSION   = "  V2";
+    protected final const string PROTO_IDENTIFY  = "IDENTIFY";
+    protected final const string PROTO_PUBLISH   = "PUB %s";
+    protected final const string PROTO_PUBDELAY  = "DPUB %s %s";
+    protected final const string PROTO_SUBSCRIBE = "SUB %s %s";
+    protected final const string PROTO_READY     = "RDY %s";
+    protected final const string PROTO_REQUEUE   = "REQ %s %s";
+    protected final const string PROTO_FINISH    = "FIN %s";
+    protected final const string PROTO_NOOP      = "NOP";
+    protected final const string PROTO_AUTH      = "AUTH";
+    protected final const string PROTO_CLOSE     = "CLS";
+    protected final const string RESPONSE_HEARTBEAT = "_heartbeat_";
+    protected final const string RESPONSE_SUCCESS   = "OK";
+    protected final const string RESPONSE_CLOSED    = "CLOSE_WAIT";
+    protected final const int FRAME_TYPE_RESPONSE = 0;
+    protected final const int FRAME_TYPE_ERROR    = 1;
+    protected final const int FRAME_TYPE_MESSAGE  = 2;
+    protected final const float HEARTBEAT_TTR_RATION = 1.5;
+    protected final const string IDENTIFY_USER_AGENT = "BackQ\Nsq";
+    protected final const int STATE_BINDWRITE = 1;
+    protected final const int STATE_BINDREAD  = 2;
+    protected final const int STATE_NOTHING   = 0;
 
     protected string $host;
 
@@ -322,8 +321,10 @@ class Nsq extends AbstractAdapter
 
             $time = floor(unpack("J", substr($messageFrame, 0, 8))[1] / 1000000000);
 
-            return [$msgId, $message, ['time' => DateTime::createFromFormat("U", $time)->format('c'),
-                'attempts' => unpack("n", substr($messageFrame, 8, 2))[1]]];
+            return [$msgId, $message, [
+                'attempts' => unpack("n", substr($messageFrame, 8, 2))[1],
+                'time'     => DateTime::createFromFormat("U", $time)->format('c'),
+            ]];
         }
 
         return false;
@@ -359,8 +360,7 @@ class Nsq extends AbstractAdapter
                  * nsqd will timeout and forcefully close a client connection that it has not heard from
                  * @see http://nsq.io/clients/building_client_libraries.html
                  */
-                if (
-                    $this->config['heartbeat_interval_ms'] &&
+                if ($this->config['heartbeat_interval_ms'] &&
                     (round($params[self::PARAM_JOBTTR] * 1000) > round(
                         $this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION
                     ))
@@ -374,8 +374,7 @@ class Nsq extends AbstractAdapter
             }
 
             if (isset($params[self::PARAM_READYWAIT])) {
-                if (
-                    $this->config['max_req_timeout']
+                if ($this->config['max_req_timeout']
                     && ($params[self::PARAM_READYWAIT] > $this->config['max_req_timeout'])
                 ) {
                     /**
@@ -453,11 +452,13 @@ class Nsq extends AbstractAdapter
             throw new RuntimeException('Incorrect protocol usage while ' . __FUNCTION__);
         }
 
-        $identify = ["feature_negotiation" => true,
-            "client_id"   => $this->config['clientId'],
-            "hostname"    => gethostname(),
-            "user_agent"  => self::IDENTIFY_USER_AGENT,
-            'msg_timeout' => $this->config['msg_timeout'] * 1000];
+        $identify = [
+            "client_id"           => $this->config['clientId'],
+            "feature_negotiation" => true,
+            "hostname"            => gethostname(),
+            "user_agent"          => self::IDENTIFY_USER_AGENT,
+            'msg_timeout'         => $this->config['msg_timeout'] * 1000,
+        ];
 
         $identify["heartbeat_interval"] = $this->config['heartbeat_interval_ms'];
 
@@ -498,8 +499,10 @@ class Nsq extends AbstractAdapter
      * write the ready command to the connected socket - this sends the size of batch of messages the client can handle
      *
      * @param int number of messages to batch up and send to this client at once
+     *
+     * @psalm-param 1 $numberOfMessages
      */
-    private function writeReady($numberOfMessages): bool
+    private function writeReady(int $numberOfMessages): bool
     {
         if ($this->connected && ConnectionState::BindRead === $this->state) {
             $this->writeCommand(sprintf(self::PROTO_READY, $numberOfMessages));
@@ -515,8 +518,12 @@ class Nsq extends AbstractAdapter
      * throws an exception if anything else is received instead
      *
      * @throws RuntimeException
+     *
+     * @param string|null $expectedResponse
+     *
+     * @psalm-param 'CLOSE_WAIT'|null $expectedResponse
      */
-    private function readSuccessResponse($expectedResponse = null): void
+    private function readSuccessResponse(string|null $expectedResponse = null): void
     {
         [$frameType, $response] = $this->readFrame();
         if ($expectedResponse && self::FRAME_TYPE_RESPONSE === $frameType) {
@@ -532,7 +539,7 @@ class Nsq extends AbstractAdapter
         }
     }
 
-    private function readAuthenticationHeader()
+    private function readAuthenticationHeader(): array
     {
         [$frameType, $response] = $this->readFrame();
 
@@ -568,7 +575,7 @@ class Nsq extends AbstractAdapter
      * write command w/o body
      * @param string $command
      */
-    private function writeCommand($cmd): void
+    private function writeCommand(string $cmd): void
     {
         $this->write($cmd . "\n");
     }
@@ -587,7 +594,6 @@ class Nsq extends AbstractAdapter
     /**
      * @param bool $raw return raw frame whatever kind of frame it is
      *
-     * @return array
      */
     private function readFrame($raw = false): array
     {
@@ -630,8 +636,10 @@ class Nsq extends AbstractAdapter
 
     /**
      * read from the socket a set size of data
+     *
+     * @psalm-param 4 $size
      */
-    private function read($size)
+    private function read(int $size): string
     {
         $this->logInfo('--> reading ' . $size . ' bytes');
         $result = $this->_io->read($size);

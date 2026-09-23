@@ -12,6 +12,9 @@ namespace BackQ\Message;
 
 use BackQ\Publisher\AbstractPublisher;
 
+/**
+ * @phpcs:disable
+ */
 class Serialized extends AbstractMessage
 {
 

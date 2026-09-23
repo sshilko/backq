@@ -14,45 +14,10 @@ use Psr\Log\NullLogger;
 
 class RegisterWorkerTest extends TestCase
 {
+
     private TestAdapter $adapter;
 
     private $client;
-
-    protected function setUp(): void
-    {
-        $this->adapter = new TestAdapter();
-        $this->client  = new class {
-            public array $created = [];
-
-            public function createPlatformEndpoint(array $payload): array
-            {
-                $this->created[] = $payload;
-
-                return ['EndpointArn' => 'arn:aws:sns:us-east-1:123:endpoint/APNS/app/xyz'];
-            }
-        };
-    }
-
-    private function makeWorker(): Register
-    {
-        $worker = new Register($this->adapter);
-        $worker->setClient($this->client);
-        $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
-        $worker->setRestartThreshold(1);
-
-        return $worker;
-    }
-
-    private function makeMessage(): RegisterMessage
-    {
-        $message = new RegisterMessage();
-        $message->addToken('device-token');
-        $message->setApplicationArn('arn:aws:sns:us-east-1:123:app/APNS/app');
-        $message->setAttributes(['Enabled' => 'true']);
-
-        return $message;
-    }
 
     public function testQueueNameIsDerivedFromClassName(): void
     {
@@ -150,11 +115,12 @@ class RegisterWorkerTest extends TestCase
         $this->adapter->pickTaskResult = [25, serialize($this->makeMessage())];
 
         $worker = new class ($this->adapter) extends Register {
+
             public $receivedArn = null;
 
             protected function onSuccess(
                 string $endpointArn,
-                \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register $message
+                \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register $message,
             ): bool {
                 $this->receivedArn = $endpointArn;
 
@@ -172,5 +138,42 @@ class RegisterWorkerTest extends TestCase
         $this->assertNotContains(['afterWorkSuccess', 25], $this->adapter->calls);
         $this->assertNotContains(['afterWorkFailed', 25], $this->adapter->calls);
         $this->assertContains('disconnect', $this->adapter->calls);
+    }
+
+    protected function setUp(): void
+    {
+        $this->adapter = new TestAdapter();
+        $this->client  = new class {
+
+            public array $created = [];
+
+            public function createPlatformEndpoint(array $payload): array
+            {
+                $this->created[] = $payload;
+
+                return ['EndpointArn' => 'arn:aws:sns:us-east-1:123:endpoint/APNS/app/xyz'];
+            }
+        };
+    }
+
+    private function makeWorker(): Register
+    {
+        $worker = new Register($this->adapter);
+        $worker->setClient($this->client);
+        $worker->setLogger(new NullLogger());
+        $worker->setTriggerErrorOnError(false);
+        $worker->setRestartThreshold(1);
+
+        return $worker;
+    }
+
+    private function makeMessage(): RegisterMessage
+    {
+        $message = new RegisterMessage();
+        $message->addToken('device-token');
+        $message->setApplicationArn('arn:aws:sns:us-east-1:123:app/APNS/app');
+        $message->setAttributes(['Enabled' => 'true']);
+
+        return $message;
     }
 }

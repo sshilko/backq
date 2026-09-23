@@ -14,43 +14,10 @@ use Psr\Log\NullLogger;
 
 class RemoveWorkerTest extends TestCase
 {
+
     private TestAdapter $adapter;
 
     private $client;
-
-    protected function setUp(): void
-    {
-        $this->adapter = new TestAdapter();
-        $this->client  = new class {
-            public array $deleted = [];
-
-            public function deleteEndpoint(array $payload): array
-            {
-                $this->deleted[] = $payload;
-
-                return ['ResponseMetadata' => ['RequestId' => 'r-1']];
-            }
-        };
-    }
-
-    private function makeWorker(): Remove
-    {
-        $worker = new Remove($this->adapter);
-        $worker->setClient($this->client);
-        $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
-        $worker->setRestartThreshold(1);
-
-        return $worker;
-    }
-
-    private function makeMessage(): RemoveMessage
-    {
-        $message = new RemoveMessage();
-        $message->setEndpointArn('arn:aws:sns:us-east-1:123:endpoint/APNS/app/xyz');
-
-        return $message;
-    }
 
     public function testQueueNameIsDerivedFromClassName(): void
     {
@@ -133,5 +100,40 @@ class RemoveWorkerTest extends TestCase
 
         $this->assertContains(['afterWorkFailed', 24], $this->adapter->calls);
         $this->assertNotContains(['afterWorkSuccess', 24], $this->adapter->calls);
+    }
+
+    protected function setUp(): void
+    {
+        $this->adapter = new TestAdapter();
+        $this->client  = new class {
+
+            public array $deleted = [];
+
+            public function deleteEndpoint(array $payload): array
+            {
+                $this->deleted[] = $payload;
+
+                return ['ResponseMetadata' => ['RequestId' => 'r-1']];
+            }
+        };
+    }
+
+    private function makeWorker(): Remove
+    {
+        $worker = new Remove($this->adapter);
+        $worker->setClient($this->client);
+        $worker->setLogger(new NullLogger());
+        $worker->setTriggerErrorOnError(false);
+        $worker->setRestartThreshold(1);
+
+        return $worker;
+    }
+
+    private function makeMessage(): RemoveMessage
+    {
+        $message = new RemoveMessage();
+        $message->setEndpointArn('arn:aws:sns:us-east-1:123:endpoint/APNS/app/xyz');
+
+        return $message;
     }
 }

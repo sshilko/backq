@@ -174,8 +174,6 @@ class NsqAdapterCoreTest extends TestCase
 
     public function testFrameMessagePayloadIsParsedFromFrame(): void
     {
-        $nsq = new Nsq(self::TEST_HOST, self::TEST_PORT);
-
         $messageFrame = $this->buildMessageFrame('the-payload');
         $message      = substr($messageFrame, 26);
         $msgId        = substr($messageFrame, 10, 16);
@@ -186,8 +184,6 @@ class NsqAdapterCoreTest extends TestCase
 
     public function testIdentifyPayloadIsJson(): void
     {
-        $nsq = new Nsq(self::TEST_HOST, self::TEST_PORT);
-
         $identify = json_decode($this->buildIdentifyJson(), true, 512, JSON_THROW_ON_ERROR);
 
         $this->assertTrue($identify['feature_negotiation']);

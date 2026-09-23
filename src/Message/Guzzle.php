@@ -17,6 +17,7 @@ use LogicException;
 
 class Guzzle extends AbstractMessage
 {
+
     private $request;
 
     private $scheme = null;

@@ -21,11 +21,9 @@ use function trim;
 
 class Logger
 {
-    protected $logFile;
 
-    public function __construct($logFile)
+    public function __construct(protected $logFile)
     {
-        $this->logFile = $logFile;
     }
 
     public function log($sMessage, $debug = false): void

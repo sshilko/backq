@@ -123,7 +123,7 @@ class Serialized extends AbstractWorker
     private function dispatchOriginalMessage(
         AbstractPublisher $publisher,
         AbstractMessage $message,
-        array $publishOptions = []
+        array $publishOptions = [],
     ): ?string {
         if ($publisher->start()) {
             return (string) $publisher->publish($message, $publishOptions);

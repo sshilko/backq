@@ -14,6 +14,8 @@ parameters:
         - ../vendor/autoload.php
     excludePaths:
         - ../example/*
+        - ../vendor/*
+        - ../build/tmp/*
     parallel:
         maximumNumberOfProcesses: 4
         processTimeout: 300.0

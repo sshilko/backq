@@ -13,15 +13,16 @@ namespace BackQ\Adapter\Amazon\DynamoDb;
 
 use function crc32;
 use function is_array;
+use function is_string;
 use function json_decode;
-use function json_validate;
 use function json_encode;
+use function json_validate;
 use function uniqid;
 
 class QueueTableRow
 {
-    private const DYNAMODB_TYPE_STRING = 'S';
-    private const DYNAMODB_TYPE_NUMBER = 'N';
+    private const string DYNAMODB_TYPE_STRING = 'S';
+    private const string DYNAMODB_TYPE_NUMBER = 'N';
 
     protected string $id;
 
@@ -29,11 +30,8 @@ class QueueTableRow
 
     protected string $time_ready;
 
-    public function __construct(
-        protected string $payload,
-        int $timeReady,
-        string $queueId = ""
-    ) {
+    public function __construct(protected string $payload, int $timeReady, string $queueId = "")
+    {
         $this->id         = uniqid($queueId . '.', false);
         $this->time_ready = (string) $timeReady;
         $this->metadata['payload_checksum'] = $this->calculateHMAC();

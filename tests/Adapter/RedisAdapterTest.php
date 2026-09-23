@@ -4,7 +4,6 @@ namespace BackQ\Tests\Adapter;
 
 use BackQ\Adapter\Redis;
 use PHPUnit\Framework\TestCase;
-
 use function extension_loaded;
 use function fclose;
 use function fsockopen;
@@ -21,9 +20,9 @@ use function uniqid;
  */
 class RedisAdapterTest extends TestCase
 {
-    private const DEFAULT_HOST = 'redis';
+    private const string DEFAULT_HOST = 'redis';
 
-    private const DEFAULT_PORT = 6379;
+    private const int DEFAULT_PORT = 6379;
 
     public function testPublisherToConsumerFlow(): void
     {

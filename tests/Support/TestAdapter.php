@@ -11,15 +11,25 @@ use Override;
  */
 class TestAdapter extends AbstractAdapter
 {
+
     public $connectResult     = true;
+
     public $disconnectResult  = true;
+
     public $bindReadResult    = true;
+
     public $bindWriteResult   = true;
+
     public $pingResult        = true;
+
     public bool $hasWorkersResult = false;
+
     public $pickTaskResult    = false;
+
     public $putTaskResult     = false;
+
     public $afterWorkSuccessResult = true;
+
     public $afterWorkFailedResult  = true;
 
     public array $calls = [];

@@ -17,17 +17,16 @@ use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
 use Override;
 use Throwable;
-
 use function date;
 use function error_log;
 use function gettype;
 use function trigger_error;
 use function unserialize;
-
 use const E_USER_WARNING;
 
 class Publish extends PlatformEndpoint
 {
+
     public ?int $workTimeout = 5;
 
     #[Override]
@@ -113,8 +112,7 @@ class Publish extends PlatformEndpoint
                              * Aws Internal errors and general network error
                              * will cause the job to be sent back to queue
                              */
-                            if (
-                                SnsException::INTERNAL === $e->getAwsErrorCode() ||
+                            if (SnsException::INTERNAL === $e->getAwsErrorCode() ||
                                 $e->getPrevious() instanceof NetworkException
                             ) {
                                 /**
@@ -173,12 +171,11 @@ class Publish extends PlatformEndpoint
      * @param \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message
      * @param string $getAwsErrorCode
      *
-     * @return null
      */
     protected function onFailure(
         \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish $message,
-        string $getAwsErrorCode
-    ) {
+        string $getAwsErrorCode,
+    ): null {
         return null;
     }
 }

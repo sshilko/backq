@@ -12,7 +12,7 @@ namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
 interface PublishMessageInterface
 {
-    public function getMessage(): string;
+    public function getMessage(): string|false;
 
     public function setMessage(array $message): void;
 

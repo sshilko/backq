@@ -16,7 +16,6 @@ use BackQ\Adapter\IO\Exception\TimeoutException;
 use Exception;
 use Override;
 use Throwable;
-
 use function error_reporting;
 use function fclose;
 use function feof;
@@ -43,12 +42,14 @@ use function strlen;
 use function strval;
 use function substr;
 use function usleep;
-
 use const E_ALL;
 use const STREAM_CLIENT_CONNECT;
 use const STREAM_CLIENT_PERSISTENT;
 use const STREAM_SHUT_RDWR;
 
+/**
+ * @phpcs:disable
+ */
 class StreamIO extends AbstractIO
 {
     public const FREAD_0_TRIES = 3;
@@ -174,8 +175,13 @@ class StreamIO extends AbstractIO
         stream_set_chunk_size($this->sock, 1024);
     }
 
+    /**
+     * @return string
+     *
+     * @psalm-param 4 $n
+     */
     #[Override]
-    public function read($n)
+    public function read(int $n)
     {
         $info = stream_get_meta_data($this->sock);
 
@@ -218,8 +224,11 @@ class StreamIO extends AbstractIO
         return $fread_result;
     }
 
+    /**
+     * @psalm-param int<1, max> $read_write_timeout
+     */
     #[Override]
-    public function stream_set_timeout($read_write_timeout): void
+    public function stream_set_timeout(int $read_write_timeout): void
     {
         if (!stream_set_timeout($this->sock, $read_write_timeout)) {
             throw new Exception("Timeout (stream_set_timeout) could not be set");
@@ -227,7 +236,7 @@ class StreamIO extends AbstractIO
     }
 
     #[Override]
-    public function write($data): void
+    public function write(string $data): void
     {
         // get status of socket to determine whether or not it has timed out
         $info = @stream_get_meta_data($this->sock);
@@ -373,6 +382,11 @@ class StreamIO extends AbstractIO
         return stream_get_contents($this->sock, $length);
     }
 
+    /**
+     * @return false|int
+     *
+     * @psalm-return false|int<0, max>
+     */
     #[Override]
     public function selectWrite($sec, $usec)
     {
@@ -383,6 +397,11 @@ class StreamIO extends AbstractIO
         return stream_select($read, $write, $except, $sec, $usec);
     }
 
+    /**
+     * @return false|int
+     *
+     * @psalm-return false|int<0, max>
+     */
     #[Override]
     public function selectRead($sec, $usec)
     {

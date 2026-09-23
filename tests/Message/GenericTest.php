@@ -4,10 +4,14 @@ namespace BackQ\Tests\Message;
 
 use BackQ\Message\Generic;
 use PHPUnit\Framework\TestCase;
+use function serialize;
+use function sprintf;
+use function strlen;
+use function unserialize;
 
 class GenericTest extends TestCase
 {
-    private const PAYLOAD = ['job' => 1, 'nested' => ['a', 'b']];
+    private const array PAYLOAD = ['job' => 1, 'nested' => ['a', 'b']];
 
     public function testGetData(): void
     {
@@ -54,7 +58,7 @@ class GenericTest extends TestCase
 
     public function testLegacyWireCapsuleReadByNewGeneric(): void
     {
-        $name = \BackQ\Message\Generic::class;
+        $name = Generic::class;
         $body = serialize(self::PAYLOAD);
 
         $capsule = sprintf(

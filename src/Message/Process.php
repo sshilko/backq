@@ -13,6 +13,7 @@ namespace BackQ\Message;
 
 class Process extends AbstractMessage
 {
+
     /**
      * Timestamp until has to be done, otherwise ignored
      */
@@ -20,22 +21,22 @@ class Process extends AbstractMessage
 
     /**
      * Process constructor.
-     * @param array $commandline
+     * @param array|string $commandline
      * @param string|null $cwd
      * @param array|null $env
      * @param null $input
      * @param float $timeout
      */
     public function __construct(
-        private $commandline,
+        private array|string $commandline,
         private ?string $cwd = null,
         private ?array $env = null,
         private $input = null,
-        private ?float $timeout = 60
+        private ?float $timeout = 60,
     ) {
     }
 
-    public function getDeadline()
+    public function getDeadline(): int
     {
         return $this->until;
     }
@@ -45,17 +46,17 @@ class Process extends AbstractMessage
         $this->until = $timestamp;
     }
 
-    public function getCommandline()
+    public function getCommandline(): array|string
     {
         return $this->commandline;
     }
 
-    public function getCwd()
+    public function getCwd(): string|null
     {
         return $this->cwd;
     }
 
-    public function getEnv()
+    public function getEnv(): array|null
     {
         return $this->env;
     }
@@ -65,7 +66,7 @@ class Process extends AbstractMessage
         return $this->input;
     }
 
-    public function getTimeout()
+    public function getTimeout(): float|null
     {
         return $this->timeout;
     }

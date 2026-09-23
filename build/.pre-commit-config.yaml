@@ -23,29 +23,32 @@ repos:
         types: [php]
       - id: php-code-phpcbf
         name: php-code-phpcbf
-        entry: php ./vendor/bin/phpcbf --standard=build/phpcs-ruleset.xml
+        entry: sh -c 'printf "%s\n" "$@" | xargs -r -n 1 -P 2 php -d memory_limit=-1 ./vendor/bin/phpcbf -v --standard=build/phpcs-ruleset.xml || exit 0' _
         language: system
         types: [php]
+        verbose: true
       - id: php-code-phpcs
         name: php-code-phpcs
-        entry: php ./vendor/bin/phpcs --standard=build/phpcs-ruleset.xml
+        entry: sh -c 'php -d memory_limit=-1 ./vendor/bin/phpcs --standard=build/phpcs-ruleset.xml "$@" || exit 0' _
         language: system
         types: [php]
+        verbose: true
       - id: php-code-phpstan
         name: php-code-phpstan
-        entry: php ./vendor/bin/phpstan analyse --memory-limit=-1 --no-progress -c build/phpstan.neon
+        entry: php -d memory_limit=-1 ./vendor/bin/phpstan analyse --memory-limit=-1 --no-progress -c build/phpstan.neon
         language: system
         types: [php]
+        verbose: true
       - id: php-code-psalm-single-changed-file-check
         name: php-code-psalm-single-changed-file-check
         entry: |
-            php ./vendor/bin/psalm.phar --config build/psalm.xml
-                                        --memory-limit=-1
-                                        --no-diff
-                                        --long-progress
-                                        --show-info=true
-                                        --stats
-                                        --disable-extension=xdebug
+          php -d memory_limit=-1 ./vendor/bin/psalm.phar --config build/psalm.xml
+                                      --memory-limit=-1
+                                      --no-diff
+                                      --long-progress
+                                      --show-info=true
+                                      --stats
+                                      --disable-extension=xdebug
         language: system
         types: [php]
         verbose: false

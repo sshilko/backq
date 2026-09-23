@@ -10,6 +10,8 @@
 
 namespace BackQ\Message;
 
+use Override;
+
 abstract class AbstractMessage implements ConsumeInterface
 {
     /**

@@ -22,6 +22,9 @@ use function strlen;
 use function strtok;
 use const PHP_INT_MAX;
 
+/**
+ * @phpcs:disable
+ */
 class Client extends \Beanstalk\Client
 {
 
@@ -32,15 +35,18 @@ class Client extends \Beanstalk\Client
     public function __construct(array $config = [])
     {
         $defaults = [
-            'persistent' => true,
             'host' => '127.0.0.1',
+            'logger' => null,
+            'persistent' => true,
             'port' => 11300,
             'timeout' => 1,
-            'logger' => null,
         ];
         $this->_config = array_merge($defaults, $config);
     }
 
+    /**
+     * @return null|true
+     */
     #[Override]
     public function __destruct()
     {
@@ -206,10 +212,11 @@ class Client extends \Beanstalk\Client
      * Gives statistical information about the specified tube if it exists.
      *
      * @param string $tube Name of the tube.
-     * @return string|bool `false` on error otherwise a string with a yaml formatted dictionary.
+     *
+     * @return array|bool|string `false` on error otherwise a string with a yaml formatted dictionary.
      */
     #[Override]
-    public function statsTube($tube)
+    public function statsTube($tube): array|string|bool
     {
         $cmd = sprintf('stats-tube %s', $tube);
         $this->_write($cmd);
@@ -281,7 +288,7 @@ class Client extends \Beanstalk\Client
     }
 
     #[Override]
-    protected function _statsRead($readWhat = '')
+    protected function _statsRead($decode = '')
     {
         $status = strtok($this->_read(), ' ');
 
@@ -291,7 +298,7 @@ class Client extends \Beanstalk\Client
 
                 return $this->_decode($data);
             default:
-                $this->_error(__FUNCTION__ . ' after ' . $readWhat . ' got ' . $status . ' expected OK');
+                $this->_error(__FUNCTION__ . ' after ' . $decode . ' got ' . $status . ' expected OK');
 
                 return false;
         }

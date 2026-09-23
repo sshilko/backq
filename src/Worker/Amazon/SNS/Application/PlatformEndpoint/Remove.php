@@ -17,7 +17,6 @@ use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
 use Override;
 use Throwable;
-
 use function date;
 use function error_log;
 use function gettype;
@@ -26,6 +25,7 @@ use function unserialize;
 
 class Remove extends PlatformEndpoint
 {
+
     public ?int $workTimeout = 5;
 
     /**
@@ -93,10 +93,12 @@ class Remove extends PlatformEndpoint
                              * With issues regarding Authorization or parameters, nothing
                              * can be done, mark as processed
                              */
-                            if (
-                                in_array($e->getAwsErrorCode(), [SnsException::AUTHERROR,
-                                SnsException::INVALID_PARAM,
-                                SnsException::NOTFOUND])
+                            if (in_array(
+                                $e->getAwsErrorCode(),
+                                [SnsException::AUTHERROR,
+                                    SnsException::INVALID_PARAM,
+                                    SnsException::NOTFOUND]
+                            )
                             ) {
                                 $work->send(true);
 
@@ -107,8 +109,7 @@ class Remove extends PlatformEndpoint
                              * Retry deletion on Internal Server error from Service
                              * or general network exceptions
                              */
-                            if (
-                                SnsException::INTERNAL === $e->getAwsErrorCode() ||
+                            if (SnsException::INTERNAL === $e->getAwsErrorCode() ||
                                 $e->getPrevious() instanceof NetworkException
                             ) {
                                 /**
@@ -163,11 +164,13 @@ class Remove extends PlatformEndpoint
 
     /**
      * Handles actions to be performed on correct deletion of an amazon endpoint
+     *
      * @param \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message
      *
      * @phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
+     *
      */
-    protected function onSuccess(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message)
+    protected function onSuccess(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message): true
     {
         return true;
     }

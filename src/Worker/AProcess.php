@@ -10,11 +10,11 @@
 
 namespace BackQ\Worker;
 
+use Override;
 use RuntimeException;
 use Symfony\Component\Process\Exception\ProcessSignaledException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
-use Override;
 use Throwable;
 use function assert;
 use function error_log;

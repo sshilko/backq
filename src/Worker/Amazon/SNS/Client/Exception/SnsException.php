@@ -22,24 +22,24 @@ class SnsException extends \Aws\Sns\Exception\SnsException
     /**
      * Indicates an internal service error.
      */
-    public const INTERNAL = 'InternalError';
+    public const string INTERNAL = 'InternalError';
 
-    public const INVALID_PARAM     = 'InvalidParameter';
+    public const string INVALID_PARAM     = 'InvalidParameter';
 
     /**
      * Exception error indicating endpoint disabled.
      */
-    public const ENDPOINT_DISABLED = 'EndpointDisabled';
+    public const string ENDPOINT_DISABLED = 'EndpointDisabled';
 
     /**
      * Indicates that the user has been denied access to the requested resource.
      */
-    public const AUTHERROR = 'AuthorizationError';
+    public const string AUTHERROR = 'AuthorizationError';
 
     /**
      * Indicates that the requested resource does not exist.
      */
-    public const NOTFOUND  = 'NotFound';
+    public const string NOTFOUND  = 'NotFound';
 
     /**
      * @see http://docs.aws.amazon.com/aws-sdk-php/v3/api/class-Aws.Exception.AwsException.html#_getAwsErrorCode
