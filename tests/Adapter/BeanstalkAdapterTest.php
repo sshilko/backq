@@ -206,6 +206,118 @@ class BeanstalkAdapterTest extends TestCase
         $this->assertFalse($adapter->hasWorkers('tube'));
     }
 
+    public function testPingReconnectsWhenStatsReturnsFalse(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->method('stats')
+            ->willReturnOnConsecutiveCalls(false, ['version' => '1.12']);
+        $client->method('connect')->willReturn(true);
+
+        $this->assertTrue($adapter->ping());
+    }
+
+    public function testPingReturnsFalseWhenReconnectAlsoFails(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client->method('stats')->willReturn(false);
+        $client->method('connect')->willReturn(false);
+
+        $this->assertFalse($adapter->ping());
+    }
+
+    public function testPingExceptionReturnsFalse(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('stats')
+            ->willThrowException(new RuntimeException('boom'));
+
+        $this->assertFalse($adapter->ping());
+    }
+
+    public function testBindReadExceptionReturnsFalse(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('watch')
+            ->with('tube')
+            ->willThrowException(new RuntimeException('boom'));
+
+        $this->assertFalse($adapter->bindRead('tube'));
+    }
+
+    public function testBindWriteExceptionReturnsFalse(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('useTube')
+            ->with('tube')
+            ->willThrowException(new RuntimeException('boom'));
+
+        $this->assertFalse($adapter->bindWrite('tube'));
+    }
+
+    public function testPickTaskExceptionReturnsFalse(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('reserve')
+            ->willThrowException(new RuntimeException('boom'));
+
+        $this->assertFalse($adapter->pickTask());
+    }
+
+    public function testPutTaskExceptionReturnsFalse(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('put')
+            ->willThrowException(new RuntimeException('boom'));
+
+        $this->assertFalse($adapter->putTask('body'));
+    }
+
+    public function testAfterWorkSuccessExceptionReturnsFalse(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('delete')
+            ->with(1)
+            ->willThrowException(new RuntimeException('boom'));
+
+        $this->assertFalse($adapter->afterWorkSuccess(1));
+    }
+
+    public function testAfterWorkFailedExceptionReturnsFalse(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('release')
+            ->with(1, 1024, 1)
+            ->willThrowException(new RuntimeException('boom'));
+
+        $this->assertFalse($adapter->afterWorkFailed(1));
+    }
+
+    public function testDisconnectExceptionReturnsFalse(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('disconnect')
+            ->willThrowException(new RuntimeException('boom'));
+
+        $this->assertFalse($adapter->disconnect());
+    }
+
     private function adapterWithConnectedClient(): array
     {
         $adapter = new Beanstalk();

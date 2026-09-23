@@ -107,6 +107,99 @@ class StreamIOTest extends TestCase
         $io->close();
     }
 
+    public function testIsSocketReadyReturnsFalseWhenHealthy(): void
+    {
+        $this->assertFalse($this->io->isSocketReady());
+    }
+
+    public function testIsSocketReadyReturnsTrueAfterPeerClose(): void
+    {
+        fclose($this->accepted);
+        $this->accepted = null;
+
+        $this->assertTrue($this->io->isSocketReady());
+    }
+
+    public function testIsSocketReadyThrowsWhenSocketClosed(): void
+    {
+        $this->io->close();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active socket connection');
+
+        $this->io->isSocketReady();
+    }
+
+    public function testReadThrowsWhenSocketClosed(): void
+    {
+        $this->io->close();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active socket connection');
+
+        $this->io->read(1);
+    }
+
+    public function testStreamSetTimeoutThrowsWhenSocketClosed(): void
+    {
+        $this->io->close();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active socket connection');
+
+        $this->io->stream_set_timeout(5);
+    }
+
+    public function testWriteThrowsWhenSocketClosed(): void
+    {
+        $this->io->close();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active socket connection');
+
+        $this->io->write('data');
+    }
+
+    public function testStreamGetLineThrowsWhenSocketClosed(): void
+    {
+        $this->io->close();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active socket connection');
+
+        $this->io->stream_get_line(8);
+    }
+
+    public function testStreamGetContentsThrowsWhenSocketClosed(): void
+    {
+        $this->io->close();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active socket connection');
+
+        $this->io->stream_get_contents(8);
+    }
+
+    public function testSelectWriteThrowsWhenSocketClosed(): void
+    {
+        $this->io->close();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active socket connection');
+
+        $this->io->selectWrite(1, 0);
+    }
+
+    public function testSelectReadThrowsWhenSocketClosed(): void
+    {
+        $this->io->close();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active socket connection');
+
+        $this->io->selectRead(1, 0);
+    }
+
     protected function setUp(): void
     {
         $this->server = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);

@@ -6,6 +6,7 @@ use BackQ\Adapter\Beanstalk\Client;
 use BackQ\Adapter\IO\Exception\RuntimeException;
 use BackQ\Tests\Support\FakeBeanstalkServer;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 use ReflectionProperty;
 use function strlen;
 use function uniqid;
@@ -233,6 +234,91 @@ class ClientTest extends TestCase
 
         $producer->disconnect();
         $worker->disconnect();
+    }
+
+    public function testDestructDisconnectsWhenNotPersistent(): void
+    {
+        $client = new Client(['host' => '127.0.0.1', 'port' => $this->server->getPort(), 'persistent' => false]);
+        $this->assertTrue($client->connect());
+        $this->server->accept();
+
+        $this->assertTrue($client->connected);
+
+        unset($client);
+        // After unset, destructor runs and disconnects
+    }
+
+    public function testDestructDoesNotDisconnectWhenPersistent(): void
+    {
+        $client = new Client(['host' => '127.0.0.1', 'port' => $this->server->getPort(), 'persistent' => true]);
+        $this->assertTrue($client->connect());
+        $this->server->accept();
+
+        $this->assertTrue($client->connected);
+
+        unset($client);
+        // After unset, destructor runs but skips disconnect for persistent
+    }
+
+    public function testWriteThrowsWhenNotConnected(): void
+    {
+        $client = new Client();
+        $method = new ReflectionMethod(Client::class, '_write');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No connecting found while writing data to socket.');
+
+        $method->invoke($client, 'hello');
+    }
+
+    public function testReadThrowsWhenNotConnected(): void
+    {
+        $client = new Client();
+        $method = new ReflectionMethod(Client::class, '_read');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No connection found while reading data from socket.');
+
+        $method->invoke($client);
+    }
+
+    public function testReadReturnsFalseOnEofTimeout(): void
+    {
+        $client = $this->connectClient();
+        $method = new ReflectionMethod(Client::class, '_read');
+
+        // Close server side so next read hits EOF
+        $this->server->close();
+
+        // With a length, _read catches TimeoutException(READ_EOF_CODE) and returns false
+        $result = $method->invoke($client, 1);
+        $this->assertFalse($result);
+    }
+
+    public function testStatsReadReturnsFalseOnNonStringBody(): void
+    {
+        $client = $this->connectClient();
+        $method = new ReflectionMethod(Client::class, '_statsRead');
+
+        // Queue OK with a body length, then close before body arrives
+        // so _read returns false for the body
+        $this->server->queueResponse("OK 5\r\n");
+        $this->server->close();
+
+        $result = $method->invoke($client);
+        $this->assertFalse($result);
+    }
+
+    public function testStatsReadReturnsFalseOnUnexpectedStatus(): void
+    {
+        $client = $this->connectClient();
+        $method = new ReflectionMethod(Client::class, '_statsRead');
+        $this->server->queueResponse("NOT_FOUND\r\n");
+
+        $result = $method->invoke($client);
+        $this->assertFalse($result);
+
+        $client->disconnect();
     }
 
     protected function setUp(): void
