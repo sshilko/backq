@@ -566,11 +566,8 @@ class Redis extends AbstractAdapter
         //});
 
         $this->app->bind('redis', function () {
-            $app = $this->app;
-            \assert($app instanceof \Illuminate\Contracts\Foundation\Application);
-
             return new Redis\Manager(
-                $app,
+                $this->app,
                 self::REDIS_DRIVER,
                 /**
                                                        * @see \Illuminate\Redis\Connectors\PhpRedisConnector
