@@ -21,6 +21,7 @@ use Illuminate\Queue\Jobs\RedisJob;
 use InvalidArgumentException;
 use Override;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 use Throwable;
 use function assert;
 use function count;
@@ -123,7 +124,7 @@ class Redis extends AbstractAdapter
 
                 /** @phan-suppress-next-line PhanUndeclaredTypeReturnType */
                 #[Override]
-                public function render($request, Throwable $e): \Symfony\Component\HttpFoundation\Response
+                public function render($request, Throwable $e): HttpFoundationResponse
                 {
                     /**
                      * @phpstan-ignore-next-line
@@ -132,7 +133,7 @@ class Redis extends AbstractAdapter
                     // @phpstan-ignore-next-line
 
                     /** @phan-suppress-next-line PhanUndeclaredClassMethod */
-                    return new \Symfony\Component\HttpFoundation\Response();
+                    return new HttpFoundationResponse();
                 }
 
                 #[Override]

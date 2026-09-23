@@ -24,9 +24,11 @@ x-app: &app
   volumes:
     - ./php.ini:/usr/local/etc/php/php.ini:ro
     - ./../:/app:rw
+    - composer-cache:/tmp/composer:rw
   environment:
     XDEBUG_MODE: "off"
     COMPOSER_NO_AUDIT: "1"
+    COMPOSER_CACHE_DIR: /tmp/composer
     COMPOSER_PROCESS_TIMEOUT: 300
     COMPOSER_NO_INTERACTION: "1"
     COMPOSER_DISABLE_XDEBUG_WARN: "1"
@@ -98,3 +100,6 @@ services:
     ports:
       - "127.0.0.1:14150:4150"
       - "127.0.0.1:14151:4151"
+
+volumes:
+  composer-cache:
