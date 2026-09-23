@@ -27,8 +27,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: build
-          dockerfile: build/Dockerfile.php83
-          push: false
+          file: build/Dockerfile.php83
+          push: true
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
