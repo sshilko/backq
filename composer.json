@@ -94,6 +94,9 @@
             "@putenv XDEBUG_MODE=off",
             "php ./vendor/bin/phpunit --configuration=phpunit.xml"
         ],
+        "app-quality": [
+            "@app-code-quality"
+        ],
         "app-code-quality": [
             "@app-phpcbf",
             "@app-phpcs",

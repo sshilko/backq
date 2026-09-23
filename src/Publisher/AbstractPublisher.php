@@ -41,6 +41,7 @@ abstract class AbstractPublisher
     {
         $class = static::class;
 
+        // @phan-suppress-next-line PhanTypeInstantiateAbstract
         return new $class();
     }
 
@@ -109,7 +110,7 @@ abstract class AbstractPublisher
      * @param array $params adapter specific params
      *
      */
-    public function publish($serializable, $params = []): string|false
+    public function publish($serializable, $params = []): string|int|false
     {
         if (!$this->bind) {
             return false;

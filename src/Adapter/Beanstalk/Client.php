@@ -88,7 +88,7 @@ class Client extends \Beanstalk\Client
             $this->_io = new IO\StreamIO(
                 (string) $config['host'],
                 (int) $config['port'],
-                $connectionTimeout,
+                (float) $connectionTimeout,
                 self::IO_TIMEOUT,
                 null,
                 true,
@@ -274,7 +274,7 @@ class Client extends \Beanstalk\Client
                     return false;
                 }
 
-                throw new RuntimeException($ex->getMessage(), $ex->getCode());
+                throw new RuntimeException($ex->getMessage(), (int) $ex->getCode());
             }
         } else {
             /**

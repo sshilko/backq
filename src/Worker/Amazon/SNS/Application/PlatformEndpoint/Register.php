@@ -145,6 +145,7 @@ class Register extends PlatformEndpoint
                      * If something fails, retry the whole process
                      */
                     if (!empty($endpointResult['EndpointArn'])) {
+                        // @phan-suppress-next-line PhanPossiblyNullTypeArgument
                         $result = $this->onSuccess($endpointResult['EndpointArn'], $message);
 
                         if (!$result) {

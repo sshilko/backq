@@ -22,7 +22,7 @@ class SnsClient extends \Aws\Sns\SnsClient
      *
      * @param array $data
      */
-    public function publish(array $data): mixed
+    public function publish(array $data = []): mixed
     {
         return parent::publish($data);
     }
@@ -36,7 +36,7 @@ class SnsClient extends \Aws\Sns\SnsClient
      *
      * @param array $data
      */
-    public function deleteEndpoint(array $data): mixed
+    public function deleteEndpoint(array $data = []): mixed
     {
         return parent::deleteEndpoint($data);
     }
@@ -56,7 +56,7 @@ class SnsClient extends \Aws\Sns\SnsClient
      * @param array $data
      *
      */
-    public function createPlatformEndpoint(array $data): mixed
+    public function createPlatformEndpoint(array $data = []): mixed
     {
         return parent::createPlatformEndpoint($data);
     }

@@ -497,7 +497,7 @@ class Nsq extends AbstractAdapter
                 throw new RuntimeException("Authentication is required, but not provided in the config");
             }
 
-            $this->writeCommandWithBody(self::PROTO_AUTH, $this->config['auth']);
+            $this->writeCommandWithBody(self::PROTO_AUTH, (string) $this->config['auth']);
             $this->authentication = $this->readAuthenticationHeader();
         }
     }

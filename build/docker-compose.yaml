@@ -22,8 +22,8 @@ x-app: &app
   tmpfs:
     - /tmp
   volumes:
-    - ./php.ini:/usr/local/etc/php/php.ini:ro,cached
-    - ./../:/app:rw,cached
+    - ./php.ini:/usr/local/etc/php/php.ini:ro
+    - ./../:/app:rw
   environment:
     XDEBUG_MODE: "off"
     COMPOSER_NO_AUDIT: "1"
@@ -89,7 +89,8 @@ services:
     tmpfs:
       - /data
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4151/ping"]
+      test:
+        ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4151/ping"]
       interval: 5s
       timeout: 3s
       retries: 12

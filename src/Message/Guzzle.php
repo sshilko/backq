@@ -18,7 +18,7 @@ use Psr\Http\Message\RequestInterface;
 class Guzzle extends AbstractMessage
 {
 
-    private $request;
+    private ?string $request;
 
     private $scheme = null;
 
@@ -50,6 +50,7 @@ class Guzzle extends AbstractMessage
      */
     public function getRequest(): RequestInterface
     {
+        \assert(null !== $this->request);
         $request = Message::parseRequest($this->request);
         if (!empty($this->scheme)) {
             $uri    = $request->getUri();

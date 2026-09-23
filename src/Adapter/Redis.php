@@ -122,9 +122,17 @@ class Redis extends AbstractAdapter
                 }
 
                 #[Override]
-                public function render($request, Throwable $e): void
+                // @phpstan-ignore-next-line
+                /** @phan-suppress-next-line PhanUndeclaredTypeReturnType */
+                public function render($request, Throwable $e): \Symfony\Component\HttpFoundation\Response
                 {
-                    return;
+                    /**
+                     * @phpstan-ignore-next-line
+                     * @phan-suppress-next-line PhanTypeInstantiateClassClassNotFound
+                     */
+                    // @phpstan-ignore-next-line
+                    /** @phan-suppress-next-line PhanUndeclaredClassMethod */
+                    return new \Symfony\Component\HttpFoundation\Response();
                 }
 
                 #[Override]
@@ -444,6 +452,7 @@ class Redis extends AbstractAdapter
                     throw new RuntimeException('Already reserved job id ' . $jobId);
                 }
 
+                \assert($redisJob instanceof \Illuminate\Queue\Jobs\RedisJob);
                 $this->reservedJobs[$jobId] = $redisJob;
 
                 /**
@@ -567,20 +576,22 @@ class Redis extends AbstractAdapter
 
         $this->app->bind('redis', function () {
             return new Redis\Manager(
+                // @phpstan-ignore-next-line
+                /** @phan-suppress-next-line PhanTypeMismatchArgument */
                 $this->app,
                 self::REDIS_DRIVER,
                 /**
-                                                       * @see \Illuminate\Redis\Connectors\PhpRedisConnector
-                                                       */
-                                                      ['default' => ['host'          => $this->host,
-                                                          'password'      => $this->auth_password,
-                                                          'prefix'        => $this->prefix,
-                                                          'timeout'       => $this->timeout,
-                                                          'read_timeout'  => $this->read_timeout,
-                                                          'persistent_id' => $this->persistent_id,
-                                                          'port'       => $this->port,
-                                                          'persistent' => $this->persistent,
-                                                          'database'   => $this->database_id]]
+                 * @see \Illuminate\Redis\Connectors\PhpRedisConnector
+                 */
+                ['default' => ['host'          => $this->host,
+                    'password'      => $this->auth_password,
+                    'prefix'        => $this->prefix,
+                    'timeout'       => $this->timeout,
+                    'read_timeout'  => $this->read_timeout,
+                    'persistent_id' => $this->persistent_id,
+                    'port'       => $this->port,
+                    'persistent' => $this->persistent,
+                    'database'   => $this->database_id]]
             );
         });
 

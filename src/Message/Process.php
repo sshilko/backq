@@ -25,7 +25,7 @@ class Process extends AbstractMessage
      * @param string|null $cwd
      * @param array|null $env
      * @param null $input
-     * @param float $timeout
+     * @param float|null $timeout
      */
     public function __construct(
         private array|string $commandline,
