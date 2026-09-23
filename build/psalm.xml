@@ -35,4 +35,7 @@
     <extraFiles>
         <directory name="../tests" />
     </extraFiles>
+    <stubs>
+        <file name="stubs/RedisManager.stub" />
+    </stubs>
 </psalm>
