@@ -121,9 +121,8 @@ class Redis extends AbstractAdapter
                     trigger_error($e->getMessage(), E_USER_WARNING);
                 }
 
-                #[Override]
-                // @phpstan-ignore-next-line
                 /** @phan-suppress-next-line PhanUndeclaredTypeReturnType */
+                #[Override]
                 public function render($request, Throwable $e): \Symfony\Component\HttpFoundation\Response
                 {
                     /**
@@ -131,6 +130,7 @@ class Redis extends AbstractAdapter
                      * @phan-suppress-next-line PhanTypeInstantiateClassClassNotFound
                      */
                     // @phpstan-ignore-next-line
+
                     /** @phan-suppress-next-line PhanUndeclaredClassMethod */
                     return new \Symfony\Component\HttpFoundation\Response();
                 }

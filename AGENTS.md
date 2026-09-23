@@ -44,7 +44,7 @@ and runs OS processes via `symfony/process`.
   with `redis` + `nsq` services from `build/docker-compose.yaml`; requires Docker
 - `composer app-tests-local` — run the PHPUnit suite on the host (Redis/Nsq integration
   tests skip without the services)
-- `docker compose -f build/docker-compose.yaml up -d --build` — build and start app.php83,
+- `docker compose -f build/docker-compose.yaml up -d --build` — build and start app-php83,
   redis, nsq containers
 - `composer app-code-quality` — run the full quality suite (phpcs, phpcbf, phpstan, psalm,
   phan, phpmd, pdepend)
