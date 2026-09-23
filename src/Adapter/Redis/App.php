@@ -14,7 +14,9 @@ use Illuminate\Container\Container;
 
 class App extends Container
 {
-    public function isDownForMaintenance()
+    /**
+     */
+    public function isDownForMaintenance(): false
     {
         return false;
     }

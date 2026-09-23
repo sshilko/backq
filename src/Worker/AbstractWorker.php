@@ -34,7 +34,7 @@ abstract class AbstractWorker
      * Work timeout value
      *
      */
-    public $workTimeout = null;
+    public ?int $workTimeout = null;
 
     /**
      * Whether syscalls should be delayed
@@ -62,7 +62,7 @@ abstract class AbstractWorker
      */
     protected int $idleTimeout = 0;
 
-    protected LoggerInterface $logger;
+    protected ?LoggerInterface $logger = null;
 
     private $adapter;
 
@@ -111,7 +111,7 @@ abstract class AbstractWorker
      */
     public function setQueueName(string $string): void
     {
-        $this->queueName = (string) $string;
+        $this->queueName = $string;
     }
 
     /**
@@ -121,7 +121,7 @@ abstract class AbstractWorker
      */
     public function setRestartThreshold(int $int): void
     {
-        $this->restartThreshold = (int) $int;
+        $this->restartThreshold = $int;
     }
 
     /**
@@ -131,7 +131,7 @@ abstract class AbstractWorker
      */
     public function setIdleTimeout(int $int): void
     {
-        $this->idleTimeout = (int) $int;
+        $this->idleTimeout = $int;
     }
 
     /**
@@ -150,15 +150,6 @@ abstract class AbstractWorker
         if (isset($this->logger)) {
             $this->logger->info($message);
         }
-    }
-
-    /**
-     * @param string $message
-     * @deprecated
-     */
-    public function debug(string $message): void
-    {
-        $this->logDebug($message);
     }
 
     /**
@@ -254,8 +245,11 @@ abstract class AbstractWorker
 
     /**
      * Process data,
+     *
+     *
+     * @psalm-return \Generator<int|string|null, string|null, mixed, null>
      */
-    protected function work()
+    protected function work(): \Generator
     {
         if (!$this->bind) {
             return;
@@ -299,10 +293,12 @@ abstract class AbstractWorker
                 /**
                  * @see http://php.net/manual/en/generator.send.php
                  */
+                /**
+                 * @var array{0: string|int, 1: string} $job
+                 */
                 $response = (yield $job[0] => $job[1]);
                 yield;
 
-                $ack = false;
                 if (false === $response) {
                     $this->logDebug('Calling afterWorkFailed, worker reported failure');
                     $ack = $this->adapter->afterWorkFailed($job[0]);

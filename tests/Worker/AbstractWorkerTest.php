@@ -4,26 +4,17 @@ namespace BackQ\Tests\Worker;
 
 use BackQ\Tests\Support\TestAdapter;
 use BackQ\Tests\Support\TestWorker;
-use Exception;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Throwable;
+use function restore_error_handler;
+use function set_error_handler;
+use const E_USER_WARNING;
 
 class AbstractWorkerTest extends TestCase
 {
+
     private TestAdapter $adapter;
-
-    protected function setUp(): void
-    {
-        $this->adapter = new TestAdapter();
-    }
-
-    private function makeWorker(array $responses = [true]): TestWorker
-    {
-        $worker = new TestWorker($this->adapter, $responses);
-        $worker->setLogger(new NullLogger());
-
-        return $worker;
-    }
 
     public function testGetSetQueueName(): void
     {
@@ -111,7 +102,7 @@ class AbstractWorkerTest extends TestCase
         $worker = $this->makeWorker();
         $worker->workTimeout = 0;
 
-        $this->expectException(Exception::class);
+        $this->expectException(Throwable::class);
         $this->expectExceptionMessage('Worker failed to fetch new job');
 
         $worker->run();
@@ -135,5 +126,18 @@ class AbstractWorkerTest extends TestCase
         }
 
         $this->assertFalse($triggered);
+    }
+
+    protected function setUp(): void
+    {
+        $this->adapter = new TestAdapter();
+    }
+
+    private function makeWorker(array $responses = [true]): TestWorker
+    {
+        $worker = new TestWorker($this->adapter, $responses);
+        $worker->setLogger(new NullLogger());
+
+        return $worker;
     }
 }

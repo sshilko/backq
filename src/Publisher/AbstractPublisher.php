@@ -37,7 +37,7 @@ abstract class AbstractPublisher
      * @param \BackQ\Adapter\AbstractAdapter $adapter
      *
      */
-    public static function getInstance(): AbstractPublisher
+    public static function getInstance(): self
     {
         $class = static::class;
 
@@ -60,7 +60,7 @@ abstract class AbstractPublisher
      */
     public function setQueueName(string $string): void
     {
-        $this->queueName = (string) $string;
+        $this->queueName = $string;
     }
 
     /**
@@ -97,7 +97,7 @@ abstract class AbstractPublisher
      * Checks (if possible) if there are workers to work immediately
      *
      */
-    public function hasWorkers(): ?int
+    public function hasWorkers(): bool
     {
         return $this->adapter->hasWorkers($this->getQueueName());
     }
@@ -108,9 +108,8 @@ abstract class AbstractPublisher
      * @param mixed $serializable job payload
      * @param array $params adapter specific params
      *
-     * @return string|false
      */
-    public function publish($serializable, $params = [])
+    public function publish($serializable, $params = []): string|false
     {
         if (!$this->bind) {
             return false;
@@ -119,7 +118,7 @@ abstract class AbstractPublisher
         return $this->adapter->putTask($this->serialize($serializable), $params);
     }
 
-    public function finish()
+    public function finish(): bool
     {
         if ($this->bind) {
             $this->adapter->disconnect();

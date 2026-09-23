@@ -7,34 +7,24 @@ use BackQ\Adapter\IO\Exception\RuntimeException;
 use BackQ\Tests\Support\FakeBeanstalkServer;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
-
 use function strlen;
 use function uniqid;
 
 class ClientTest extends TestCase
 {
+
     private FakeBeanstalkServer $server;
-
-    protected function setUp(): void
-    {
-        $this->server = new FakeBeanstalkServer();
-    }
-
-    protected function tearDown(): void
-    {
-        $this->server->close();
-    }
 
     public function testConfigDefaultsAreApplied(): void
     {
         $client = new Client();
 
         $this->assertSame([
-            'persistent' => true,
             'host' => '127.0.0.1',
+            'logger' => null,
+            'persistent' => true,
             'port' => 11300,
             'timeout' => 1,
-            'logger' => null,
         ], $this->config($client));
     }
 
@@ -43,11 +33,11 @@ class ClientTest extends TestCase
         $client = new Client(['host' => '10.0.0.1', 'port' => 12345, 'timeout' => 5, 'persistent' => false]);
 
         $this->assertSame([
-            'persistent' => false,
             'host' => '10.0.0.1',
+            'logger' => null,
+            'persistent' => false,
             'port' => 12345,
             'timeout' => 5,
-            'logger' => null,
         ], $this->config($client));
     }
 
@@ -243,6 +233,16 @@ class ClientTest extends TestCase
 
         $producer->disconnect();
         $worker->disconnect();
+    }
+
+    protected function setUp(): void
+    {
+        $this->server = new FakeBeanstalkServer();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->server->close();
     }
 
     private function connectClient(): Client

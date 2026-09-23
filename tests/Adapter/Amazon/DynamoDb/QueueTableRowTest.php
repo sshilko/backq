@@ -4,8 +4,9 @@ namespace BackQ\Tests\Adapter\Amazon\DynamoDb;
 
 use BackQ\Adapter\Amazon\DynamoDb\QueueTableRow;
 use PHPUnit\Framework\TestCase;
-
+use function array_key_first;
 use function crc32;
+use function json_decode;
 use function json_encode;
 
 class QueueTableRowTest extends TestCase
@@ -94,5 +95,29 @@ class QueueTableRowTest extends TestCase
         ];
 
         $this->assertNotNull(QueueTableRow::fromArray($plain));
+    }
+
+    public function testFromArrayWithMetadataMissingChecksumReturnsNull(): void
+    {
+        $plain = [
+            'id'         => 'q.1',
+            'metadata'   => json_encode(['extra' => 'meta']),
+            'payload'    => 'job-body',
+            'time_ready' => 12345,
+        ];
+
+        $this->assertNull(QueueTableRow::fromArray($plain));
+    }
+
+    public function testFromArrayWithMalformedMetadataReturnsNull(): void
+    {
+        $plain = [
+            'id'         => 'q.1',
+            'metadata'   => 'not-json',
+            'payload'    => 'job-body',
+            'time_ready' => 12345,
+        ];
+
+        $this->assertNull(QueueTableRow::fromArray($plain));
     }
 }

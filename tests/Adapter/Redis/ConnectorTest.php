@@ -7,6 +7,7 @@ use BackQ\Adapter\Redis\Queue;
 use Illuminate\Contracts\Redis\Factory;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
+use function assert;
 
 class ConnectorTest extends TestCase
 {
@@ -16,13 +17,13 @@ class ConnectorTest extends TestCase
 
         $connector = new Connector($redis);
 
-        /** @var Queue $queue */
         $queue = $connector->connect([
-            'queue'      => 'backq.test.queue',
-            'connection' => 'default',
-            'retry_after' => 90,
             'block_for'   => 3,
+            'connection' => 'default',
+            'queue'      => 'backq.test.queue',
+            'retry_after' => 90,
         ]);
+        assert($queue instanceof Queue);
 
         $this->assertInstanceOf(Queue::class, $queue);
 
@@ -39,8 +40,8 @@ class ConnectorTest extends TestCase
 
         $connector = new Connector($redis);
 
-        /** @var Queue $queue */
         $queue = $connector->connect(['queue' => 'default']);
+        assert($queue instanceof Queue);
 
         $this->assertInstanceOf(Queue::class, $queue);
 

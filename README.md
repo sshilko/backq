@@ -9,12 +9,12 @@ Background **queue processing** - publish tasks and process with workers, simpli
 * [Long delay scheduling](https://aws.amazon.com/blogs/aws/new-manage-dynamodb-items-using-time-to-live-ttl/) via the DynamoSQS adapter and the serialized worker, for reliable long-term scheduled jobs
 * Extendable - write your own worker and use existing adapters out of the box ...
 
-Requires **PHP >= 8.1**.
+Requires **PHP >= 8.3**.
 
 #### Installation
 
 ```
-composer require sshilko/backq:^4.0
+composer require sshilko/backq:^5.0
 ```
 
 #### Testing
@@ -58,7 +58,7 @@ docker stop example-backq-redis
 
 The examples autoload the library from the repo-root `vendor/autoload.php`, so run them
 from a checkout of this repository. In your own project, depend on
-`composer require sshilko/backq:^4.0` and build workers against `BackQ\` directly.
+`composer require sshilko/backq:^5.0` and build workers against `BackQ\` directly.
 
 #### Supported queue servers
 
@@ -88,9 +88,9 @@ Adapter implemented features
 | [DynamoSQS](https://aws.amazon.com/) | * | * | +
 
 `*` - unsupported/partial: `NSQ::ping()` only reflects an already-open connection;
-`DynamoSQS::ping()` always returns `true`. `hasWorkers` is a **deprecated** stub on
-`Redis`, `Nsq` and `DynamoSQS` that always reports `true` (Beanstalkd implements it
-against real stats). `NSQ::setWorkTimeout()` is accepted but not applied by the server
+`DynamoSQS::ping()` always returns `true`. `hasWorkers()` is a stub on `Redis`,
+`Nsq` and `DynamoSQS` that always reports `false` (Beanstalkd implements it against
+real stats). `NSQ::setWorkTimeout()` is accepted but not applied by the server
 protocol.
 
 Worker available features
@@ -98,9 +98,9 @@ Worker available features
 - `setRestartThreshold` (limit max number of jobs cycles, then terminate)
 - `setIdleTimeout` (limit max idle time, then terminating)
 
-> Migrating from 3.x? See [UPGRADING](UPGRADING) for 4.x backward-incompatible changes:
-> PHP >= 8.1 requirement, typed adapter-contract return types, and the removal of the
-> legacy APNs binary and GCM/FCM push stacks (use AWS SNS platform endpoints instead).
+> Migrating from 4.x? See [UPGRADING](UPGRADING) for 5.x backward-incompatible changes:
+> PHP >= 8.3 requirement, `hasWorkers()` narrowed to `bool`, and the removal of
+> deprecated adapter aliases and dead API.
 
 TLDR
 

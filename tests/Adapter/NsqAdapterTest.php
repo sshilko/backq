@@ -5,7 +5,6 @@ namespace BackQ\Tests\Adapter;
 use BackQ\Adapter\Nsq;
 use PHPUnit\Framework\TestCase;
 use Throwable;
-
 use function fclose;
 use function fsockopen;
 use function getenv;
@@ -22,9 +21,9 @@ use function uniqid;
  */
 class NsqAdapterTest extends TestCase
 {
-    private const DEFAULT_HOST = 'nsq';
+    private const string DEFAULT_HOST = 'nsq';
 
-    private const DEFAULT_PORT = 4150;
+    private const int DEFAULT_PORT = 4150;
 
     public function testPublisherToConsumerFlow(): void
     {
@@ -53,7 +52,7 @@ class NsqAdapterTest extends TestCase
         $task = $this->pickTaskUntilMessageReceived($consumer);
 
         if (is_array($task)) {
-            [$id, $message, ] = $task;
+            [$id, $message,] = $task;
             $this->assertSame($body, $message);
             $this->assertTrue($consumer->afterWorkSuccess($id));
         } else {
@@ -73,7 +72,7 @@ class NsqAdapterTest extends TestCase
         while (time() < $deadline) {
             try {
                 $task = $consumer->pickTask();
-            } catch (Throwable $e) {
+            } catch (Throwable) {
                 $task = false;
             }
 

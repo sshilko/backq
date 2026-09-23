@@ -10,6 +10,7 @@
 
 namespace BackQ\Message;
 
+use Override;
 use Serializable;
 use function serialize;
 use function unserialize;
@@ -17,11 +18,31 @@ use function unserialize;
 class Generic extends AbstractMessage implements Serializable
 {
 
-    protected mixed $data;
-
-    public function __construct(mixed $data)
+    public function __construct(protected mixed $data)
     {
-        $this->data = $data;
+    }
+
+    /**
+     * @deprecated use native __serialize()/__unserialize() instead
+     */
+    #[Override]
+    public function serialize(): string
+    {
+        return serialize($this->data);
+    }
+
+    /**
+     * @deprecated use native __serialize()/__unserialize() instead
+     */
+    #[Override]
+    public function unserialize(string $data): void
+    {
+        $this->data = unserialize($data);
+    }
+
+    public function getData(): mixed
+    {
+        return $this->data;
     }
 
     public function __serialize(): array
@@ -32,26 +53,5 @@ class Generic extends AbstractMessage implements Serializable
     public function __unserialize(array $data): void
     {
         $this->data = $data['data'] ?? null;
-    }
-
-    /**
-     * @deprecated use native __serialize()/__unserialize() instead
-     */
-    public function serialize(): string
-    {
-        return serialize($this->data);
-    }
-
-    /**
-     * @deprecated use native __serialize()/__unserialize() instead
-     */
-    public function unserialize(string $data): void
-    {
-        $this->data = unserialize($data);
-    }
-
-    public function getData(): mixed
-    {
-        return $this->data;
     }
 }

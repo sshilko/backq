@@ -9,6 +9,20 @@
 ========================================
 
 - PHP: minimum supported version is now `>= 8.3` (was `>= 8.1`).
+- `BackQ\Adapter\AbstractAdapter::hasWorkers($queue)` is narrowed to `bool`
+  (was `bool|int|null`). Concrete adapters return real values where the backend
+  supports the check and `false` elsewhere: `Redis`, `Nsq` and `DynamoSQS`
+  report "no workers" (a documented stub contract), `Beanstalk` implements the
+  check against real tube stats. Subclasses overriding `hasWorkers()` must
+  declare a `bool` return type.
+- `BackQ\Worker\AbstractWorker::$workTimeout` is now typed `?int` (was untyped,
+  default `null`). Child classes that assign an `int` (such as the SNS workers'
+  `= 5`) must declare `?int $workTimeout`.
+- Deprecated/dead API removed:
+  - `BackQ\Worker\AbstractWorker::debug()` (use `logDebug()`)
+  - NSQ `info()`/`error()` aliases on `BackQ\Adapter\Nsq` (use the PSR-3
+    `logInfo()`/`logError()` methods)
+  - `BackQ\Adapter\Beanstalk::pickTasks()` (dead, unused)
 - `BackQ\Message\Generic` keeps `Serializable` for backward compatibility but
   now also implements the native `__serialize()`/`__unserialize()` magic
   methods (removing the PHP 8.1+ interface deprecation). The legacy
@@ -17,12 +31,22 @@
   `O:` format.
 - Dependency floors raised (see `composer.json`): `symfony/console` is now a
   declared runtime dependency (was a transitive, undeclared one).
+- `#[Override]` attributes are used on adapter, worker and message method
+  overrides (PHP 8.3). Subclasses that override a method that already carries
+  the attribute only need to keep their own signatures compatible — the
+  attribute is not inherited and is not required on child overrides.
 
 ========================================
 2. New Features
 ========================================
 
+- `BackQ\Adapter\ConnectionState`: backed `int` enum (`Nothing` = 0,
+  `BindWrite` = 1, `BindRead` = 2) used internally by the `Redis` and `Nsq`
+  adapters for the connection state machine. The legacy `STATE_*` integer
+  constants on both adapters are kept for backward compatibility.
 - `BackQ\Message\Generic::$data` and `getData()` are typed (`mixed`).
+- `json_validate()` in place of `@json_decode(...)` + `is_array` checks in
+  `BackQ\Adapter\DynamoSQS` and `BackQ\Adapter\Amazon\DynamoDb\QueueTableRow`.
 
 ------------------------------------------------------------------------------
 3.x -> 4.x (PHP 8.1 modernization)

@@ -10,34 +10,35 @@
 
 namespace BackQ\Message\Amazon\SNS\Application\PlatformEndpoint;
 
+use Override;
 use function json_encode;
 
 class Publish implements PublishMessageInterface
 {
 
-    protected $attributes;
+    protected array $attributes = [];
 
     /**
      * Amazon Resource name that uniquely identifies a Resource on AWS that we'll
      * publish to, in this case it's an endpoint
      */
-    protected string $targetArn;
+    protected string $targetArn = '';
 
     /**
      * Message payload
      * @see http://docs.aws.amazon.com/sns/latest/dg/mobile-push-send-custommessage.html
      *
-     * @var array
      */
-    protected array $message;
+    protected array $message = [];
 
-    protected $messageStructure;
+    protected string $messageStructure = '';
 
     /**
      * Message payload
      *
      * @param array $message
      */
+    #[Override]
     public function setMessage(array $message): void
     {
         $this->message = $message;
@@ -48,7 +49,8 @@ class Publish implements PublishMessageInterface
      * a subset of Gcm format into a customContent key
      *
      */
-    public function getMessage(): string
+    #[Override]
+    public function getMessage(): string|false
     {
         return json_encode($this->message);
     }
@@ -57,6 +59,7 @@ class Publish implements PublishMessageInterface
      * Returns the Amazon Resource Name for the endpoint a message should be published to
      *
      */
+    #[Override]
     public function getTargetArn(): string
     {
         return $this->targetArn;
@@ -67,6 +70,7 @@ class Publish implements PublishMessageInterface
      *
      * @param string $targetArn
      */
+    #[Override]
     public function setTargetArn(string $targetArn): void
     {
         $this->targetArn = $targetArn;
@@ -75,8 +79,8 @@ class Publish implements PublishMessageInterface
     /**
      * Gets specific attributes to complete a Publish operation to an endpoint
      *
-     * @return array
      */
+    #[Override]
     public function getAttributes(): array
     {
         return $this->attributes;
@@ -87,16 +91,19 @@ class Publish implements PublishMessageInterface
      *
      * @param array $attrs
      */
+    #[Override]
     public function setAttributes(array $attrs): void
     {
         $this->attributes = $attrs;
     }
 
+    #[Override]
     public function getMessageStructure(): string
     {
         return $this->messageStructure;
     }
 
+    #[Override]
     public function setMessageStructure(string $structure): void
     {
         $this->messageStructure = $structure;

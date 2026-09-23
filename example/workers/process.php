@@ -9,7 +9,6 @@
  * Redistributions of files must retain the above copyright notice.
  */
 use BackQ\Adapter\Beanstalk;
-use BackQ\Adapter\Redis;
 use BackQ\Worker\AProcess;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
@@ -26,13 +25,12 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 $output  = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
 $logger  = new ConsoleLogger($output);
 
-$adapters = [new Redis(), new Beanstalk()];
-$adapter  = $adapters[array_rand($adapters)];
+$adapter = new Beanstalk();
 echo 'Using ' . get_class($adapter) . ' adapter' . "\n";
 
 $worker = new AProcess($adapter);
 $worker->setLogger($logger);
 $worker->setWorkTimeout(5);
 $worker->setIdleTimeout(12);
-$worker->setQueueName('abc');
+$worker->setQueueName('process');
 $worker->run();

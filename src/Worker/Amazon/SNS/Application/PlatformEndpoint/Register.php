@@ -11,23 +11,24 @@
 
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
-use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RegisterMessageInterface;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
+use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
+use Override;
 use Throwable;
-
 use function date;
 use function error_log;
-use function get_class;
 use function gettype;
 use function in_array;
-use function is_subclass_of;
+use function is_string;
 use function unserialize;
 
 class Register extends PlatformEndpoint
 {
-    public $workTimeout = 5;
 
+    public ?int $workTimeout = 5;
+
+    #[Override]
     public function run(): void
     {
         $this->logDebug('Started');
@@ -57,41 +58,47 @@ class Register extends PlatformEndpoint
                          */
                         continue;
                     }
+                    if (!is_string($payload)) {
+                        $work->send(true);
+                        $this->logDebug('Worker does not support payload of: ' . gettype($payload));
+
+                        continue;
+                    }
+                    if (null === $taskId) {
+                        continue;
+                    }
                     $message   = @unserialize($payload);
                     $processed = true;
 
-                    if (!($message instanceof RegisterMessageInterface)) {
+                    if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register)) {
                         $work->send(true);
                         $this->logDebug('Worker does not support payload of: ' . gettype($message));
 
                         continue;
                     }
 
+                    /**
+                     * @var array{EndpointArn: string}|null $endpointResult
+                     */
+                    $endpointResult = null;
                     try {
                         $endpointResult = $this->snsClient->createPlatformEndpoint([
+                            'Attributes'             => $message->getAttributes(),
                             'PlatformApplicationArn' => $message->getApplicationArn(),
                             'Token'                  => $message->getToken(),
-                            'Attributes'             => $message->getAttributes(),
                         ]);
                     } catch (Throwable $e) {
-                        if (
-                            is_subclass_of(
-                                '\BackQ\Worker\Amazon\SNS\Client\Exception\SnsException',
-                                $e::class
-                            )
-                        ) {
+                        if ($e instanceof SnsException) {
                             /**
                              * We can't do anything on specific errors and then the job is marked as processed
                              * @see http://docs.aws.amazon.com/sns/latest/api/API_CreatePlatformEndpoint.html#API_CreatePlatformEndpoint_Errors
-                             * @var $e SnsException
                              */
-                            if (
-                                in_array(
-                                    $e->getAwsErrorCode(),
-                                    [SnsException::AUTHERROR,
+                            if (in_array(
+                                $e->getAwsErrorCode(),
+                                [SnsException::AUTHERROR,
                                     SnsException::INVALID_PARAM,
                                     SnsException::NOTFOUND]
-                                )
+                            )
                             ) {
                                 $work->send(true);
 
@@ -103,12 +110,8 @@ class Register extends PlatformEndpoint
                              * temporary issue and we can retry creating the endpoint
                              * Same process for general network issues
                              */
-                            if (
-                                SnsException::INTERNAL === $e->getAwsErrorCode() ||
-                                is_subclass_of(
-                                    '\BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException',
-                                    $e->getPrevious()::class
-                                )
+                            if (SnsException::INTERNAL === $e->getAwsErrorCode() ||
+                                $e->getPrevious() instanceof NetworkException
                             ) {
                                 /**
                                  * Only retry if the max threshold has not been reached
@@ -171,7 +174,7 @@ class Register extends PlatformEndpoint
      */
     protected function onSuccess(
         string $endpointArn,
-        \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register $message
+        \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register $message,
     ): bool {
         return true;
     }

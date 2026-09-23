@@ -12,11 +12,12 @@
 namespace BackQ\Message;
 
 use GuzzleHttp\Psr7\Message;
-use GuzzleHttp\Psr7\Request;
 use LogicException;
+use Psr\Http\Message\RequestInterface;
 
 class Guzzle extends AbstractMessage
 {
+
     private $request;
 
     private $scheme = null;
@@ -24,14 +25,13 @@ class Guzzle extends AbstractMessage
     /**
      * Guzzle constructor.
      *
-     * @param Request|null $request
+     * @param RequestInterface|null $request
      * @param string|null                   $rawRequest
      */
     public function __construct($request = null, ?string $rawRequest = null)
     {
         if ($request) {
             if ('https' === $request->getUri()->getScheme()) {
-                $request->withRequestTarget('absolute-form');
                 /**
                  * Preserver HTTPS schema correctly
                  */
@@ -48,7 +48,7 @@ class Guzzle extends AbstractMessage
 
     /**
      */
-    public function getRequest(): Request
+    public function getRequest(): RequestInterface
     {
         $request = Message::parseRequest($this->request);
         if (!empty($this->scheme)) {

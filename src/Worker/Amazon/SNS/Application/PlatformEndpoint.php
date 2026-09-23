@@ -24,7 +24,7 @@ abstract class PlatformEndpoint extends Application
      * Maximum number of times that the same Job can attempt to be reprocessed
      * after an error that it could be recovered from in a next iteration
      */
-    public const RETRY_MAX = 3;
+    public const int RETRY_MAX = 3;
 
     protected $queueName = 'aws_sns_endpoints_';
 
@@ -45,6 +45,8 @@ abstract class PlatformEndpoint extends Application
      */
     public function getPlatform(): string
     {
-        return substr($this->queueName, strrpos($this->queueName, '_') + 1);
+        $pos = strrpos($this->queueName, '_');
+
+        return substr($this->queueName, (false === $pos ? 0 : $pos) + 1);
     }
 }

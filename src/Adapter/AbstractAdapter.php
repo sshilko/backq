@@ -16,17 +16,17 @@ use const E_USER_WARNING;
 
 abstract class AbstractAdapter
 {
-    public const PARAM_JOBTTR    = 'jobttr';
-    public const PARAM_READYWAIT = 'readywait';
+    public const string PARAM_JOBTTR    = 'jobttr';
+    public const string PARAM_READYWAIT = 'readywait';
 
-    public const JOBTTR_DEFAULT  = 60;
+    public const int JOBTTR_DEFAULT  = 60;
 
     /**
      * Whether logError should always call trigger_error
      */
     protected bool $triggerErrorOnError = true;
 
-    protected LoggerInterface $logger;
+    protected ?LoggerInterface $logger = null;
 
     /**
      * Connect to server
@@ -54,14 +54,14 @@ abstract class AbstractAdapter
      *
      * @return bool|array [id, payload]
      */
-    abstract public function pickTask($timeout = null);
+    abstract public function pickTask($timeout = null): bool|array;
 
     /**
      * Put job to process
      *
      * @return bool|string|int job id or false on failure
      */
-    abstract public function putTask($body, $params = []);
+    abstract public function putTask($body, $params = []): bool|string|int;
 
     /**
      * Acknowledge server: callback after successfully processing job
@@ -83,9 +83,8 @@ abstract class AbstractAdapter
     /**
      * Is there workers ready for job immediately
      *
-     * @return bool|int|null
      */
-    abstract public function hasWorkers($queue);
+    abstract public function hasWorkers($queue): bool;
 
     /**
      * Preffered limit of one work cycle

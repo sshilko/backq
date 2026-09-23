@@ -7,29 +7,14 @@ use BackQ\Adapter\Beanstalk\Client;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use RuntimeException;
-
+use function fclose;
 use function stream_socket_get_name;
 use function stream_socket_server;
 use function strrpos;
 use function substr;
-use function fclose;
 
 class BeanstalkAdapterTest extends TestCase
 {
-    private function adapterWithConnectedClient(): array
-    {
-        $adapter = new Beanstalk();
-        $client  = $this->createMock(Client::class);
-
-        $clientProp  = new ReflectionProperty(Beanstalk::class, 'client');
-        $clientProp->setValue($adapter, $client);
-
-        $connectedProp = new ReflectionProperty(Beanstalk::class, 'connected');
-        $connectedProp->setValue($adapter, true);
-
-        return [$adapter, $client];
-    }
-
     public function testConnectWhenAlreadyConnectedReturnsTrue(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
@@ -73,9 +58,9 @@ class BeanstalkAdapterTest extends TestCase
             ->willReturn(42);
 
         $params = [
+            Beanstalk::PARAM_JOBTTR    => 3,
             Beanstalk::PARAM_PRIORITY  => 1,
             Beanstalk::PARAM_READYWAIT => 2,
-            Beanstalk::PARAM_JOBTTR    => 3,
         ];
         $result = $adapter->putTask('body', $params);
         $this->assertSame('42', $result);
@@ -115,22 +100,6 @@ class BeanstalkAdapterTest extends TestCase
         $this->assertFalse($adapter->pickTask());
     }
 
-    public function testPickTasksReturnsCollectedJobs(): void
-    {
-        [$adapter, $client] = $this->adapterWithConnectedClient();
-        $client
-            ->expects($this->exactly(3))
-            ->method('reserve')
-            ->with(0)
-            ->willReturnOnConsecutiveCalls(
-                ['id' => 1, 'body' => 'a'],
-                ['id' => 2, 'body' => 'b'],
-                false
-            );
-
-        $this->assertSame([[1, 'a'], [2, 'b']], $adapter->pickTasks(5, 0));
-    }
-
     public function testAfterWorkSuccessDelegatesToDelete(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
@@ -147,7 +116,7 @@ class BeanstalkAdapterTest extends TestCase
         $this->assertTrue($adapter->afterWorkFailed(1));
     }
 
-    public function testHasWorkersReturnsWatchingCountForQueue(): void
+    public function testHasWorkersTrueWhenWorkersWatchingQueue(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
         $client
@@ -156,15 +125,27 @@ class BeanstalkAdapterTest extends TestCase
             ->with('tube')
             ->willReturn(['current-watching' => 2]);
 
-        $this->assertSame(2, $adapter->hasWorkers('tube'));
+        $this->assertTrue($adapter->hasWorkers('tube'));
     }
 
-    public function testHasWorkersReturnsWorkerCountWithoutQueue(): void
+    public function testHasWorkersFalseWhenNoWorkersWatchingQueue(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('statsTube')
+            ->with('tube')
+            ->willReturn(['current-watching' => 0]);
+
+        $this->assertFalse($adapter->hasWorkers('tube'));
+    }
+
+    public function testHasWorkersTrueWhenWorkersConnectedWithoutQueue(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
         $client->expects($this->once())->method('stats')->willReturn(['current-workers' => 3]);
 
-        $this->assertSame(3, $adapter->hasWorkers());
+        $this->assertTrue($adapter->hasWorkers());
     }
 
     public function testPingDelegatesToStats(): void
@@ -189,12 +170,11 @@ class BeanstalkAdapterTest extends TestCase
         $adapter->setTriggerErrorOnError(false);
         $this->assertFalse($adapter->putTask('body'));
         $this->assertFalse($adapter->pickTask());
-        $this->assertFalse($adapter->pickTasks(1, 0));
         $this->assertFalse($adapter->afterWorkSuccess(1));
         $this->assertFalse($adapter->afterWorkFailed(1));
         $this->assertFalse($adapter->bindWrite('tube'));
         $this->assertFalse($adapter->bindRead('tube'));
-        $this->assertNull($adapter->hasWorkers('tube'));
+        $this->assertFalse($adapter->hasWorkers('tube'));
         $this->assertFalse($adapter->disconnect());
         $this->assertFalse($adapter->connect('127.0.0.1', 1));
     }
@@ -223,6 +203,20 @@ class BeanstalkAdapterTest extends TestCase
             ->with('tube')
             ->willThrowException(new RuntimeException('boom'));
 
-        $this->assertNull($adapter->hasWorkers('tube'));
+        $this->assertFalse($adapter->hasWorkers('tube'));
+    }
+
+    private function adapterWithConnectedClient(): array
+    {
+        $adapter = new Beanstalk();
+        $client  = $this->createMock(Client::class);
+
+        $clientProp  = new ReflectionProperty(Beanstalk::class, 'client');
+        $clientProp->setValue($adapter, $client);
+
+        $connectedProp = new ReflectionProperty(Beanstalk::class, 'connected');
+        $connectedProp->setValue($adapter, true);
+
+        return [$adapter, $client];
     }
 }

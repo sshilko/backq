@@ -3,7 +3,6 @@
 namespace BackQ\Tests\Support;
 
 use RuntimeException;
-
 use function fclose;
 use function fread;
 use function fwrite;
@@ -13,8 +12,8 @@ use function sprintf;
 use function stream_socket_accept;
 use function stream_socket_get_name;
 use function stream_socket_server;
-use function strrpos;
 use function strlen;
+use function strrpos;
 use function substr;
 use function usleep;
 
@@ -27,9 +26,9 @@ use function usleep;
  */
 final class FakeBeanstalkServer
 {
-    private const READ_RETRIES = 200;
+    private const int READ_RETRIES = 200;
 
-    private const READ_RETRY_SLEEP_US = 10000;
+    private const int READ_RETRY_SLEEP_US = 10000;
 
     private $server;
 
@@ -107,6 +106,7 @@ final class FakeBeanstalkServer
             }
             if ('' === $chunk) {
                 usleep(self::READ_RETRY_SLEEP_US);
+
                 continue;
             }
             $data .= $chunk;

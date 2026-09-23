@@ -11,23 +11,29 @@
 namespace BackQ\Worker;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
+use Override;
+use Psr\Http\Message\ResponseInterface;
 use Throwable;
 use function date;
 use function error_log;
 use function gettype;
+use function is_string;
 use function json_encode;
 use function unserialize;
+use const JSON_THROW_ON_ERROR;
 
 final class Guzzle extends AbstractWorker
 {
 
-    public $workTimeout  = 4;
+    public ?int $workTimeout = 4;
 
     protected $queueName = 'guzzle';
     
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
+    #[Override]
     public function run(): void
     {
         $connected = $this->start();
@@ -55,6 +61,12 @@ final class Guzzle extends AbstractWorker
                         continue;
                     }
 
+                    if (!is_string($payload)) {
+                        $work->send(true);
+                        $this->logDebug('Worker does not support payload of: ' . gettype($payload));
+
+                        continue;
+                    }
                     $message   = @unserialize($payload);
                     $processed = true;
 
@@ -88,13 +100,14 @@ final class Guzzle extends AbstractWorker
 
                         $request = $message->getRequest();
                         $promise = $client->sendAsync($request)->then(
-                            static function ($fulfilledResponse) use ($me): void {
-                            /** @var $fulfilledResponse \GuzzleHttp\Psr7\Response */
+                            static function (ResponseInterface $fulfilledResponse) use ($me): void {
                                 $me->logDebug('Request sent, got response ' . $fulfilledResponse->getStatusCode() .
-                                         ' ' . json_encode((string)    $fulfilledResponse->getBody()));
+                                         ' ' . json_encode(
+                                             (string) $fulfilledResponse->getBody(),
+                                             JSON_THROW_ON_ERROR
+                                         ));
                             },
-                            static function ($rejectedResponse) use ($me): void {
-                                /** @var $rejectedResponse \GuzzleHttp\Exception\RequestException */
+                            static function (RequestException $rejectedResponse) use ($me): void {
                                 $me->logDebug('Request sent, FAILED with ' . $rejectedResponse->getMessage());
                             }
                         );

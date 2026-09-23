@@ -2,11 +2,12 @@
 
 [`backq-scheduled-stream`](backq-scheduled-stream.js) is a Lambda function setup as trigger for DynamoDB Streams. The Streams record all events from DynamoDB tables: Inserts, Updates, Removals.
 
-The function processes only items that were expired by Dynamo and sends the item body to an SQS queue. It is assumed that the DynamoDB table and the SQS queue have the same name (same requirement on DynamoSQS adapter).
+The function processes only items that were expired by DynamoDB TTL and sends the item body to an SQS queue. It is assumed that the DynamoDB table and the SQS queue have the same name (same requirement on DynamoSQS adapter).
 
 Moreover, it calculates the delay between expected item TTL trigger and actual triggered time and sends it as a custom CloudWatch metric.
 
-The latest function version uses the Node.js 12.x runtime. It should be executed relatively fast and has 3 seconds timeout.
+The function uses the Node.js 18.x runtime (or newer) and the AWS SDK for JavaScript v3 packages
+(`@aws-sdk/client-sqs`, `@aws-sdk/client-cloudwatch`, `@aws-sdk/util-dynamodb`). It should be executed relatively fast and has 3 seconds timeout.
 
 
 ### DynamoDB Stream/TTL setup ###
@@ -17,7 +18,7 @@ By default, Dynamo Streams are disabled. It can be enabled via the *Overview* ta
 
 To setup a stream, there are multiple views for the affected items: KEYS_ONLY, NEW_IMAGE, OLD_IMAGE, NEW_AND_OLD_IMAGES. Since the function will only need `removed` items, it is set as the **OLD_IMAGE** only.
 
-Payloads received by the function have the full item contents that can be converted to a readable JSON format via `DynamoDB.Converter.unmarshall`.
+Payloads received by the function have the full item contents that can be converted to a readable JSON format via `@aws-sdk/util-dynamodb` `unmarshall`.
 
 Streams are set as lambda function triggers and the batch size can be configured as wished. We keep batches of 10 items.
 

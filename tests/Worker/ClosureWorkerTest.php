@@ -9,26 +9,12 @@ use BackQ\Worker\Closure as ClosureWorker;
 use Opis\Closure\SerializableClosure;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use function serialize;
 
 class ClosureWorkerTest extends TestCase
 {
+
     private TestAdapter $adapter;
-
-    protected function setUp(): void
-    {
-        Flag::$value       = false;
-        $this->adapter     = new TestAdapter();
-    }
-
-    private function makeWorker(): ClosureWorker
-    {
-        $worker = new ClosureWorker($this->adapter);
-        $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
-        $worker->setRestartThreshold(1);
-
-        return $worker;
-    }
 
     public function testProcessesClosureMessage(): void
     {
@@ -52,5 +38,21 @@ class ClosureWorkerTest extends TestCase
 
         $this->assertContains(['afterWorkSuccess', 8], $this->adapter->calls);
         $this->assertSame(false, Flag::$value);
+    }
+
+    protected function setUp(): void
+    {
+        Flag::$value       = false;
+        $this->adapter     = new TestAdapter();
+    }
+
+    private function makeWorker(): ClosureWorker
+    {
+        $worker = new ClosureWorker($this->adapter);
+        $worker->setLogger(new NullLogger());
+        $worker->setTriggerErrorOnError(false);
+        $worker->setRestartThreshold(1);
+
+        return $worker;
     }
 }

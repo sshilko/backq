@@ -10,10 +10,13 @@
 
 namespace BackQ\Message;
 
+use Override;
+
 abstract class AbstractMessage implements ConsumeInterface
 {
     /**
      */
+    #[Override]
     public function isReady(): bool
     {
         return true;
@@ -21,6 +24,7 @@ abstract class AbstractMessage implements ConsumeInterface
 
     /**
      */
+    #[Override]
     public function isExpired(): bool
     {
         return false;

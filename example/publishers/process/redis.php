@@ -23,7 +23,7 @@ use Symfony\Component\Console\Output\ConsoleOutput;
 
 require_once __DIR__ . '/../../../vendor/autoload.php';
 
-final class MyProcessPublisher extends Process
+final class MyRedisProcessPublisher extends Process
 {
     public const PARAM_READYWAIT = Redis::PARAM_READYWAIT;
 
@@ -39,11 +39,11 @@ final class MyProcessPublisher extends Process
     }
 }
 
-$publisher = MyProcessPublisher::getInstance();
+$publisher = MyRedisProcessPublisher::getInstance();
 if ($publisher->start() //&& $publisher->hasWorkers()
    ) {
     $message = new \BackQ\Message\Process('echo $( date +%s ) >> /tmp/test');
-    $result  = $publisher->publish($message, [MyProcessPublisher::PARAM_READYWAIT => random_int(0, 2)]);
+    $result  = $publisher->publish($message, [MyRedisProcessPublisher::PARAM_READYWAIT => random_int(0, 2)]);
     if ($result) {
         /**
          * Success

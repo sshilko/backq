@@ -14,8 +14,8 @@ namespace BackQ\Adapter\IO;
 use BackQ\Adapter\IO\Exception\RuntimeException;
 use BackQ\Adapter\IO\Exception\TimeoutException;
 use Exception;
+use Override;
 use Throwable;
-
 use function error_reporting;
 use function fclose;
 use function feof;
@@ -42,12 +42,14 @@ use function strlen;
 use function strval;
 use function substr;
 use function usleep;
-
 use const E_ALL;
 use const STREAM_CLIENT_CONNECT;
 use const STREAM_CLIENT_PERSISTENT;
 use const STREAM_SHUT_RDWR;
 
+/**
+ * @phpcs:disable
+ */
 class StreamIO extends AbstractIO
 {
     public const FREAD_0_TRIES = 3;
@@ -75,10 +77,10 @@ class StreamIO extends AbstractIO
      * @param      $host
      * @param      $port
      * @param      $connection_timeout
-     * @param null $read_write_timeout
-     * @param null $context
+     * @param int|null $read_write_timeout
+     * @param resource|null $context
      * @param bool $blocking
-     * @param string $persistent persistent connection identifier
+     * @param string|bool $persistent persistent connection identifier
      *
      * @throws RuntimeException
      * @throws Exception
@@ -90,7 +92,7 @@ class StreamIO extends AbstractIO
         $read_write_timeout = null,
         $context = null,
         $blocking = false,
-        private string $persistent = ''
+        private string|bool $persistent = ''
     ) {
         $errstr = $errno  = null;
         $this->sock       = null;
@@ -170,10 +172,19 @@ class StreamIO extends AbstractIO
          * Set small chunk size (default=4096/8192)
          * Setting this to small values (100bytes) still does NOT help detecting feof()
          */
-        stream_set_chunk_size($this->sock, 1024);
+        $chunkSize = stream_set_chunk_size($this->sock, 1024);
+        if (0 > $chunkSize) {
+            throw new Exception("Chunk size could not be set");
+        }
     }
 
-    public function read($n)
+    /**
+     * @return string
+     *
+     * @psalm-param int $n
+     */
+    #[Override]
+    public function read(int $n)
     {
         $info = stream_get_meta_data($this->sock);
 
@@ -216,14 +227,19 @@ class StreamIO extends AbstractIO
         return $fread_result;
     }
 
-    public function stream_set_timeout($read_write_timeout): void
+    /**
+     * @psalm-param int $read_write_timeout
+     */
+    #[Override]
+    public function stream_set_timeout(int $read_write_timeout): void
     {
         if (!stream_set_timeout($this->sock, $read_write_timeout)) {
             throw new Exception("Timeout (stream_set_timeout) could not be set");
         }
     }
 
-    public function write($data): void
+    #[Override]
+    public function write(string $data): void
     {
         // get status of socket to determine whether or not it has timed out
         $info = @stream_get_meta_data($this->sock);
@@ -297,10 +313,11 @@ class StreamIO extends AbstractIO
             //set_error_handler($ohandler);
             restore_error_handler();
 
-            throw new RuntimeException($t->getMessage(), $t->getCode());
+            throw new RuntimeException($t->getMessage(), (int) $t->getCode());
         }
     }
 
+    #[Override]
     public function close(): void
     {
         if (is_resource($this->sock)) {
@@ -319,6 +336,7 @@ class StreamIO extends AbstractIO
      * @throws TimeoutException
      * @return string|false
      */
+    #[Override]
     public function stream_get_line(int $length, string $delimiter = "\r\n")
     {
         $info = stream_get_meta_data($this->sock);
@@ -351,6 +369,7 @@ class StreamIO extends AbstractIO
      * @throws TimeoutException
      * @return string|false
      */
+    #[Override]
     public function stream_get_contents(int $length)
     {
         $info = stream_get_meta_data($this->sock);
@@ -366,6 +385,12 @@ class StreamIO extends AbstractIO
         return stream_get_contents($this->sock, $length);
     }
 
+    /**
+     * @return false|int
+     *
+     * @psalm-return false|int<0, max>
+     */
+    #[Override]
     public function selectWrite($sec, $usec)
     {
         $read   = null;
@@ -375,6 +400,12 @@ class StreamIO extends AbstractIO
         return stream_select($read, $write, $except, $sec, $usec);
     }
 
+    /**
+     * @return false|int
+     *
+     * @psalm-return false|int<0, max>
+     */
+    #[Override]
     public function selectRead($sec, $usec)
     {
         $read   = [$this->sock];

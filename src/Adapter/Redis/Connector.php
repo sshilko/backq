@@ -12,6 +12,7 @@ namespace BackQ\Adapter\Redis;
 
 use Illuminate\Contracts\Redis\Factory as Redis;
 use Illuminate\Queue\Connectors\RedisConnector;
+use Override;
 
 class Connector extends RedisConnector
 {
@@ -32,8 +33,12 @@ class Connector extends RedisConnector
      *
      * @param  array  $config
      */
+    #[Override]
     public function connect(array $config): Queue
     {
+        /**
+         * @var array{queue: string, connection?: string|null, retry_after?: int|null, block_for?: int|null} $config
+         */
         return new Queue(
             $this->redis,
             $config['queue'],

@@ -31,7 +31,7 @@ final class MySerializedPublisher extends Serialized
     public const PARAM_READYWAIT  = Beanstalk::PARAM_READYWAIT;
     public const PARAM_JOBTTR     = Beanstalk::PARAM_JOBTTR;
 
-    protected $queueName = '123';
+    protected $queueName = 'serialized';
 
     protected function setupAdapter(): AbstractAdapter
     {

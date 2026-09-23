@@ -30,7 +30,7 @@ if ($nsqsub->connect()) {
         while ($i > 0) {
             $nsqsub->logInfo('Picking task');
             $job = $nsqsub->pickTask();
-            if ($job) {
+            if ($job && $job[0]) {
                 $nsqsub->logInfo('Got task: ' . json_encode($job));
                 if (1 === rand(1, 2)) {
                     $nsqsub->logInfo('Reporting success');

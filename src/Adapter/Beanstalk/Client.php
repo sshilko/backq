@@ -12,15 +12,20 @@ namespace BackQ\Adapter\Beanstalk;
 
 use BackQ\Adapter\IO;
 use BackQ\Adapter\IO\Exception\RuntimeException;
+use Override;
 use Throwable;
 use function array_merge;
 use function intval;
+use function is_string;
 use function rtrim;
 use function sprintf;
 use function strlen;
 use function strtok;
 use const PHP_INT_MAX;
 
+/**
+ * @phpcs:disable
+ */
 class Client extends \Beanstalk\Client
 {
 
@@ -31,23 +36,25 @@ class Client extends \Beanstalk\Client
     public function __construct(array $config = [])
     {
         $defaults = [
-            'persistent' => true,
             'host' => '127.0.0.1',
+            'logger' => null,
+            'persistent' => true,
             'port' => 11300,
             'timeout' => 1,
-            'logger' => null,
         ];
         $this->_config = array_merge($defaults, $config);
     }
 
+    #[Override]
     public function __destruct()
     {
-        if (!empty($this->_config)) {
-            if ($this->_config['persistent']) {
-                return true;
-            }
+        /**
+         * @var array{persistent?: bool} $config
+         */
+        $config = $this->_config;
+        if (empty($config['persistent'])) {
+            $this->disconnect();
         }
-        $this->disconnect();
     }
 
     /**
@@ -60,26 +67,32 @@ class Client extends \Beanstalk\Client
      * @see \Beanstalk\Client::reserve()
      * @return bool `true` if the connection was established, `false` otherwise.
      */
+    #[Override]
     public function connect(): bool
     {
         if (isset($this->_io)) {
             $this->disconnect();
         }
 
+        /**
+         * @var array{host: string, port: int, timeout: int, persistent: bool} $config
+         */
+        $config = $this->_config;
+
         $connectionTimeout = 1;
-        if ($this->_config['timeout']) {
-            $connectionTimeout = $this->_config['timeout'];
+        if ($config['timeout']) {
+            $connectionTimeout = $config['timeout'];
         }
 
         try {
             $this->_io = new IO\StreamIO(
-                $this->_config['host'],
-                $this->_config['port'],
+                $config['host'],
+                $config['port'],
                 $connectionTimeout,
                 self::IO_TIMEOUT,
                 null,
                 true,
-                $this->_config['persistent']
+                $config['persistent']
             );
             $this->connected = true;
         } catch (Throwable $ex) {
@@ -90,18 +103,24 @@ class Client extends \Beanstalk\Client
     }
 
     /**
-     * @param null $timeout not specifying timeout may result in undetected connection issue and infinite waiting time
+     * @param int|null $timeout not specifying timeout may result in undetected connection issue and infinite waiting time
      *
      * @return array|false
      */
+    #[Override]
     public function reserve($timeout = null)
     {
+        /**
+         * @var IO\StreamIO $io
+         */
+        $io = $this->_io;
+
         /**
          * Writing will throw Exception on timeout -->
          */
         if (isset($timeout)) {
             $streamTimeout = $timeout + self::IO_TIMEOUT;
-            $this->_io->stream_set_timeout($streamTimeout);
+            $io->stream_set_timeout($streamTimeout);
             $this->_write(sprintf('reserve-with-timeout %d', $timeout));
         } else {
             $streamTimeout = PHP_INT_MAX;
@@ -109,7 +128,7 @@ class Client extends \Beanstalk\Client
              * Dangerously long waiting time, also pretty optimistic to expect an answer w/o timeout,
              * NOT RECOMMENDED use reserve w/o timeout
              */
-            $this->_io->stream_set_timeout($streamTimeout);
+            $io->stream_set_timeout($streamTimeout);
             $this->_write('reserve');
         }
         /**
@@ -120,7 +139,7 @@ class Client extends \Beanstalk\Client
          * Read mig
          */
         $readio = $this->_read();
-        $status = strtok($readio, ' ');
+        $status = is_string($readio) ? (string) strtok($readio, ' ') : '';
 
         /**
          * Every subsequent call to strtok only needs the token to use,
@@ -146,7 +165,7 @@ class Client extends \Beanstalk\Client
          * we write and then we try to read from the stream until: TIMEOUT is reached OR payload received
          * then restore general timeout
          */
-        $this->_io->stream_set_timeout(self::IO_TIMEOUT);
+        $io->stream_set_timeout(self::IO_TIMEOUT);
 
         switch ($status) {
             case 'RESERVED':
@@ -154,8 +173,6 @@ class Client extends \Beanstalk\Client
                     'id'   => $jobid,
                     'body' => $this->_read($bodyN),
                 ];
-
-                break;
             /**
              * If a non-negative timeout was specified and the timeout exceeded before a job
              * became available, or if the client's connection is half-closed, the server
@@ -171,8 +188,6 @@ class Client extends \Beanstalk\Client
                  * we waited TIMEOUT period and no payload was received, basicly a HEARTBEAT
                  */
                 return false;
-
-                break;
             case 'DEADLINE_SOON':
             default:
                 $this->_error(__FUNCTION__ . " status = '" . $status . "', timeout=" . $streamTimeout);
@@ -181,6 +196,7 @@ class Client extends \Beanstalk\Client
         }
     }
 
+    #[Override]
     public function disconnect()
     {
         if ($this->connected) {
@@ -197,20 +213,7 @@ class Client extends \Beanstalk\Client
         return $this->connected;
     }
 
-    /**
-     * Gives statistical information about the specified tube if it exists.
-     *
-     * @param string $tube Name of the tube.
-     * @return string|bool `false` on error otherwise a string with a yaml formatted dictionary.
-     */
-    public function statsTube($tube)
-    {
-        $cmd = sprintf('stats-tube %s', $tube);
-        $this->_write($cmd);
-
-        return $this->_statsRead($cmd);
-    }
-
+    #[Override]
     protected function _write($data)
     {
         if (!$this->connected) {
@@ -218,7 +221,11 @@ class Client extends \Beanstalk\Client
 
             throw new RuntimeException($message);
         }
-        $this->_io->write($data . "\r\n");
+        /**
+         * @var IO\StreamIO $io
+         */
+        $io = $this->_io;
+        $io->write($data . "\r\n");
 
         return strlen($data);
     }
@@ -226,6 +233,7 @@ class Client extends \Beanstalk\Client
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
+    #[Override]
     protected function _read($length = null)
     {
         if (!$this->connected) {
@@ -234,12 +242,17 @@ class Client extends \Beanstalk\Client
             throw new RuntimeException($message);
         }
 
+        /**
+         * @var IO\StreamIO $io
+         */
+        $io = $this->_io;
+
         if ($length) {
             try {
                 /**
                  * +2 for trailing "\r\n"
                  */
-                $packet = $this->_io->stream_get_contents($length + 2);
+                $packet = $io->stream_get_contents($length + 2);
                 if (false === $packet) {
                     /**
                      * stream_get_contents returns false on failure
@@ -260,7 +273,7 @@ class Client extends \Beanstalk\Client
             /**
              * The number of bytes to read from the handle
              */
-            $packet = $this->_io->stream_get_line(32768, "\r\n");
+            $packet = $io->stream_get_line(32768, "\r\n");
             if (false === $packet) {
                 /**
                  * stream_get_line can also return false on failure
@@ -272,17 +285,26 @@ class Client extends \Beanstalk\Client
         return $packet;
     }
 
-    protected function _statsRead($readWhat = '')
+    /**
+     * @param bool|string $decode
+     */
+    #[Override]
+    protected function _statsRead($decode = true)
     {
-        $status = strtok($this->_read(), ' ');
+        $status = (string) strtok((string) $this->_read(), ' ');
 
         switch ($status) {
             case 'OK':
                 $data = $this->_read((int) strtok(' '));
+                if (!is_string($data)) {
+                    $this->_error(__FUNCTION__ . ' failed to read stats body');
+
+                    return false;
+                }
 
                 return $this->_decode($data);
             default:
-                $this->_error(__FUNCTION__ . ' after ' . $readWhat . ' got ' . $status . ' expected OK');
+                $this->_error(__FUNCTION__ . ' after ' . (string) $decode . ' got ' . $status . ' expected OK');
 
                 return false;
         }

@@ -8,41 +8,20 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
-use BackQ\Adapter\AbstractAdapter;
 use BackQ\Adapter\Beanstalk;
-use BackQ\Adapter\Redis;
-use BackQ\Publisher\Process;
+use BackQ\Message\Process;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
 /**
  * Publisher
  *
- * Queues a process execution
+ * Queues a process execution via Beanstalk
  * Publishes a job into default queue="process"
  */
 
 require_once __DIR__ . '/../../vendor/autoload.php';
-
-final class MyProcessPublisher extends Process
-{
-
-    protected $queueName = 'abc';
-
-    protected function setupAdapter(): AbstractAdapter
-    {
-        $adapters = [new Redis(), new Beanstalk()];
-        $adapter  = $adapters[array_rand($adapters)];
-        echo 'Using ' . get_class($adapter) . ' adapter' . "\n";
-
-        $output  = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
-        $logger  = new ConsoleLogger($output);
-
-        $adapter->setLogger($logger);
-
-        return $adapter;
-    }
-}
+require_once __DIR__ . '/lib/myprocesspublisher.php';
 
 $publisher = MyProcessPublisher::getInstance();
 if ($publisher->start()) {

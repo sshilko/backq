@@ -15,13 +15,15 @@ use BackQ\Worker\AbstractWorker;
 abstract class Application extends AbstractWorker
 {
 
-    /** @var $snsClient AwsSnsClient */
-    protected $snsClient;
+    /**
+     * Sets up a client that will Publish SNS messages
+     */
+    protected mixed $snsClient;
 
     /**
      * Sets up a client that will Publish SNS messages
      *
-     * @param AwsSnsClient $awsSnsClient
+     * @param SnsClient $awsSnsClient
      */
     public function setClient($awsSnsClient): void
     {

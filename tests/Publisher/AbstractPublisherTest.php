@@ -8,15 +8,10 @@ use PHPUnit\Framework\TestCase;
 
 class AbstractPublisherTest extends TestCase
 {
-    private TestAdapter $adapter;
-    private TestPublisher $publisher;
 
-    protected function setUp(): void
-    {
-        $this->adapter   = new TestAdapter();
-        $this->publisher = new TestPublisher($this->adapter);
-        $this->publisher->setQueueName('testqueue');
-    }
+    private TestAdapter $adapter;
+
+    private TestPublisher $publisher;
 
     public function testGetSetQueueName(): void
     {
@@ -75,9 +70,9 @@ class AbstractPublisherTest extends TestCase
 
     public function testHasWorkersDelegatesToAdapter(): void
     {
-        $this->adapter->hasWorkersResult = 3;
+        $this->adapter->hasWorkersResult = true;
 
-        $this->assertSame(3, $this->publisher->hasWorkers());
+        $this->assertTrue($this->publisher->hasWorkers());
         $this->assertContains(['hasWorkers', 'testqueue'], $this->adapter->calls);
     }
 
@@ -96,10 +91,17 @@ class AbstractPublisherTest extends TestCase
         $serialized = serialize($this->publisher);
         $this->assertContains('disconnect', $this->adapter->calls);
 
-        /** @var TestPublisher $restored */
         $restored = unserialize($serialized);
+        \assert($restored instanceof TestPublisher);
 
         $this->assertInstanceOf(TestPublisher::class, $restored);
         $this->assertSame('testqueue', $restored->getQueueName());
+    }
+
+    protected function setUp(): void
+    {
+        $this->adapter   = new TestAdapter();
+        $this->publisher = new TestPublisher($this->adapter);
+        $this->publisher->setQueueName('testqueue');
     }
 }
