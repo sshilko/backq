@@ -321,6 +321,7 @@ class BeanstalkAdapterTest extends TestCase
     private function adapterWithConnectedClient(): array
     {
         $adapter = new Beanstalk();
+        $adapter->setTriggerErrorOnError(false);
         $client  = $this->createMock(Client::class);
 
         $clientProp  = new ReflectionProperty(Beanstalk::class, 'client');

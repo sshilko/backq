@@ -99,6 +99,15 @@ Notes:
 
 ## Testing quirks
 
+- **Always run PHPUnit inside the container** — never on the host. The host environment
+  (PHP version, missing extensions, different `vendor/` layout) will produce misleading
+  results. Use `docker exec backq.php83 sh -c 'cd /app && php ./vendor/bin/phpunit
+  --configuration=phpunit.xml'` or `composer app-tests` from within the repo root.
+- **The host shell is PowerShell, not bash.** Any command block that contains bash syntax
+  (`$var`, backticks, `&&`, `|` piped to `docker exec -i … bash -s`) must be sent as a
+  single-quoted here-string (`@' … '@`) so PowerShell does not interpolate variables.
+  One-shot `docker exec … bash -c "…"` commands work too as long as no host `$` variables
+  are present. Do not paste bare bash into a PowerShell prompt.
 - Always run PHPUnit inside the container: `php ./vendor/bin/phpunit --configuration=phpunit.xml`
 - `php -l` does **not** catch all load-time errors. A class file that fails to compile —
   e.g. a redundant union type such as `string|false|bool` ("Duplicate type false is
