@@ -29,6 +29,18 @@ jobs:
       - name: Pull dependency containers
         run: docker pull redis:7-alpine && docker pull nsqio/nsq:v1.3.0
 
+      - name: Cache tool caches
+        id: cache-restore
+        uses: actions/cache@v4
+        with:
+          path: |
+            tmp/psalm-cache
+            tmp/phpstan
+            .phan/cache
+          key: ${{ runner.os }}-quality-cache-${{ hashFiles('composer.lock', 'build/psalm.xml', 'build/phpstan.neon', 'build/phan.php') }}
+          restore-keys: |
+            ${{ runner.os }}-quality-cache-
+
       - name: Start services
         run: docker compose -f build/docker-compose.yaml up -d --pull never --wait redis nsq app-php83
 
@@ -38,8 +50,23 @@ jobs:
       - name: Run the PHPUnit suite (Redis + NSQ integration)
         run: docker compose -f build/docker-compose.yaml exec -T app-php83 php ./vendor/bin/phpunit --configuration=phpunit.xml
 
+      - name: Restore tool caches into container
+        if: steps.cache-restore.outputs.cache-hit == 'true'
+        run: |
+          for dir in tmp/psalm-cache tmp/phpstan .phan/cache; do
+            [ -d "$dir" ] && docker cp "$dir" app-php83:/app/"$dir"
+          done
+
       - name: Run the code quality suite
         run: docker compose -f build/docker-compose.yaml exec -T app-php83 composer app-code-quality
+
+      - name: Save tool caches from container
+        if: always()
+        run: |
+          mkdir -p tmp/psalm-cache tmp/phpstan .phan/cache
+          for dir in tmp/psalm-cache tmp/phpstan .phan/cache; do
+            docker cp app-php83:/app/"$dir" "$dir"
+          done
 
       - name: Stop services
         if: always()

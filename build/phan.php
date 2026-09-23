@@ -23,7 +23,10 @@ use Phan\Issue;
 return [
     // The number of processes to fork off during the analysis
     // phase.
-    'processes' => 2,
+    'processes' => 4,
+
+    // Cache directory for Phan's parsed AST cache.
+    'cache_directory' => '.phan/cache',
 
     // The minimum severity level to report on. This can be
     // set to Issue::SEVERITY_LOW, Issue::SEVERITY_NORMAL or

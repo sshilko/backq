@@ -3,8 +3,30 @@
          xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          cacheDirectory=".phpunit.cache"
-         colors="true"
-         failOnWarning="true">
+    colors="true"
+    columns="60"
+    processIsolation="false"
+    stopOnDefect="false"
+    stopOnError="false"
+    stopOnFailure="false"
+    stopOnWarning="false"
+    stopOnIncomplete="false"
+    stopOnSkipped="false"
+    stopOnRisky="false"
+    failOnRisky="true"
+    failOnWarning="false"
+    failOnIncomplete="true"
+    failOnSkipped="true"
+    defaultTimeLimit="0"
+    enforceTimeLimit="false"
+    testdox="true"
+    executionOrder="depends,defects"
+    beStrictAboutOutputDuringTests="false"
+    beStrictAboutChangesToGlobalState="true"
+    displayDetailsOnTestsThatTriggerDeprecations="false"
+    displayDetailsOnTestsThatTriggerErrors="true"
+    displayDetailsOnTestsThatTriggerNotices="true"
+    displayDetailsOnTestsThatTriggerWarnings="true">
     <testsuites>
         <testsuite name="backq">
             <directory>tests</directory>
