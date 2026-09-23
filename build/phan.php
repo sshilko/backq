@@ -27,7 +27,7 @@ return [
     // The minimum severity level to report on. This can be
     // set to Issue::SEVERITY_LOW, Issue::SEVERITY_NORMAL or
     // Issue::SEVERITY_CRITICAL.
-    'minimum_severity' => Issue::SEVERITY_LOW,
+    'minimum_severity' => Issue::SEVERITY_NORMAL,
 
     'suppress_issue_types' => [
         'PhanParamNameIndicatingUnusedInClosure'
@@ -76,6 +76,7 @@ return [
     //       and `exclude_analysis_directory_list` arrays.
     'exclude_analysis_directory_list' => [
         'vendor/',
+        'build/tmp',
     ],
 
     # ------------------------------------------------------
