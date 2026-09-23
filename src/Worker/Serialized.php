@@ -15,6 +15,7 @@ use BackQ\Publisher\AbstractPublisher;
 use Override;
 use Throwable;
 use function gettype;
+use function is_string;
 use function time;
 use function unserialize;
 
@@ -54,6 +55,12 @@ class Serialized extends AbstractWorker
                         continue;
                     }
 
+                    if (!is_string($payload)) {
+                        $work->send(true);
+                        $this->logError('Worker does not support payload of: ' . gettype($payload));
+
+                        continue;
+                    }
                     $message   = @unserialize($payload);
                     $processed = true;
 

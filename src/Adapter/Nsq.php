@@ -11,7 +11,7 @@
 
 namespace BackQ\Adapter;
 
-use Datetime;
+use DateTime;
 use Override;
 use RuntimeException;
 use Throwable;
@@ -119,7 +119,7 @@ class Nsq extends AbstractAdapter
     {
         $this->config['host']     = $host;
         $this->config['port']     = $port;
-        $this->config['clientId'] = gethostname() . '_' . getmypid();
+        $this->config['clientId'] = (string) gethostname() . '_' . (string) getmypid();
 
         if (!empty($config)) {
             $this->config = array_merge($this->config, $config);
@@ -133,7 +133,7 @@ class Nsq extends AbstractAdapter
             /**
              * 1000ms is minimum hearbeat
              */
-            $this->config['heartbeat_interval_ms'] = (int) ($seconds * 1000);
+            $this->config['heartbeat_interval_ms'] = $seconds * 1000;
         }
     }
 
@@ -153,7 +153,9 @@ class Nsq extends AbstractAdapter
                     $this->writeCommand(self::PROTO_CLOSE);
                     $this->readSuccessResponse(self::RESPONSE_CLOSED);
                 }
-                $this->_io->close();
+                $io = $this->_io;
+                \assert($io instanceof IO\StreamIO);
+                $io->close();
             } catch (Throwable $ex) {
                 $this->logError(self::class . ' ' . __FUNCTION__ . ': ' . $ex->getMessage());
             }
@@ -319,11 +321,11 @@ class Nsq extends AbstractAdapter
             $message = substr($messageFrame, 26);
             $msgId   = substr($messageFrame, 10, 16);
 
-            $time = floor(unpack("J", substr($messageFrame, 0, 8))[1] / 1000000000);
+            $time = floor($this->unpackField('J', substr($messageFrame, 0, 8)) / 1000000000);
 
             return [$msgId, $message, [
-                'attempts' => unpack("n", substr($messageFrame, 8, 2))[1],
-                'time'     => DateTime::createFromFormat("U", $time)->format('c'),
+                'attempts' => $this->unpackField('n', substr($messageFrame, 8, 2)),
+                'time'     => DateTime::createFromFormat('U', (string) $time)->format('c'),
             ]];
         }
 
@@ -367,7 +369,7 @@ class Nsq extends AbstractAdapter
                 ) {
                     throw new RuntimeException('Desired ' . self::PARAM_JOBTTR .
                                                ' param ' . $params[self::PARAM_JOBTTR] .
-                                               's > ' . ($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION) . 'ms (x' . self::HEARTBEAT_TTR_RATION . ' heartbeat), ' .
+                                               's > ' . (string) ($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION) . 'ms (x' . (string) self::HEARTBEAT_TTR_RATION . ' heartbeat), ' .
                                                'NSQ expects answer within two hearbeats, but cannot guarantee that, ' .
                                                'please configure your heartbeat_interval_ms to extend heartbeat intervals');
                 }
@@ -464,7 +466,7 @@ class Nsq extends AbstractAdapter
 
         $this->writeCommandWithBody(
             self::PROTO_IDENTIFY,
-            json_encode($identify)
+            json_encode($identify, JSON_THROW_ON_ERROR)
         );
 
         [$frameType, $response] = $this->readFrame();
@@ -485,7 +487,7 @@ class Nsq extends AbstractAdapter
             );
         }
 
-        if ($features['auth_required']) {
+        if (!empty($features['auth_required'])) {
             if (empty($this->config['auth'])) {
                 throw new RuntimeException("Authentication is required, but not provided in the config");
             }
@@ -588,7 +590,9 @@ class Nsq extends AbstractAdapter
     private function write($buffer): void
     {
         $this->logInfo('--> writing ' . trim($buffer));
-        $this->_io->write($buffer);
+        $io = $this->_io;
+        \assert($io instanceof IO\StreamIO);
+        $io->write($buffer);
     }
 
     /**
@@ -627,27 +631,42 @@ class Nsq extends AbstractAdapter
     /**
      * read and unpack a 32bit binary INT
      */
-    private function readInt()
+    private function readInt(): int
     {
         $bytes = $this->read(4);
 
-        return unpack("N", $bytes)[1];
+        return $this->unpackField('N', $bytes);
     }
 
     /**
      * read from the socket a set size of data
      *
-     * @psalm-param 4 $size
+     * @param int $size
      */
     private function read(int $size): string
     {
         $this->logInfo('--> reading ' . $size . ' bytes');
-        $result = $this->_io->read($size);
+        $io = $this->_io;
+        \assert($io instanceof IO\StreamIO);
+        $result = $io->read($size);
         if ($size !== strlen($result)) {
             throw new RuntimeException('Failed to read ' . $size . ' bytes from IO');
         }
         $this->logInfo('<-- reading ' . $size . ' bytes');
 
         return $result;
+    }
+
+    /**
+     * unpack a binary message field, throws when the data is not decodeable
+     */
+    private function unpackField(string $format, string $data): int
+    {
+        $unpacked = unpack($format, $data);
+        if (false === $unpacked || !isset($unpacked[1])) {
+            throw new RuntimeException('Failed to unpack frame data');
+        }
+
+        return (int) $unpacked[1];
     }
 }

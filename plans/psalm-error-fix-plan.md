@@ -1,5 +1,9 @@
 # Psalm Error Fix Plan (145 errors → 0)
 
+> **SUPERSEDED** — replaced by `plans/psalm-and-phan-inference-plan.md` (2026-09-23):
+> the error count is **147**, not 145, and `--alter --issues=ClassMustBeFinal`
+> **corrupts files** (it must not be run). Use the new plan's per-error checklist.
+
 - Status: **proposed** — plan only, no code changes yet.
 - Scope: fix the **145 Psalm errors** reported at `errorLevel=3` one by one
   (baseline: Sep 2026, `backq.php83` container). Info-level issues (190) are not

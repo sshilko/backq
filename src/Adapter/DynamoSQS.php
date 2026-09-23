@@ -91,7 +91,7 @@ class DynamoSQS extends AbstractAdapter
      * Timeout for receiveMessage from SQS command (Long polling)
      *
      */
-    private int $workTimeout = 5;
+    private ?int $workTimeout = 5;
 
     private $maxNumberOfMessages = 1;
 
@@ -182,30 +182,38 @@ class DynamoSQS extends AbstractAdapter
             $this->logError($e->getMessage());
         }
 
-        if ($result && $result->hasKey('Messages') && count($result->get('Messages')) > 0) {
-            $messagePayload = ($result->get('Messages')[0]);
+        if ($result && $result->hasKey('Messages')) {
+            /**
+             * @var list<mixed>|null $messages
+             */
+            $messages = $result->get('Messages');
+            if (is_array($messages) && count($messages) > 0) {
+                /**
+                 * @var array{Body: mixed, ReceiptHandle: mixed} $messagePayload
+                 */
+                $messagePayload = $messages[0];
 
-            $messageBody = null;
-            $itemPayload = null;
-            if (
-                is_string($messagePayload['Body']) &&
-                json_validate($messagePayload['Body']) &&
-                is_array($messageBody = json_decode($messagePayload['Body'], true))
-            ) {
-                $item = QueueTableRow::fromArray($messageBody);
+                $itemPayload = null;
+                if (
+                    is_string($messagePayload['Body']) &&
+                    json_validate($messagePayload['Body']) &&
+                    is_array($messageBody = json_decode($messagePayload['Body'], true))
+                ) {
+                    $item = QueueTableRow::fromArray($messageBody);
 
-                if ($item) {
-                    $itemPayload = $item->getPayload();
+                    if ($item) {
+                        $itemPayload = $item->getPayload();
+                    } else {
+                        $this->logError(__FUNCTION__ . ' Invalid received message body');
+                    }
                 } else {
-                    $this->logError(__FUNCTION__ . ' Invalid received message body');
+                    $this->logError(__FUNCTION__ . ' Unexpected data format on message body');
                 }
-            } else {
-                $this->logError(__FUNCTION__ . ' Unexpected data format on message body');
+
+                $messageId = $messagePayload['ReceiptHandle'];
+
+                return [$messageId, $itemPayload];
             }
-
-            $messageId = $messagePayload['ReceiptHandle'];
-
-            return [$messageId, $itemPayload];
         }
 
         return false;
@@ -233,21 +241,25 @@ class DynamoSQS extends AbstractAdapter
             throw new InvalidArgumentException('Cannot process item with TTL: ' . $readyTime);
         }
 
-        $msgid = crc32(getmypid() . gethostname());
+        $msgid = (string) crc32((string) getmypid() . (string) gethostname());
         if (isset($params[self::PARAM_MESSAGE_ID])) {
-            $msgid = $params[self::PARAM_MESSAGE_ID];
+            $msgid = (string) $params[self::PARAM_MESSAGE_ID];
         }
 
         $item = new QueueTableRow($body, $readyTime, $msgid);
         try {
             $response = $this->dynamoDBClient->putItem(['Item'      => $item->toArray(),
                 'TableName' => $this->dynamoDbTableName]);
-            if ($response &&
-                isset($response['@metadata']['statusCode']) &&
-                200 === $response['@metadata']['statusCode']) {
-                $this->logDebug(__FUNCTION__ . ' success');
+            if ($response) {
+                /**
+                 * @var array{statusCode?: mixed}|null $metadata
+                 */
+                $metadata = $response['@metadata'];
+                if (isset($metadata['statusCode']) && 200 === $metadata['statusCode']) {
+                    $this->logDebug(__FUNCTION__ . ' success');
 
-                return true;
+                    return true;
+                }
             }
         } catch (DynamoDbException $e) {
             $this->logError(__FUNCTION__ . ' service failed: ' . $e->getMessage());
@@ -263,10 +275,8 @@ class DynamoSQS extends AbstractAdapter
     public function afterWorkSuccess($workId): bool
     {
         if ($this->sqsClient) {
-            $sqs = $this->sqsClient;
-            assert($sqs instanceof SqsClient);
             try {
-                $sqs->deleteMessage(['QueueUrl' => $this->sqsQueueURL, 'ReceiptHandle' => $workId]);
+                $this->sqsClient->deleteMessage(['QueueUrl' => $this->sqsQueueURL, 'ReceiptHandle' => $workId]);
 
                 return true;
             } catch (AwsException $e) {

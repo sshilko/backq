@@ -47,7 +47,7 @@ class Beanstalk extends AbstractAdapter
     #[Override]
     public function connect($host = '127.0.0.1', $port = 11300, $timeout = 1, $persistent = false, $logger = null): bool
     {
-        if (true === $this->connected && $this->client) {
+        if (true === $this->connected) {
             return true;
         }
 
@@ -109,16 +109,22 @@ class Beanstalk extends AbstractAdapter
                      * rarely fails with NOT_FOUND even when we binded (use %tube) successfuly before
                      * failure produces error-log entries
                      */
+                    /**
+                     * @var array<array-key, mixed>|false
+                     */
                     $result = $this->client->statsTube($queue);
-                    if ($result && is_array($result) && isset($result['current-watching'])) {
+                    if (is_array($result) && isset($result['current-watching'])) {
                         return $result['current-watching'] > 0;
                     }
                 } else {
                     /**
                      * Workers at all connected (not very usefull)
                      */
+                    /**
+                     * @var array<array-key, mixed>|false
+                     */
                     $result = $this->client->stats();
-                    if ($result && is_array($result) && isset($result['current-workers'])) {
+                    if (is_array($result) && isset($result['current-workers'])) {
                         return $result['current-workers'] > 0;
                     }
                 }
@@ -209,6 +215,9 @@ class Beanstalk extends AbstractAdapter
         if ($this->connected) {
             try {
                 $result = $this->client->reserve($this->workTimeout);
+                /**
+                 * @var array{id: int, body: string|false}|false $result
+                 */
                 if (is_array($result)) {
                     return [$result['id'], $result['body'], []];
                 }

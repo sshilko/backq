@@ -60,7 +60,7 @@ abstract class AbstractPublisher
      */
     public function setQueueName(string $string): void
     {
-        $this->queueName = (string) $string;
+        $this->queueName = $string;
     }
 
     /**

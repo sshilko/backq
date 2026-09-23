@@ -10,6 +10,7 @@
 
 namespace BackQ\Adapter\Redis;
 
+use Illuminate\Contracts\Redis\Factory as Redis;
 use Illuminate\Queue\RedisQueue;
 
 class Queue extends RedisQueue
@@ -29,9 +30,27 @@ class Queue extends RedisQueue
 
     /**
      * The maximum number of seconds to block for a job.
-     *
      */
     protected $blockFor = null;
+
+    /**
+     * @param Redis $redis
+     * @param string        $default
+     * @param string|null   $connection
+     * @param int|null      $retryAfter
+     * @param int|null      $blockFor
+     */
+    public function __construct(
+        Redis $redis,
+        $default = 'default',
+        $connection = null,
+        ?int $retryAfter = null,
+        ?int $blockFor = null,
+    ) {
+        parent::__construct($redis, $default, $connection, $retryAfter ?? 60, $blockFor);
+
+        $this->retryAfter = $retryAfter;
+    }
 
     /**
      * @param int|null $seconds

@@ -26,7 +26,7 @@ abstract class AbstractAdapter
      */
     protected bool $triggerErrorOnError = true;
 
-    protected LoggerInterface $logger;
+    protected ?LoggerInterface $logger = null;
 
     /**
      * Connect to server

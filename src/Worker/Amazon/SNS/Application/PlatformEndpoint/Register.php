@@ -11,7 +11,6 @@
 
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
-use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RegisterMessageInterface;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
@@ -21,6 +20,7 @@ use function date;
 use function error_log;
 use function gettype;
 use function in_array;
+use function is_string;
 use function unserialize;
 
 class Register extends PlatformEndpoint
@@ -58,16 +58,29 @@ class Register extends PlatformEndpoint
                          */
                         continue;
                     }
+                    if (!is_string($payload)) {
+                        $work->send(true);
+                        $this->logDebug('Worker does not support payload of: ' . gettype($payload));
+
+                        continue;
+                    }
+                    if (null === $taskId) {
+                        continue;
+                    }
                     $message   = @unserialize($payload);
                     $processed = true;
 
-                    if (!($message instanceof RegisterMessageInterface)) {
+                    if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register)) {
                         $work->send(true);
                         $this->logDebug('Worker does not support payload of: ' . gettype($message));
 
                         continue;
                     }
 
+                    /**
+                     * @var array{EndpointArn: string}|null $endpointResult
+                     */
+                    $endpointResult = null;
                     try {
                         $endpointResult = $this->snsClient->createPlatformEndpoint([
                             'Attributes'             => $message->getAttributes(),

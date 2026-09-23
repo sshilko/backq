@@ -77,10 +77,10 @@ class StreamIO extends AbstractIO
      * @param      $host
      * @param      $port
      * @param      $connection_timeout
-     * @param null $read_write_timeout
-     * @param null $context
+     * @param int|null $read_write_timeout
+     * @param resource|null $context
      * @param bool $blocking
-     * @param string $persistent persistent connection identifier
+     * @param string|bool $persistent persistent connection identifier
      *
      * @throws RuntimeException
      * @throws Exception
@@ -92,7 +92,7 @@ class StreamIO extends AbstractIO
         $read_write_timeout = null,
         $context = null,
         $blocking = false,
-        private string $persistent = ''
+        private string|bool $persistent = ''
     ) {
         $errstr = $errno  = null;
         $this->sock       = null;
@@ -172,13 +172,16 @@ class StreamIO extends AbstractIO
          * Set small chunk size (default=4096/8192)
          * Setting this to small values (100bytes) still does NOT help detecting feof()
          */
-        stream_set_chunk_size($this->sock, 1024);
+        $chunkSize = stream_set_chunk_size($this->sock, 1024);
+        if (0 > $chunkSize) {
+            throw new Exception("Chunk size could not be set");
+        }
     }
 
     /**
      * @return string
      *
-     * @psalm-param 4 $n
+     * @psalm-param int $n
      */
     #[Override]
     public function read(int $n)
@@ -225,7 +228,7 @@ class StreamIO extends AbstractIO
     }
 
     /**
-     * @psalm-param int<1, max> $read_write_timeout
+     * @psalm-param int $read_write_timeout
      */
     #[Override]
     public function stream_set_timeout(int $read_write_timeout): void
@@ -310,7 +313,7 @@ class StreamIO extends AbstractIO
             //set_error_handler($ohandler);
             restore_error_handler();
 
-            throw new RuntimeException($t->getMessage(), $t->getCode());
+            throw new RuntimeException($t->getMessage(), (int) $t->getCode());
         }
     }
 

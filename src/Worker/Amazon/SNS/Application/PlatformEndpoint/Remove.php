@@ -11,7 +11,6 @@
 
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
-use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\RemoveMessageInterface;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
@@ -21,6 +20,7 @@ use function date;
 use function error_log;
 use function gettype;
 use function in_array;
+use function is_string;
 use function unserialize;
 
 class Remove extends PlatformEndpoint
@@ -62,9 +62,18 @@ class Remove extends PlatformEndpoint
                         continue;
                     }
 
+                    if (!is_string($payload)) {
+                        $work->send(true);
+                        $this->logDebug('Worker does not support payload of: ' . gettype($payload));
+
+                        continue;
+                    }
+                    if (null === $taskId) {
+                        continue;
+                    }
                     $message = @unserialize($payload);
 
-                    if (!($message instanceof RemoveMessageInterface)) {
+                    if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove)) {
                         $work->send(true);
                         $this->logDebug('Worker does not support payload of: ' . gettype($message));
 
@@ -167,10 +176,11 @@ class Remove extends PlatformEndpoint
      *
      * @param \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message
      *
+     *
      * @phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
      *
      */
-    protected function onSuccess(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message): true
+    protected function onSuccess(\BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Remove $message): bool
     {
         return true;
     }

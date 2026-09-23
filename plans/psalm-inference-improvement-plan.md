@@ -1,5 +1,15 @@
 # Psalm Type-Inference Improvement Plan (88.31% → ≥ 95%)
 
+> **EXTENDED** — `plans/psalm-and-phan-inference-plan.md` (2026-09-23) re-scopes
+> this same goal together with the 147-error fix list and adds a "maximise Phan
+> type-inference" goal (§5) with proxy metrics. This file remains for the Psalm
+> inference-% measurement detail.
+
+> **DONE (Psalm-error portion, 2026-09-23)** — the 147-error fix executed on
+> branch `psalm-error-fixes`. Re-measured `--stats` inference:
+> **92.3495%** (baseline 88.3122%), with 0 errors at `errorLevel=3` (no
+> suppressions). The ≥ 95% Phase 3–4 roadmap below remains future work.
+
 - Status: **proposed** — plan only, no code changes yet.
 - Goal: raise `Psalm was able to infer types for X% of the codebase` from the
   current **88.3122%** to **≥ 95%** on the main track, **≥ 98%** as stretch, and

@@ -45,6 +45,8 @@ abstract class PlatformEndpoint extends Application
      */
     public function getPlatform(): string
     {
-        return substr($this->queueName, strrpos($this->queueName, '_') + 1);
+        $pos = strrpos($this->queueName, '_');
+
+        return substr($this->queueName, (false === $pos ? 0 : $pos) + 1);
     }
 }

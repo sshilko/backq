@@ -36,6 +36,9 @@ class Connector extends RedisConnector
     #[Override]
     public function connect(array $config): Queue
     {
+        /**
+         * @var array{queue: string, connection?: string|null, retry_after?: int|null, block_for?: int|null} $config
+         */
         return new Queue(
             $this->redis,
             $config['queue'],

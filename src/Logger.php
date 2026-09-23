@@ -33,7 +33,7 @@ class Logger
         }
 
         if ($log_handler = fopen($this->logFile, 'a')) {
-            fwrite($log_handler, date('Y-m-d H:i:s') . ' - ' . getmypid() . ' - ' . trim($sMessage) . "\n");
+            fwrite($log_handler, date('Y-m-d H:i:s') . ' - ' . (string) getmypid() . ' - ' . trim($sMessage) . "\n");
             fclose($log_handler);
         }
     }

@@ -11,7 +11,6 @@
 
 namespace BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
-use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\PublishMessageInterface;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint;
 use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
 use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
@@ -20,6 +19,7 @@ use Throwable;
 use function date;
 use function error_log;
 use function gettype;
+use function is_string;
 use function trigger_error;
 use function unserialize;
 use const E_USER_WARNING;
@@ -61,8 +61,17 @@ class Publish extends PlatformEndpoint
                         continue;
                     }
 
+                    if (!is_string($payload)) {
+                        $work->send(true);
+                        $this->logDebug('Worker does not support payload of: ' . gettype($payload));
+
+                        continue;
+                    }
+                    if (null === $taskId) {
+                        continue;
+                    }
                     $message = @unserialize($payload);
-                    if (!($message instanceof PublishMessageInterface)) {
+                    if (!($message instanceof \BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish)) {
                         $work->send(true);
                         $this->logDebug('Worker does not support payload of: ' . gettype($message));
 
@@ -105,7 +114,7 @@ class Publish extends PlatformEndpoint
                                  * Current job to be processed by current queue but
                                  * will send it to a queue to remove endpoints
                                  */
-                                $this->onFailure($message, $e->getAwsErrorCode());
+                                $this->onFailure($message, $e->getAwsErrorCode() ?? '');
                             }
 
                             /**
