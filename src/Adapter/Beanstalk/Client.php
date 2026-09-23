@@ -240,6 +240,7 @@ class Client extends \Beanstalk\Client
      * @return string|false
      *
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
+     * @suppress PhanUndeclaredTypeReturnType, PhanParamSignatureRealMismatchHasParamType 
      */
     #[Override]
     protected function _read($length = null)

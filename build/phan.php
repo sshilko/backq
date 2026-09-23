@@ -1,4 +1,5 @@
 <?php
+
 /**
  * (c) Sergei Shilko <contact@sshilko.com>
  *
@@ -9,7 +10,7 @@
  * @license https://opensource.org/licenses/mit-license.php MIT
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 use Phan\Issue;
 
@@ -22,7 +23,7 @@ use Phan\Issue;
 return [
     // The number of processes to fork off during the analysis
     // phase.
-    'processes' => 1,
+    'processes' => 2,
 
     // The minimum severity level to report on. This can be
     // set to Issue::SEVERITY_LOW, Issue::SEVERITY_NORMAL or
@@ -30,7 +31,11 @@ return [
     'minimum_severity' => Issue::SEVERITY_NORMAL,
 
     'suppress_issue_types' => [
-        'PhanParamNameIndicatingUnusedInClosure'
+        'PhanParamNameIndicatingUnusedInClosure',
+        'PhanRedefinedClassReference',
+        'PhanRedefineClass',
+        'PhanUnreferencedUseNormal',
+        'PhanUnreferencedUseFunction'
     ],
 
     // Supported values: `'5.6'`, `'7.0'`, `'7.1'`, `'7.2'`, `'7.3'`,
@@ -75,7 +80,9 @@ return [
     //       should be added to both the `directory_list`
     //       and `exclude_analysis_directory_list` arrays.
     'exclude_analysis_directory_list' => [
+        'tmp/',
         'vendor/',
+        'example/',
         'build/tmp',
     ],
 
@@ -252,7 +259,7 @@ return [
     // (Phan does not check if classes with these names exist)
     //
     // Example setting: `['unknown' => '', 'number' => 'int|float', 'char' => 'string', 'long' => 'int', 'the' => '']`
-    'phpdoc_type_mapping' => [ ],
+    'phpdoc_type_mapping' => [],
 
     // Set to true in order to attempt to detect dead
     // (unreferenced) code. Keep in mind that the
