@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -274,6 +275,9 @@ class Client extends \Beanstalk\Client
                     return false;
                 }
 
+                /**
+                 * @psalm-suppress RedundantCast
+                 */
                 throw new RuntimeException($ex->getMessage(), (int) $ex->getCode());
             }
         } else {

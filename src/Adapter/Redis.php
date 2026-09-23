@@ -168,7 +168,8 @@ class Redis extends AbstractAdapter
          *
          * Declared Safe since Laravel 5.8
          */
-        if (null !== $seconds
+        if (
+            null !== $seconds
             && (
                 $seconds >= $this->timeout
                 || $seconds >= $this->read_timeout
@@ -287,7 +288,8 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
+        if (
+            $this->connected && (ConnectionState::BindRead === $this->state ||
                 ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(__FUNCTION__ . ' currently ' . count($this->reservedJobs) . ' reserved job(s)');
@@ -323,7 +325,8 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
+        if (
+            $this->connected && (ConnectionState::BindRead === $this->state ||
                 ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(__FUNCTION__ . ' currently ' . count($this->reservedJobs) . ' reserved job(s)');
@@ -418,7 +421,8 @@ class Redis extends AbstractAdapter
             $this->blockFor = $timeout;
         }
 
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
+        if (
+            $this->connected && (ConnectionState::BindRead === $this->state ||
                 ConnectionState::BindWrite === $this->state)
         ) {
             $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
@@ -446,6 +450,9 @@ class Redis extends AbstractAdapter
                     throw new RuntimeException('Already reserved job id ' . $jobId);
                 }
 
+                /**
+                 * @psalm-suppress RedundantCondition
+                 */
                 \assert($redisJob instanceof \Illuminate\Queue\Jobs\RedisJob);
                 $this->reservedJobs[$jobId] = $redisJob;
 
@@ -486,7 +493,8 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
+        if (
+            $this->connected && (ConnectionState::BindRead === $this->state ||
                 ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(
@@ -570,7 +578,6 @@ class Redis extends AbstractAdapter
 
         $this->app->bind('redis', function () {
             return new Redis\Manager(
-                // @phpstan-ignore-next-line
                 /** @phan-suppress-next-line PhanTypeMismatchArgument */
                 $this->app,
                 self::REDIS_DRIVER,
