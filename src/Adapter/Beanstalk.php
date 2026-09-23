@@ -146,8 +146,11 @@ class Beanstalk extends AbstractAdapter
             /**
              * @todo Any other fast && reliable options to check if socket is alive?
              */
+            /**
+             * @var array<array-key, mixed>|false $result
+             */
             $result = $this->client->stats();
-            if ($result) {
+            if (false !== $result) {
                 return true;
             }
 
@@ -232,7 +235,7 @@ class Beanstalk extends AbstractAdapter
     /**
      * Put task into queue
      *
-     * @param string $data The job body.
+     * @param string $body The job body.
      *
      * @return false|numeric-string `false` on otherwise an integer indicating the job id.
      */

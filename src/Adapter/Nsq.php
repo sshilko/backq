@@ -323,9 +323,14 @@ class Nsq extends AbstractAdapter
 
             $time = floor($this->unpackField('J', substr($messageFrame, 0, 8)) / 1000000000);
 
+            $readyAt = DateTime::createFromFormat('U', (string) $time);
+            if (false === $readyAt) {
+                throw new RuntimeException('Failed to parse message timestamp as a DateTime');
+            }
+
             return [$msgId, $message, [
                 'attempts' => $this->unpackField('n', substr($messageFrame, 8, 2)),
-                'time'     => DateTime::createFromFormat('U', (string) $time)->format('c'),
+                'time'     => $readyAt->format('c'),
             ]];
         }
 
@@ -426,13 +431,13 @@ class Nsq extends AbstractAdapter
 
         try {
             $this->_io = new IO\StreamIO(
-                $this->config['host'],
-                $this->config['port'],
-                $this->config['connection_timeout'],
-                $this->config['stream_set_timeout'],
+                (string) $this->config['host'],
+                (int) $this->config['port'],
+                (float) $this->config['connection_timeout'],
+                (int) $this->config['stream_set_timeout'],
                 null,
                 true,
-                $this->config['persistent']
+                (bool) $this->config['persistent']
             );
             $this->connected = true;
 

@@ -65,5 +65,13 @@ $publishOptions = [MySerializedPublisher::PARAM_JOBTTR     => 10,
 $response = null;
 if ($publisher->start()) {
     $response = $publisher->publish($message, $publishOptions);
-    echo 'Published process message via serialized message for long delay as ID=' . $response . "\n";
+    if ($response) {
+        echo 'Published process message via serialized message for long delay as ID=' . $response . "\n";
+    } else {
+        echo 'Failed to publish process message via serialized message' . "\n";
+        exit(1);
+    }
+} else {
+    echo 'Failed to start publisher, is beanstalkd running on 127.0.0.1:11300?' . "\n";
+    exit(1);
 }

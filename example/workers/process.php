@@ -26,6 +26,7 @@ $output  = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
 $logger  = new ConsoleLogger($output);
 
 $adapter = new Beanstalk();
+$adapter->setLogger($logger);
 echo 'Using ' . get_class($adapter) . ' adapter' . "\n";
 
 $worker = new AProcess($adapter);

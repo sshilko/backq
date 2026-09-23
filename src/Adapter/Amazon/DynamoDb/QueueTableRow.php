@@ -47,7 +47,7 @@ class QueueTableRow
             return null;
         }
 
-        $item     = new self($array['payload'], $array['time_ready']);
+        $item     = new self((string) $array['payload'], (int) $array['time_ready']);
         $metadata = json_decode($array['metadata'], true);
 
         if (!is_array($metadata) || !isset($metadata['payload_checksum'])) {

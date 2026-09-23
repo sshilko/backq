@@ -41,7 +41,8 @@ RUN apt-get install -y --no-install-recommends \
     pre-commit \
     locales \
     netcat-traditional \
-    git
+    git \
+    beanstalkd
 
 # Package manager cleanup
 RUN apt-get clean
@@ -84,4 +85,5 @@ RUN git config --global --add safe.directory /app
 
 STOPSIGNAL SIGINT
 ENTRYPOINT [ "/bin/bash" ]
-CMD ["-c", "trap exit INT; while sleep 1; do sleep 1; done;"]
+# beanstalkd serves the beanstalk-backed examples (default 127.0.0.1:11300)
+CMD ["-c", "beanstalkd & trap exit INT; while sleep 1; do sleep 1; done;"]

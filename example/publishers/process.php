@@ -35,4 +35,7 @@ if ($publisher->start()) {
         }
         sleep(1);
     }
+} else {
+    echo 'Failed to start publisher, is beanstalkd running on 127.0.0.1:11300?' . "\n";
+    exit(1);
 }

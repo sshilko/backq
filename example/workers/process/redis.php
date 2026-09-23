@@ -14,16 +14,13 @@ use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
 /**
- * Publisher
+ * Worker
  *
- * Queues a process execution
- * Publishes a job into default queue="process"
+ * Executes process jobs from the default queue="process"
  */
 require_once __DIR__ . '/../../../vendor/autoload.php';
 
-$command = 'echo $( date +%s ) >> /tmp/test';
-
-$adapter = new Redis();
+$adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
 
 /**
  * Optional adapter logger

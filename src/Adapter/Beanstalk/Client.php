@@ -86,13 +86,13 @@ class Client extends \Beanstalk\Client
 
         try {
             $this->_io = new IO\StreamIO(
-                $config['host'],
-                $config['port'],
+                (string) $config['host'],
+                (int) $config['port'],
                 $connectionTimeout,
                 self::IO_TIMEOUT,
                 null,
                 true,
-                $config['persistent']
+                (bool) $config['persistent']
             );
             $this->connected = true;
         } catch (Throwable $ex) {
@@ -105,15 +105,17 @@ class Client extends \Beanstalk\Client
     /**
      * @param int|null $timeout not specifying timeout may result in undetected connection issue and infinite waiting time
      *
+     * @throws RuntimeException
+     *
      * @return array|false
      */
     #[Override]
     public function reserve($timeout = null)
     {
-        /**
-         * @var IO\StreamIO $io
-         */
         $io = $this->_io;
+        if (null === $io) {
+            throw new RuntimeException('No active connection, call connect() first');
+        }
 
         /**
          * Writing will throw Exception on timeout -->
@@ -221,20 +223,25 @@ class Client extends \Beanstalk\Client
 
             throw new RuntimeException($message);
         }
-        /**
-         * @var IO\StreamIO $io
-         */
+
         $io = $this->_io;
+        if (null === $io) {
+            throw new RuntimeException('No active connection, call connect() first');
+        }
         $io->write($data . "\r\n");
 
         return strlen($data);
     }
 
     /**
+     * @throws RuntimeException
+     *
+     * @return string|false
+     *
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
     #[Override]
-    protected function _read($length = null)
+    protected function _read(int|null $length = null)
     {
         if (!$this->connected) {
             $message = 'No connection found while reading data from socket.';
@@ -242,24 +249,24 @@ class Client extends \Beanstalk\Client
             throw new RuntimeException($message);
         }
 
-        /**
-         * @var IO\StreamIO $io
-         */
         $io = $this->_io;
+        if (null === $io) {
+            throw new RuntimeException('No active connection, call connect() first');
+        }
 
         if ($length) {
             try {
                 /**
                  * +2 for trailing "\r\n"
                  */
-                $packet = $io->stream_get_contents($length + 2);
+                $packet = $io->stream_get_contents((int) $length + 2);
                 if (false === $packet) {
                     /**
                      * stream_get_contents returns false on failure
                      */
                     throw new RuntimeException('Failed to io.stream_get_contents on ' . __FUNCTION__);
                 }
-                if ($packet) {
+                if ('' !== $packet) {
                     $packet = rtrim($packet, "\r\n");
                 }
             } catch (IO\Exception\TimeoutException $ex) {
@@ -267,7 +274,7 @@ class Client extends \Beanstalk\Client
                     return false;
                 }
 
-                throw new RuntimeException($ex->getMessage(), $ex->getCode());
+                throw new RuntimeException($ex->getMessage(), (int) $ex->getCode());
             }
         } else {
             /**

@@ -9,6 +9,8 @@
  * Redistributions of files must retain the above copyright notice.
  */
 use BackQ\Adapter\Nsq;
+use Symfony\Component\Console\Logger\ConsoleLogger;
+use Symfony\Component\Console\Output\ConsoleOutput;
 
 /**
  * Example subscriber using
@@ -19,12 +21,19 @@ require_once __DIR__ . '/../../../vendor/autoload.php';
 
 $queue = 'hello-world';
 
-$nsqsub = new Nsq('127.0.0.1', 4150, ['persistent' => false]);
+$nsqdHost = getenv('BACKQ_NSQD_HOST') ?: '127.0.0.1';
+$nsqdPort = (int) (getenv('BACKQ_NSQD_PORT') ?: 4150);
+
+$nsqsub = new Nsq($nsqdHost, $nsqdPort, ['persistent' => false]);
+$nsqsub->setLogger(new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG)));
 $nsqsub->logInfo('Starting');
 $nsqsub->setWorkTimeout(5);
-if ($nsqsub->connect()) {
-    $nsqsub->logInfo('Connected');
-    if ($nsqsub->bindRead($queue)) {
+if (!$nsqsub->connect()) {
+    echo 'Failed to connect to nsqd at ' . $nsqdHost . ':' . $nsqdPort . "\n";
+    exit(1);
+}
+$nsqsub->logInfo('Connected');
+if ($nsqsub->bindRead($queue)) {
         $nsqsub->logInfo('Subscribed');
         $i = 100;
         while ($i > 0) {
@@ -44,8 +53,10 @@ if ($nsqsub->connect()) {
             }
             $i--;
         }
+    } else {
+        $nsqsub->logError('Failed to bind to read queue ' . $queue);
+        exit(1);
     }
-}
 $nsqsub->logInfo('All done');
 $nsqsub->disconnect();
 $nsqsub->logInfo('Disconnected');

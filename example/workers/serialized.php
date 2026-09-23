@@ -21,8 +21,11 @@ require_once __DIR__ . '/../publishers/lib/myprocesspublisher.php';
  * Re-queue serialized messages
  */
 
-$worker = new Serialized(new Beanstalk());
-$logger = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
+$adapter = new Beanstalk();
+$logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
+$adapter->setLogger($logger);
+
+$worker = new Serialized($adapter);
 $worker->setLogger($logger);
 $worker->setQueueName('serialized');
 $worker->setWorkTimeout(1);
