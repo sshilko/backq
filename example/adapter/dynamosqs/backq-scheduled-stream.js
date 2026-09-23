@@ -1,7 +1,7 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2016-2026 Carolina Alarcon
+ * Copyright (c) 2016-2020 Carolina Alarcon
  *
  * Distributed under the terms of the MIT License.
  */
@@ -34,13 +34,13 @@ const {
     CloudWatchClient,
     PutMetricDataCommand
 } = require('@aws-sdk/client-cloudwatch');
-const {unmarshall} = require('@aws-sdk/util-dynamodb');
+const { unmarshall } = require('@aws-sdk/util-dynamodb');
 
-const TARGET_EVENT_NAME   = process.env.EVENT_REMOVE || 'REMOVE';
+const TARGET_EVENT_NAME = process.env.EVENT_REMOVE || 'REMOVE';
 const PRINCIPAL_ID_DYNAMO = process.env.DYNAMODB_PRINCIPAL_ID || 'dynamodb.amazonaws.com';
-const METRIC_NAMESPACE    = process.env.CLOUDWATCH_METRIC_NAMESPACE || 'BackqScheduler';
+const METRIC_NAMESPACE = process.env.CLOUDWATCH_METRIC_NAMESPACE || 'BackqScheduler';
 
-const sqs        = new SQSClient({});
+const sqs = new SQSClient({});
 const cloudWatch = new CloudWatchClient({});
 
 exports.handler = async (event) => {
@@ -65,7 +65,7 @@ exports.handler = async (event) => {
         console.log(payload);
 
         if (Object.keys(payload).length > 0) {
-            const now        = Math.floor(Date.now() / 1000);
+            const now = Math.floor(Date.now() / 1000);
             const sourceTable = record.eventSourceARN.split('/', 2)[1];
 
             let queueUrl = process.env.SQS_URL_PREFIX;
@@ -77,15 +77,15 @@ exports.handler = async (event) => {
 
                 default:
                     console.error('Invalid DynamoDB table name ', sourceTable);
-                    return {statusCode: 500};
+                    return { statusCode: 500 };
             }
 
             try {
-                await sqs.send(new SendMessageCommand({MessageBody: JSON.stringify(payload), QueueUrl: queueUrl}));
+                await sqs.send(new SendMessageCommand({ MessageBody: JSON.stringify(payload), QueueUrl: queueUrl }));
                 console.log('Sent to SQS ', queueUrl);
             } catch (error) {
                 console.error(error);
-                return {statusCode: 500};
+                return { statusCode: 500 };
             }
 
             try {
@@ -95,9 +95,9 @@ exports.handler = async (event) => {
                     MetricData: [
                         {
                             MetricName: 'ApproximateDelayTime',
-                            Dimensions: [{Name: 'Per Source', Value: sourceTable}],
-                            Unit:       'Seconds',
-                            Value:      delayTime
+                            Dimensions: [{ Name: 'Per Source', Value: sourceTable }],
+                            Unit: 'Seconds',
+                            Value: delayTime
                         }
                     ],
                     Namespace: METRIC_NAMESPACE
@@ -105,7 +105,7 @@ exports.handler = async (event) => {
                 console.info('Seconds delay:', delayTime);
             } catch (error) {
                 console.error('CloudWatch error ', error);
-                return {statusCode: 500};
+                return { statusCode: 500 };
             }
         }
     }
