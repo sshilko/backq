@@ -15,6 +15,9 @@ jobs:
       - name: Set up Docker Buildx with GitHub Actions cache
         uses: docker/setup-buildx-action@v4
 
+      - name: Pull dependency containers
+        run: docker pull redis:7-alpine && docker pull nsqio/nsq:v1.3.0
+
       - name: Build and start the php83 dockerized app
         run: docker compose -f build/docker-compose.yaml up -d --pull never --wait redis nsq app-php83
 
