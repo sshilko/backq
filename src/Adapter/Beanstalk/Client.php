@@ -241,7 +241,7 @@ class Client extends \Beanstalk\Client
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
     #[Override]
-    protected function _read(int|null $length = null)
+    protected function _read($length = null)
     {
         if (!$this->connected) {
             $message = 'No connection found while reading data from socket.';
