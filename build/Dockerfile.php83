@@ -9,7 +9,7 @@ FROM library/composer:2 AS composer
 FROM library/php:8.3-cli
 LABEL author='Sergei Shilko <contact@sshilko.com>'
 
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 
 # /usr/share/man/man1 needs to be created before installing openjdk-11-jre lest it will fail
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=863199#23
@@ -57,9 +57,9 @@ RUN echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen
 RUN /usr/sbin/locale-gen
 RUN echo "TZ=Etc/UTC" >> /etc/environment
 
-ENV LANG "en_US.UTF-8"
-ENV LC_ALL "en_US.UTF-8"
-ENV TZ "Etc/UTC"
+ENV LANG="en_US.UTF-8"
+ENV LC_ALL="en_US.UTF-8"
+ENV TZ="Etc/UTC"
 
 HEALTHCHECK --interval=10s --timeout=1s --retries=2 --start-period=5s CMD /usr/local/bin/php -v || exit 1
 WORKDIR /app
@@ -77,7 +77,7 @@ RUN install-php-extensions ast redis
 
 #phpunit coverage requirement
 RUN mkdir /root/tmp && pear config-set temp_dir /root/tmp && install-php-extensions xdebug
-ENV XDEBUG_MODE "coverage"
+ENV XDEBUG_MODE="coverage"
 
 RUN docker-php-ext-enable opcache
 

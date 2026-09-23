@@ -28,7 +28,7 @@ jobs:
         with:
           context: build
           file: build/Dockerfile.php83
-          push: true
+          push: false
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
