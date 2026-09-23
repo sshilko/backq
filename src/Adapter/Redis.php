@@ -126,13 +126,6 @@ class Redis extends AbstractAdapter
                 #[Override]
                 public function render($request, Throwable $e): HttpFoundationResponse
                 {
-                    /**
-                     * @phpstan-ignore-next-line
-                     * @phan-suppress-next-line PhanTypeInstantiateClassClassNotFound
-                     */
-                    // @phpstan-ignore-next-line
-
-                    /** @phan-suppress-next-line PhanUndeclaredClassMethod */
                     return new HttpFoundationResponse();
                 }
 
@@ -175,7 +168,8 @@ class Redis extends AbstractAdapter
          *
          * Declared Safe since Laravel 5.8
          */
-        if (null !== $seconds
+        if (
+            null !== $seconds
             && (
                 $seconds >= $this->timeout
                 || $seconds >= $this->read_timeout
@@ -294,8 +288,9 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
-                                 ConnectionState::BindWrite === $this->state)
+        if (
+            $this->connected && (ConnectionState::BindRead === $this->state ||
+                ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(__FUNCTION__ . ' currently ' . count($this->reservedJobs) . ' reserved job(s)');
 
@@ -330,8 +325,9 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
-                                 ConnectionState::BindWrite === $this->state)
+        if (
+            $this->connected && (ConnectionState::BindRead === $this->state ||
+                ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(__FUNCTION__ . ' currently ' . count($this->reservedJobs) . ' reserved job(s)');
 
@@ -425,8 +421,9 @@ class Redis extends AbstractAdapter
             $this->blockFor = $timeout;
         }
 
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
-                                 ConnectionState::BindWrite === $this->state)
+        if (
+            $this->connected && (ConnectionState::BindRead === $this->state ||
+                ConnectionState::BindWrite === $this->state)
         ) {
             $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
             assert($redisQueue instanceof Queue);
@@ -493,8 +490,9 @@ class Redis extends AbstractAdapter
     {
         $this->logDebug(__FUNCTION__);
 
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
-                                 ConnectionState::BindWrite === $this->state)
+        if (
+            $this->connected && (ConnectionState::BindRead === $this->state ||
+                ConnectionState::BindWrite === $this->state)
         ) {
             $this->logDebug(
                 __FUNCTION__ . ' is connected and ready to: ' . (ConnectionState::BindRead === $this->state ? 'read' : 'write')
@@ -514,12 +512,12 @@ class Redis extends AbstractAdapter
             //$jobName = \Illuminate\Queue\CallQueuedClosure::class;
 
             //if (isset($params[self::PARAM_JOBTTR]) && $params[self::PARAM_JOBTTR] > 0) {
-                /**
-                 * TTR is only used on picking in Redis adapter,
-                 * migrate() that moves rotten reserved or delayed jobs only happen on pop/pick
-                 * NOT in put
-                 * Ignoring TTR
-                 */
+            /**
+             * TTR is only used on picking in Redis adapter,
+             * migrate() that moves rotten reserved or delayed jobs only happen on pop/pick
+             * NOT in put
+             * Ignoring TTR
+             */
             //}
 
             if (isset($params[self::PARAM_READYWAIT]) && $params[self::PARAM_READYWAIT] > 0) {
@@ -584,7 +582,8 @@ class Redis extends AbstractAdapter
                 /**
                  * @see \Illuminate\Redis\Connectors\PhpRedisConnector
                  */
-                ['default' => ['host'          => $this->host,
+                ['default' => [
+                    'host'          => $this->host,
                     'password'      => $this->auth_password,
                     'prefix'        => $this->prefix,
                     'timeout'       => $this->timeout,
@@ -592,7 +591,8 @@ class Redis extends AbstractAdapter
                     'persistent_id' => $this->persistent_id,
                     'port'       => $this->port,
                     'persistent' => $this->persistent,
-                    'database'   => $this->database_id]]
+                    'database'   => $this->database_id
+                ]]
             );
         });
 
