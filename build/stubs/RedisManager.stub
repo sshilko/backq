@@ -1,0 +1,27 @@
+<?php
+
+/**
+ * Psalm stub for Illuminate\Redis\RedisManager.
+ *
+ * Laravel documents __construct() as taking \Illuminate\Contracts\Foundation\Application,
+ * but the parameter is natively untyped and the code only ever calls bound()/make() on it.
+ * Every real-world entry point — the RedisServiceProvider, the Capsule/standalone container
+ * and this library — passes a plain \Illuminate\Container\Container, so the docblock type
+ * is corrected here to match how the class is actually used.
+ */
+
+namespace Illuminate\Redis;
+
+use Illuminate\Container\Container;
+
+class RedisManager
+{
+    /**
+     * @param Container $app
+     * @param string    $driver
+     * @param array     $config
+     */
+    public function __construct($app, $driver, array $config)
+    {
+    }
+}

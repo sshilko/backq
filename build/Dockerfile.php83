@@ -80,6 +80,8 @@ ENV XDEBUG_MODE "coverage"
 
 RUN docker-php-ext-enable opcache
 
+RUN git config --global --add safe.directory /app
+
 STOPSIGNAL SIGINT
 ENTRYPOINT [ "/bin/bash" ]
 CMD ["-c", "trap exit INT; while sleep 1; do sleep 1; done;"]
