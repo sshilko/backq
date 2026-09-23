@@ -12,13 +12,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up Docker Buildx with GitHub Actions cache
+      - name: Cache vendor directory
+        uses: actions/cache@v4
+        with:
+          path: vendor/
+          key: ${{ runner.os }}-vendor-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+
+      - name: Build PHP image with GitHub Actions cache
+        uses: docker/build-push-action@v6
+        with:
+          context: build
+          dockerfile: build/Dockerfile.php83
+          push: false
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: app/php83
 
       - name: Pull dependency containers
         run: docker pull redis:7-alpine && docker pull nsqio/nsq:v1.3.0
 
-      - name: Build and start the php83 dockerized app
+      - name: Start services
         run: docker compose -f build/docker-compose.yaml up -d --pull never --wait redis nsq app-php83
 
       - name: Install dependencies inside the container
