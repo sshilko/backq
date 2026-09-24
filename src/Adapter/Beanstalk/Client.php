@@ -352,8 +352,9 @@ class Client extends \Beanstalk\Client
             if ($value[0] === '-') {
                 $value = ltrim($value, '- ');
             } elseif (strpos($value, ':') !== false) {
-                list($key, $value) = explode(':', $value);
-                $value = ltrim($value, ' ');
+                $parts = explode(':', $value, 2);
+                $key = $parts[0];
+                $value = ltrim($parts[1] ?? '', ' ');
             }
             if (is_numeric($value)) {
                 $value = (integer) $value == $value ? (integer) $value : (float) $value;

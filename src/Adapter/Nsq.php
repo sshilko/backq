@@ -192,7 +192,7 @@ class Nsq extends AbstractAdapter
     public function afterWorkFailed(int|string|null $workId): bool
     {
         if ($this->connected && ConnectionState::BindRead === $this->state) {
-            $this->writeCommand(sprintf(self::PROTO_REQUEUE, $workId, 0));
+            $this->writeCommand(sprintf(self::PROTO_REQUEUE, (string) $workId, 0));
 
             return true;
         }
