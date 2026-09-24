@@ -113,8 +113,8 @@ them from a clone of this repository. In your own project, depend on
 | Adapter / Worker | [Process](http://symfony.com/doc/current/components/process.html) | [Guzzle](https://www.php-fig.org/psr/psr-7/) | Serialized | [AWS SNS](https://aws.amazon.com/sns/) | [Closure](https://github.com/opis/closure) |
 |---|---|---|---|---|---|
 | [Beanstalkd](https://beanstalkd.github.io/) | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [Redis](https://redis.io) | ✓ | ✓ | ? | ✓ | ✓ |
-| [NSQ](https://nsq.io/) | ✓ | ✓ | ? | ✓ | ? |
+| [Redis](https://redis.io) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [NSQ](https://nsq.io/) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [DynamoSQS](https://aws.amazon.com/) | ✓ | ✓ | ✓ | ? | ✓ |
 
 ### Adapter features
@@ -207,8 +207,20 @@ every pull request in [GitHub Actions](https://github.com/sshilko/backq/actions/
 ## Examples
 
 See the [`example/`](https://github.com/sshilko/backq/tree/master/example) folder
-for usage examples covering every adapter and worker combination, including the
-DynamoDB scheduled-stream integration.
+for usage examples covering every adapter and worker combination:
+
+- `example/adapter/<name>/{push,pop}.php` — raw queue adapters (Redis, NSQ,
+  Beanstalkd)
+- `example/publishers/<type>[/<adapter>].php` + `example/workers/<type>[/<adapter>].php` —
+  runnable publisher/worker pairs for the `process`, `closure`, `guzzle` and
+  `serialized` worker types against the Redis and NSQ adapters
+- `example/http/server.php` — a minimal `php -S` router that the Guzzle examples
+  point at, so they run without any external HTTP service
+- `example/adapter/dynamosqs/` and `example/publishers/sns/` — AWS integrations
+  (DynamoDB scheduled-stream processing, SNS push notifications)
+
+The Redis and NSQ examples run against the dockerized services from
+`build/docker-compose.yaml`.
 
 ## License
 

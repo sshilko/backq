@@ -8,11 +8,6 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
-use BackQ\Adapter\AbstractAdapter;
-use BackQ\Adapter\Redis;
-use BackQ\Publisher\Process;
-use Symfony\Component\Console\Logger\ConsoleLogger;
-use Symfony\Component\Console\Output\ConsoleOutput;
 
 /**
  * Publisher
@@ -22,22 +17,7 @@ use Symfony\Component\Console\Output\ConsoleOutput;
  */
 
 require_once __DIR__ . '/../../../vendor/autoload.php';
-
-final class MyRedisProcessPublisher extends Process
-{
-    public const PARAM_READYWAIT = Redis::PARAM_READYWAIT;
-
-    protected function setupAdapter(): AbstractAdapter
-    {
-        $output = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
-        $logger = new ConsoleLogger($output);
-
-        $adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
-        $adapter->setLogger($logger);
-
-        return $adapter;
-    }
-}
+require_once __DIR__ . '/../lib/myredisprocesspublisher.php';
 
 $publisher = MyRedisProcessPublisher::getInstance();
 if (!$publisher->start()) {
