@@ -217,7 +217,7 @@ class Beanstalk extends AbstractAdapter
     {
         if ($this->connected) {
             try {
-                $result = $this->client->reserve($this->workTimeout);
+                $result = $this->client->reserve($timeout ?? $this->workTimeout);
                 /**
                  * @var array{id: int, body: string|false}|false $result
                  */
@@ -285,7 +285,7 @@ class Beanstalk extends AbstractAdapter
                 /**
                  * Release task back to queue with default priority and 1 second ready-delay
                  */
-                if ($this->client->release($workId, self::PRIORITY_DEFAULT, 1)) {
+                if ($this->client->release((int) $workId, self::PRIORITY_DEFAULT, 1)) {
                     return true;
                 }
             } catch (Throwable $e) {
@@ -305,7 +305,7 @@ class Beanstalk extends AbstractAdapter
     {
         if ($this->connected) {
             try {
-                if ($this->client->delete($workId)) {
+                if ($this->client->delete((int) $workId)) {
                     return true;
                 }
             } catch (Throwable $e) {

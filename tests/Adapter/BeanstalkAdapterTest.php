@@ -309,6 +309,18 @@ class BeanstalkAdapterTest extends TestCase
         $this->assertFalse($adapter->pickTask());
     }
 
+    public function testPickTaskForwardsTimeoutArgument(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('reserve')
+            ->with(7)
+            ->willReturn(false);
+
+        $this->assertFalse($adapter->pickTask(7));
+    }
+
     public function testPutTaskExceptionReturnsFalse(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();

@@ -8,6 +8,8 @@ use BackQ\Tests\Support\FakeBeanstalkServer;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use ReflectionProperty;
+use function restore_error_handler;
+use function set_error_handler;
 use function strlen;
 use function uniqid;
 
@@ -402,6 +404,33 @@ class ClientTest extends TestCase
         $this->assertFalse($result);
 
         $client->disconnect();
+    }
+
+    public function testDecodeSkipsEmptyLinesWithoutWarnings(): void
+    {
+        $client = new Client();
+        $method = new ReflectionMethod(Client::class, '_decode');
+
+        /**
+         * Real beanstalkd YAML stats bodies end with a trailing newline, so
+         * explode("\n", $data) yields an empty final line. Vendored
+         * _decode() reads $value[0] on it -> "Uninitialized string offset 0".
+         */
+        $warnings = [];
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = $message;
+
+            return true;
+        });
+        try {
+            $result = $method->invoke($client, "---\ncurrent-workers: 1\nversion: 1.12\n");
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame([], $warnings);
+        $this->assertSame(1, $result['current-workers']);
+        $this->assertSame(1.12, $result['version']);
     }
 
     protected function setUp(): void

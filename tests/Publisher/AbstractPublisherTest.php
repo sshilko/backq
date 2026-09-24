@@ -79,7 +79,7 @@ class AbstractPublisherTest extends TestCase
 
     public function testReadyPingsOnlyWhenBound(): void
     {
-        $this->assertNull($this->publisher->ready());
+        $this->assertFalse($this->publisher->ready());
 
         $this->publisher->start();
         $this->assertTrue($this->publisher->ready());

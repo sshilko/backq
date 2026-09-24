@@ -16,11 +16,16 @@ use BackQ\Adapter\IO\Exception\RuntimeException;
 use Override;
 use Throwable;
 use function array_merge;
+use function array_slice;
+use function explode;
 use function intval;
+use function is_numeric;
 use function is_string;
+use function ltrim;
 use function rtrim;
 use function sprintf;
 use function strlen;
+use function strpos;
 use function strtok;
 use const PHP_INT_MAX;
 
@@ -320,5 +325,43 @@ class Client extends \Beanstalk\Client
 
                 return false;
         }
+    }
+
+    /**
+     * Decodes YAML data. This is a super naive decoder which just works on
+     * a subset of YAML which is commonly returned by beanstalk.
+     *
+     * The vendored decoder reads $value[0] on every line, which raises
+     * "Uninitialized string offset 0" on PHP 8 when the YAML ends with a
+     * trailing newline (the final explode() element is empty). Skip empty
+     * lines instead.
+     *
+     * @param string $data The data in YAML format, can be either a list or a dictionary.
+     * @return array An (associative) array of the converted data.
+     */
+    #[Override]
+    protected function _decode($data)
+    {
+        $data = array_slice(explode("\n", $data), 1);
+        $result = [];
+
+        foreach ($data as $key => $value) {
+            if ('' === $value) {
+                continue;
+            }
+            if ($value[0] === '-') {
+                $value = ltrim($value, '- ');
+            } elseif (strpos($value, ':') !== false) {
+                $parts = explode(':', $value, 2);
+                $key = $parts[0];
+                $value = ltrim($parts[1] ?? '', ' ');
+            }
+            if (is_numeric($value)) {
+                $value = (integer) $value == $value ? (integer) $value : (float) $value;
+            }
+            $result[$key] = $value;
+        }
+
+        return $result;
     }
 }
