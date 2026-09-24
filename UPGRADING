@@ -25,6 +25,9 @@
   - `ping(bool $reconnect = true)`
   Subclasses overriding these methods and callers must match the new argument
   types.
+- `BackQ\Publisher\AbstractPublisher::ready()` is narrowed to `bool` (was
+  untyped; it returned `null` before `start()`). The bound path is unchanged;
+  callers and subclasses overriding `ready()` must use a `bool` return type.
 - `BackQ\Worker\AbstractWorker::$workTimeout` is now typed `?int` (was untyped,
   default `null`). Child classes that assign an `int` (such as the SNS workers'
   `= 5`) must declare `?int $workTimeout`.

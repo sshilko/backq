@@ -87,11 +87,13 @@ abstract class AbstractPublisher
     /**
      * Check if connection is alive and ready to do the job
      */
-    public function ready()
+    public function ready(): bool
     {
         if ($this->bind) {
             return $this->adapter->ping();
         }
+
+        return false;
     }
 
     /**

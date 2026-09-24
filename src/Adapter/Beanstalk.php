@@ -217,7 +217,7 @@ class Beanstalk extends AbstractAdapter
     {
         if ($this->connected) {
             try {
-                $result = $this->client->reserve($this->workTimeout);
+                $result = $this->client->reserve($timeout ?? $this->workTimeout);
                 /**
                  * @var array{id: int, body: string|false}|false $result
                  */
