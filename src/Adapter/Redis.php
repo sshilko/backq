@@ -258,7 +258,7 @@ class Redis extends AbstractAdapter
      * Returns TRUE if connection is alive
      */
     #[Override]
-    public function ping($reconnect = true): bool
+    public function ping(bool $reconnect = true): bool
     {
         if ($this->connected) {
             $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
@@ -283,7 +283,7 @@ class Redis extends AbstractAdapter
      *
      */
     #[Override]
-    public function afterWorkFailed($workId): bool
+    public function afterWorkFailed(int|string|null $workId): bool
     {
         $this->logDebug(__FUNCTION__);
 
@@ -319,7 +319,7 @@ class Redis extends AbstractAdapter
      *
      */
     #[Override]
-    public function afterWorkSuccess($workId): bool
+    public function afterWorkSuccess(int|string|null $workId): bool
     {
         $this->logDebug(__FUNCTION__);
 
@@ -355,7 +355,7 @@ class Redis extends AbstractAdapter
      *
      */
     #[Override]
-    public function bindWrite($queue): bool
+    public function bindWrite(string $queue): bool
     {
         if ($this->connected && ConnectionState::Nothing === $this->state) {
             $this->state = ConnectionState::BindWrite;
@@ -373,7 +373,7 @@ class Redis extends AbstractAdapter
      *
      */
     #[Override]
-    public function bindRead($queue): bool
+    public function bindRead(string $queue): bool
     {
         if ($this->connected && ConnectionState::Nothing === $this->state) {
             $this->state = ConnectionState::BindRead;
@@ -393,7 +393,7 @@ class Redis extends AbstractAdapter
      * underlying list-based jobs, so this always reports "no workers".
      */
     #[Override]
-    public function hasWorkers($queue = false): bool
+    public function hasWorkers(string $queue): bool
     {
         $this->logInfo(self::class . '.' . __FUNCTION__ . ' not supported, reporting no workers');
 
@@ -407,7 +407,7 @@ class Redis extends AbstractAdapter
      * @return bool|array [id, payload]
      */
     #[Override]
-    public function pickTask($timeout = null): bool|array
+    public function pickTask(?int $timeout = null): bool|array
     {
         /**
          * @todo deny picking task if already picked ?
@@ -485,7 +485,7 @@ class Redis extends AbstractAdapter
      * @return string|false job-id on success
      */
     #[Override]
-    public function putTask($body, $params = []): string|int|bool
+    public function putTask(string $body, array $params = []): string|int|bool
     {
         $this->logDebug(__FUNCTION__);
 

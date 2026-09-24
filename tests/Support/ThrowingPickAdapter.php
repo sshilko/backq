@@ -16,7 +16,7 @@ class ThrowingPickAdapter extends TestAdapter
     public int $picks = 0;
 
     #[Override]
-    public function pickTask($timeout = null): bool|array
+    public function pickTask(?int $timeout = null): bool|array
     {
         $this->calls[] = ['pickTask', $timeout];
         ++$this->picks;

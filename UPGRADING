@@ -15,6 +15,16 @@
   report "no workers" (a documented stub contract), `Beanstalk` implements the
   check against real tube stats. Subclasses overriding `hasWorkers()` must
   declare a `bool` return type.
+- `BackQ\Adapter\AbstractAdapter` method parameters are now typed (were untyped):
+  - `bindRead(string $queue)`, `bindWrite(string $queue)`,
+    `hasWorkers(string $queue)`
+  - `pickTask(?int $timeout = null)`
+  - `putTask(string $body, array $params = [])`
+  - `afterWorkSuccess(int|string|null $workId)`,
+    `afterWorkFailed(int|string|null $workId)`
+  - `ping(bool $reconnect = true)`
+  Subclasses overriding these methods and callers must match the new argument
+  types.
 - `BackQ\Worker\AbstractWorker::$workTimeout` is now typed `?int` (was untyped,
   default `null`). Child classes that assign an `int` (such as the SNS workers'
   `= 5`) must declare `?int $workTimeout`.

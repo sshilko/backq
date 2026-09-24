@@ -45,7 +45,7 @@ class Beanstalk extends AbstractAdapter
      *
      */
     #[Override]
-    public function connect($host = '127.0.0.1', $port = 11300, $timeout = 1, $persistent = false, $logger = null): bool
+    public function connect(string $host = '127.0.0.1', int $port = 11300, int $timeout = 1, bool $persistent = false, $logger = null): bool
     {
         if (true === $this->connected) {
             return true;
@@ -94,7 +94,7 @@ class Beanstalk extends AbstractAdapter
      *
      */
     #[Override]
-    public function hasWorkers($queue = false): bool
+    public function hasWorkers(string $queue = ''): bool
     {
         if ($this->connected) {
             try {
@@ -140,7 +140,7 @@ class Beanstalk extends AbstractAdapter
      * Returns TRUE if connection is alive
      */
     #[Override]
-    public function ping($reconnect = true): bool
+    public function ping(bool $reconnect = true): bool
     {
         try {
             /**
@@ -171,7 +171,7 @@ class Beanstalk extends AbstractAdapter
      *
      */
     #[Override]
-    public function bindRead($queue): bool
+    public function bindRead(string $queue): bool
     {
         if ($this->connected) {
             try {
@@ -191,7 +191,7 @@ class Beanstalk extends AbstractAdapter
      *
      */
     #[Override]
-    public function bindWrite($queue): bool
+    public function bindWrite(string $queue): bool
     {
         if ($this->connected) {
             try {
@@ -213,7 +213,7 @@ class Beanstalk extends AbstractAdapter
      * @return bool|array [id, payload]
      */
     #[Override]
-    public function pickTask($timeout = null): bool|array
+    public function pickTask(?int $timeout = null): bool|array
     {
         if ($this->connected) {
             try {
@@ -240,7 +240,7 @@ class Beanstalk extends AbstractAdapter
      * @return false|numeric-string `false` on otherwise an integer indicating the job id.
      */
     #[Override]
-    public function putTask($body, $params = []): string|false
+    public function putTask(string $body, array $params = []): string|false
     {
         if ($this->connected) {
             try {
@@ -278,7 +278,7 @@ class Beanstalk extends AbstractAdapter
      *
      */
     #[Override]
-    public function afterWorkFailed($workId): bool
+    public function afterWorkFailed(int|string|null $workId): bool
     {
         if ($this->connected) {
             try {
@@ -301,7 +301,7 @@ class Beanstalk extends AbstractAdapter
      *
      */
     #[Override]
-    public function afterWorkSuccess($workId): bool
+    public function afterWorkSuccess(int|string|null $workId): bool
     {
         if ($this->connected) {
             try {

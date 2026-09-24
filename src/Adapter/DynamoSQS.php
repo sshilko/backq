@@ -138,7 +138,7 @@ class DynamoSQS extends AbstractAdapter
      * @param string $queue
      */
     #[Override]
-    public function bindRead($queue): bool
+    public function bindRead(string $queue): bool
     {
         $this->sqsQueueURL = $this->generateSqsEndpointUrl($queue);
 
@@ -149,7 +149,7 @@ class DynamoSQS extends AbstractAdapter
      * @param string $sqsURL
      */
     #[Override]
-    public function bindWrite($queue): bool
+    public function bindWrite(string $queue): bool
     {
         $this->dynamoDbTableName = $queue;
 
@@ -157,7 +157,7 @@ class DynamoSQS extends AbstractAdapter
     }
 
     #[Override]
-    public function pickTask($timeout = null): bool|array
+    public function pickTask(?int $timeout = null): bool|array
     {
         $this->logDebug(__FUNCTION__);
 
@@ -220,7 +220,7 @@ class DynamoSQS extends AbstractAdapter
     }
 
     #[Override]
-    public function putTask($body, $params = []): bool
+    public function putTask(string $body, array $params = []): bool
     {
         $this->logDebug(__FUNCTION__);
 
@@ -272,7 +272,7 @@ class DynamoSQS extends AbstractAdapter
      * @param $workId
      */
     #[Override]
-    public function afterWorkSuccess($workId): bool
+    public function afterWorkSuccess(int|string|null $workId): bool
     {
         if ($this->sqsClient) {
             try {
@@ -291,7 +291,7 @@ class DynamoSQS extends AbstractAdapter
      * @phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
      */
     #[Override]
-    public function afterWorkFailed($workId): bool
+    public function afterWorkFailed(int|string|null $workId): bool
     {
         /**
          * Could call SQS ChangeMessageVisibility but why bother, the message will come back after
@@ -301,7 +301,7 @@ class DynamoSQS extends AbstractAdapter
     }
 
     #[Override]
-    public function ping($reconnect = true): bool
+    public function ping(bool $reconnect = true): bool
     {
         return true;
     }
@@ -310,7 +310,7 @@ class DynamoSQS extends AbstractAdapter
      * @phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
      */
     #[Override]
-    public function hasWorkers($queue): bool
+    public function hasWorkers(string $queue): bool
     {
         /**
          * @todo implement using SQS GetQueueAttributes (ApproximateNumberOfMessages)

@@ -12,7 +12,7 @@ class ThrowingPutTaskAdapter extends TestAdapter
 {
 
     #[Override]
-    public function putTask($body, $params = []): string|bool
+    public function putTask(string $body, array $params = []): string|bool
     {
         $this->calls[] = ['putTask', $body, $params];
 

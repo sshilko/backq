@@ -40,51 +40,64 @@ abstract class AbstractAdapter
 
     /**
      * Subscribe to server queue
+     *
+     * @param string $queue
      */
-    abstract public function bindRead($queue): bool;
+    abstract public function bindRead(string $queue): bool;
 
     /**
      * Prepare to write to server queue
+     *
+     * @param string $queue
      */
-    abstract public function bindWrite($queue): bool;
+    abstract public function bindWrite(string $queue): bool;
 
     /**
      * Get job to process
+     *
      * @param int|null $timeout seconds
      *
      * @return bool|array [id, payload]
      */
-    abstract public function pickTask($timeout = null): bool|array;
+    abstract public function pickTask(?int $timeout = null): bool|array;
 
     /**
      * Put job to process
      *
+     * @param string $body
+     * @param array $params
+     *
      * @return bool|string|int job id or false on failure
      */
-    abstract public function putTask($body, $params = []): bool|string|int;
+    abstract public function putTask(string $body, array $params = []): bool|string|int;
 
     /**
      * Acknowledge server: callback after successfully processing job
+     *
+     * @param int|string|null $workId
      */
-    abstract public function afterWorkSuccess($workId): bool;
+    abstract public function afterWorkSuccess(int|string|null $workId): bool;
 
     /**
      * Acknowledge server: callback after failing to process job
+     *
+     * @param int|string|null $workId
      */
-    abstract public function afterWorkFailed($workId): bool;
+    abstract public function afterWorkFailed(int|string|null $workId): bool;
 
     /**
      * Ping if still has alive connection to server
      *
      * @param bool $reconnect
      */
-    abstract public function ping($reconnect = true): bool;
+    abstract public function ping(bool $reconnect = true): bool;
 
     /**
      * Is there workers ready for job immediately
      *
+     * @param string $queue
      */
-    abstract public function hasWorkers($queue): bool;
+    abstract public function hasWorkers(string $queue): bool;
 
     /**
      * Preffered limit of one work cycle

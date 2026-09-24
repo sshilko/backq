@@ -51,7 +51,7 @@ class TestAdapter extends AbstractAdapter
     }
 
     #[Override]
-    public function bindRead($queue): bool
+    public function bindRead(string $queue): bool
     {
         $this->calls[] = ['bindRead', $queue];
 
@@ -59,7 +59,7 @@ class TestAdapter extends AbstractAdapter
     }
 
     #[Override]
-    public function bindWrite($queue): bool
+    public function bindWrite(string $queue): bool
     {
         $this->calls[] = ['bindWrite', $queue];
 
@@ -67,7 +67,7 @@ class TestAdapter extends AbstractAdapter
     }
 
     #[Override]
-    public function pickTask($timeout = null): bool|array
+    public function pickTask(?int $timeout = null): bool|array
     {
         $this->calls[] = ['pickTask', $timeout];
 
@@ -75,7 +75,7 @@ class TestAdapter extends AbstractAdapter
     }
 
     #[Override]
-    public function putTask($body, $params = []): string|bool
+    public function putTask(string $body, array $params = []): string|bool
     {
         $this->calls[] = ['putTask', $body, $params];
 
@@ -83,7 +83,7 @@ class TestAdapter extends AbstractAdapter
     }
 
     #[Override]
-    public function afterWorkSuccess($workId): bool
+    public function afterWorkSuccess(int|string|null $workId): bool
     {
         $this->calls[] = ['afterWorkSuccess', $workId];
 
@@ -91,7 +91,7 @@ class TestAdapter extends AbstractAdapter
     }
 
     #[Override]
-    public function afterWorkFailed($workId): bool
+    public function afterWorkFailed(int|string|null $workId): bool
     {
         $this->calls[] = ['afterWorkFailed', $workId];
 
@@ -99,7 +99,7 @@ class TestAdapter extends AbstractAdapter
     }
 
     #[Override]
-    public function ping($reconnect = true): bool
+    public function ping(bool $reconnect = true): bool
     {
         $this->calls[] = ['ping', $reconnect];
 
@@ -107,7 +107,7 @@ class TestAdapter extends AbstractAdapter
     }
 
     #[Override]
-    public function hasWorkers($queue): bool
+    public function hasWorkers(string $queue): bool
     {
         $this->calls[] = ['hasWorkers', $queue];
 

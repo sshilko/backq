@@ -13,7 +13,7 @@ class SleepingPickAdapter extends TestAdapter
     public int $sleepMicros = 600000;
 
     #[Override]
-    public function pickTask($timeout = null): bool|array
+    public function pickTask(?int $timeout = null): bool|array
     {
         $this->calls[] = ['pickTask', $timeout];
         usleep($this->sleepMicros);

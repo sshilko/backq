@@ -175,7 +175,7 @@ class Nsq extends AbstractAdapter
      * Returns TRUE if connection is alive
      */
     #[Override]
-    public function ping($reconnect = true): bool
+    public function ping(bool $reconnect = true): bool
     {
         if ($this->connected && $this->_io) {
             return $this->_io->isSocketReady();
@@ -189,7 +189,7 @@ class Nsq extends AbstractAdapter
      *
      */
     #[Override]
-    public function afterWorkFailed($workId): bool
+    public function afterWorkFailed(int|string|null $workId): bool
     {
         if ($this->connected && ConnectionState::BindRead === $this->state) {
             $this->writeCommand(sprintf(self::PROTO_REQUEUE, $workId, 0));
@@ -205,7 +205,7 @@ class Nsq extends AbstractAdapter
      *
      */
     #[Override]
-    public function afterWorkSuccess($workId): bool
+    public function afterWorkSuccess(int|string|null $workId): bool
     {
         if ($workId && $this->connected && ConnectionState::BindRead === $this->state) {
             $this->writeCommand(sprintf(self::PROTO_FINISH, $workId));
@@ -221,7 +221,7 @@ class Nsq extends AbstractAdapter
      *
      */
     #[Override]
-    public function bindRead($queue): bool
+    public function bindRead(string $queue): bool
     {
         if ($this->connected && ConnectionState::Nothing === $this->state) {
             /**
@@ -247,7 +247,7 @@ class Nsq extends AbstractAdapter
      *
      */
     #[Override]
-    public function bindWrite($queue): bool
+    public function bindWrite(string $queue): bool
     {
         if ($this->connected && ConnectionState::Nothing === $this->state) {
             $this->state = ConnectionState::BindWrite;
@@ -266,7 +266,7 @@ class Nsq extends AbstractAdapter
      * is connected directly to nsqd, so this always reports "no workers".
      */
     #[Override]
-    public function hasWorkers($queue = false): bool
+    public function hasWorkers(string $queue): bool
     {
         $this->logInfo(self::class . '.' . __FUNCTION__ . ' not supported, reporting no workers');
 
@@ -280,7 +280,7 @@ class Nsq extends AbstractAdapter
      * @return bool|array [id, payload]
      */
     #[Override]
-    public function pickTask($timeout = null): bool|array
+    public function pickTask(?int $timeout = null): bool|array
     {
         if ($timeout) {
             $this->logInfo(self::class . '.' . __FUNCTION__ . ' arguments deprecated');
@@ -343,7 +343,7 @@ class Nsq extends AbstractAdapter
      * @param  string $data The job body.
      */
     #[Override]
-    public function putTask($body, $params = []): bool
+    public function putTask(string $body, array $params = []): bool
     {
         /**
          * @todo add support fot $params args
