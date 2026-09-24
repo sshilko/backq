@@ -4,6 +4,7 @@ namespace BackQ\Tests\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use Aws\Command;
 use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Publish as PublishMessage;
+use BackQ\Tests\Support\RecordingLogger;
 use BackQ\Tests\Support\TestAdapter;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint\Publish;
 use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
@@ -191,6 +192,99 @@ class PublishWorkerTest extends TestCase
 
         $this->assertCount(3, $this->filterCalls(['afterWorkFailed', 25]));
         $this->assertCount(1, $this->filterCalls(['afterWorkSuccess', 25]));
+    }
+
+    public function testSkipsEmptyPayload(): void
+    {
+        $this->adapter->pickTaskResult = false;
+
+        $this->makeWorker()->run();
+
+        $this->assertCount(0, $this->client->published);
+        $this->assertContains('disconnect', $this->adapter->calls);
+    }
+
+    public function testRejectsNonStringPayloadAsSuccess(): void
+    {
+        $this->adapter->pickTaskResult = [33, 123];
+
+        $this->makeWorker()->run();
+
+        $this->assertCount(0, $this->client->published);
+        $this->assertContains(['afterWorkSuccess', 33], $this->adapter->calls);
+    }
+
+    public function testSkipsJobWithNullTaskId(): void
+    {
+        $this->adapter->pickTaskResult = [null, serialize($this->makeMessage())];
+
+        $this->makeWorker()->run();
+
+        $this->assertCount(0, $this->client->published);
+        $this->assertContains(['afterWorkSuccess', null], $this->adapter->calls);
+    }
+
+    public function testLogsHardErrorOnInternalException(): void
+    {
+        $this->client = new class {
+            public function publish(array $payload): array
+            {
+                throw new \RuntimeException('hard failure');
+            }
+        };
+
+        $warnings = [];
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = $message;
+
+            return true;
+        }, E_USER_WARNING);
+
+        try {
+            $this->adapter->pickTaskResult = [26, serialize($this->makeMessage())];
+            $this->makeWorker()->run();
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertContains('BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint\Publish hard failure', $warnings);
+        $this->assertContains(['afterWorkSuccess', 26], $this->adapter->calls);
+    }
+
+    public function testLogsOuterExceptionOnAckFailure(): void
+    {
+        $this->adapter->pickTaskResult           = [27, serialize($this->makeMessage())];
+        $this->adapter->afterWorkSuccessResult   = false;
+
+        $errorLog = tempnam(sys_get_temp_dir(), 'snserr_');
+        $previous = ini_get('error_log');
+        ini_set('error_log', $errorLog);
+
+        try {
+            $this->makeWorker()->run();
+        } finally {
+            ini_set('error_log', $previous);
+        }
+
+        $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
+        unlink($errorLog);
+
+        $this->assertStringContainsString('SNS worker exception', $loggedErrors);
+        $this->assertContains('disconnect', $this->adapter->calls);
+    }
+
+    public function testLogsUnableToConnect(): void
+    {
+        $this->adapter->connectResult = false;
+        $logger                       = new RecordingLogger();
+
+        $worker = $this->makeWorker();
+        $worker->setLogger($logger);
+        $worker->run();
+
+        $wholeLog = implode("\n", array_column($logger->records, 1));
+        $this->assertStringContainsString('Unable to connect', $wholeLog);
+        $this->assertNotContains('disconnect', $this->adapter->calls);
     }
 
     /**

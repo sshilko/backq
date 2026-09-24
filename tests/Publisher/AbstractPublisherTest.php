@@ -2,6 +2,7 @@
 
 namespace BackQ\Tests\Publisher;
 
+use BackQ\Tests\Support\NoArgTestPublisher;
 use BackQ\Tests\Support\TestAdapter;
 use BackQ\Tests\Support\TestPublisher;
 use PHPUnit\Framework\TestCase;
@@ -40,6 +41,23 @@ class AbstractPublisherTest extends TestCase
 
         $this->assertFalse($this->publisher->start());
         $this->assertSame(false, $this->publisher->start());
+    }
+
+    public function testStartReturnsTrueWhenAlreadyBound(): void
+    {
+        $this->assertTrue($this->publisher->start());
+        $this->adapter->calls = [];
+
+        $this->assertTrue($this->publisher->start());
+
+        $this->assertNotContains('connect', $this->adapter->calls);
+    }
+
+    public function testGetInstanceBuildsFreshPublisher(): void
+    {
+        $publisher = NoArgTestPublisher::getInstance();
+
+        $this->assertInstanceOf(NoArgTestPublisher::class, $publisher);
     }
 
     public function testPublishDelegatesToAdapter(): void

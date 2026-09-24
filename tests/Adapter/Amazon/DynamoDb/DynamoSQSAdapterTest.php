@@ -220,6 +220,54 @@ class DynamoSQSAdapterTest extends TestCase
         $this->assertTrue($adapter->afterWorkFailed('rh-1'));
     }
 
+    public function testConnectCreatesClientsAndReturnsTrue(): void
+    {
+        $adapter = new DynamoSQS(self::ACCOUNT_ID, 'key', 'secret', self::REGION);
+
+        $this->assertTrue($adapter->connect());
+    }
+
+    public function testDisconnectClearsClients(): void
+    {
+        $adapter = new DynamoSQS(self::ACCOUNT_ID, 'key', 'secret', self::REGION);
+        $adapter->connect();
+        $adapter->bindRead(self::QUEUE);
+        $adapter->bindWrite(self::TABLE);
+
+        $this->assertTrue($adapter->disconnect());
+    }
+
+    public function testPickTaskReturnsFalseWithoutSqsClient(): void
+    {
+        $adapter = new DynamoSQS(self::ACCOUNT_ID, 'key', 'secret', self::REGION);
+
+        $this->assertFalse($adapter->pickTask());
+    }
+
+    public function testAfterWorkSuccessLogsOnAwsException(): void
+    {
+        $exception = new AwsException('queue gone', new Command('DeleteMessage'));
+        $sqs       = new MockHandler([$exception]);
+        $adapter   = $this->makeAdapter(new MockHandler([]), $sqs);
+        $adapter->setTriggerErrorOnError(false);
+
+        $this->assertTrue($adapter->afterWorkSuccess('rh-9'));
+    }
+
+    public function testPingAlwaysTrue(): void
+    {
+        $adapter = $this->makeAdapter(new MockHandler([]), new MockHandler([]));
+
+        $this->assertTrue($adapter->ping());
+    }
+
+    public function testHasWorkersReportsNoWorkers(): void
+    {
+        $adapter = $this->makeAdapter(new MockHandler([]), new MockHandler([]));
+
+        $this->assertFalse($adapter->hasWorkers('queue'));
+    }
+
     private function makeAdapter(MockHandler $dynamo, MockHandler $sqs): TestDynamoSQS
     {
         $adapter = new TestDynamoSQS(self::ACCOUNT_ID, 'key', 'secret', self::REGION);

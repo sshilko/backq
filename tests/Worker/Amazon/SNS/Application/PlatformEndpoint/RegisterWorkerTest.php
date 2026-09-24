@@ -4,6 +4,7 @@ namespace BackQ\Tests\Worker\Amazon\SNS\Application\PlatformEndpoint;
 
 use Aws\Command;
 use BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\Register as RegisterMessage;
+use BackQ\Tests\Support\RecordingLogger;
 use BackQ\Tests\Support\TestAdapter;
 use BackQ\Worker\Amazon\SNS\Application\PlatformEndpoint\Register;
 use BackQ\Worker\Amazon\SNS\Client\Exception\NetworkException;
@@ -11,6 +12,20 @@ use BackQ\Worker\Amazon\SNS\Client\Exception\SnsException;
 use GuzzleHttp\Psr7\Request;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use function array_column;
+use function array_filter;
+use function array_values;
+use function file_exists;
+use function file_get_contents;
+use function implode;
+use function ini_get;
+use function ini_set;
+use function restore_error_handler;
+use function set_error_handler;
+use function sys_get_temp_dir;
+use function tempnam;
+use function unlink;
+use const E_USER_WARNING;
 
 class RegisterWorkerTest extends TestCase
 {
@@ -140,6 +155,130 @@ class RegisterWorkerTest extends TestCase
         $this->assertContains('disconnect', $this->adapter->calls);
     }
 
+    public function testSkipsEmptyPayload(): void
+    {
+        $this->adapter->pickTaskResult = false;
+
+        $this->makeWorker()->run();
+
+        $this->assertCount(0, $this->client->created);
+        $this->assertContains('disconnect', $this->adapter->calls);
+    }
+
+    public function testRejectsNonStringPayloadAsSuccess(): void
+    {
+        $this->adapter->pickTaskResult = [33, 123];
+
+        $this->makeWorker()->run();
+
+        $this->assertCount(0, $this->client->created);
+        $this->assertContains(['afterWorkSuccess', 33], $this->adapter->calls);
+    }
+
+    public function testSkipsJobWithNullTaskId(): void
+    {
+        $this->adapter->pickTaskResult = [null, serialize($this->makeMessage())];
+
+        $this->makeWorker()->run();
+
+        $this->assertCount(0, $this->client->created);
+        $this->assertContains(['afterWorkSuccess', null], $this->adapter->calls);
+    }
+
+    public function testRetriesExhaustedThenMarksProcessed(): void
+    {
+        $this->client = new class {
+            public function createPlatformEndpoint(array $payload): array
+            {
+                throw new SnsException(
+                    'InternalError',
+                    new Command('CreatePlatformEndpoint'),
+                    ['code' => 'InternalError']
+                );
+            }
+        };
+        $this->adapter->pickTaskResult = [25, serialize($this->makeMessage())];
+        $logger                        = new RecordingLogger();
+
+        $worker = new Register($this->adapter);
+        $worker->setClient($this->client);
+        $worker->setLogger($logger);
+        $worker->setTriggerErrorOnError(false);
+        $worker->setRestartThreshold(4);
+
+        $worker->run();
+
+        $wholeLog = implode("\n", array_column($logger->records, 1));
+        $this->assertStringContainsString('Retried re-processing the same job too many times', $wholeLog);
+        $this->assertCount(3, $this->filterCalls(['afterWorkFailed', 25]));
+        $this->assertCount(1, $this->filterCalls(['afterWorkSuccess', 25]));
+    }
+
+    public function testAbandonsJobWhenSnsReturnsEmptyResult(): void
+    {
+        $this->client = new class {
+            public function createPlatformEndpoint(array $payload): array
+            {
+                return [];
+            }
+        };
+        $this->adapter->pickTaskResult = [26, serialize($this->makeMessage())];
+
+        $this->makeWorker()->run();
+
+        $this->assertContains(['afterWorkFailed', 26], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkSuccess', 26], $this->adapter->calls);
+    }
+
+    public function testLogsOuterExceptionOnAckFailure(): void
+    {
+        $this->adapter->pickTaskResult         = [27, serialize($this->makeMessage())];
+        $this->adapter->afterWorkSuccessResult = false;
+
+        $errorLog = tempnam(sys_get_temp_dir(), 'snserr_');
+        $previous = ini_get('error_log');
+        ini_set('error_log', $errorLog);
+
+        try {
+            $this->makeWorker()->run();
+        } finally {
+            ini_set('error_log', $previous);
+        }
+
+        $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
+        unlink($errorLog);
+
+        $this->assertStringContainsString('Register SNS worker exception', $loggedErrors);
+        $this->assertContains('disconnect', $this->adapter->calls);
+    }
+
+    public function testLogsHardErrorOnInternalException(): void
+    {
+        $this->client = new class {
+            public function createPlatformEndpoint(array $payload): array
+            {
+                throw new \RuntimeException('hard failure');
+            }
+        };
+
+        $warnings = [];
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = $message;
+
+            return true;
+        }, E_USER_WARNING);
+
+        try {
+            $this->adapter->pickTaskResult = [28, serialize($this->makeMessage())];
+            $this->makeWorker()->run();
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertCount(0, $warnings);
+        $this->assertContains(['afterWorkFailed', 28], $this->adapter->calls);
+    }
+
     protected function setUp(): void
     {
         $this->adapter = new TestAdapter();
@@ -175,5 +314,15 @@ class RegisterWorkerTest extends TestCase
         $message->setAttributes(['Enabled' => 'true']);
 
         return $message;
+    }
+
+    /**
+     * @return array<int, array{0:string,1:mixed}>
+     */
+    private function filterCalls(array $needle): array
+    {
+        return array_values(array_filter($this->adapter->calls, static function ($call) use ($needle): bool {
+            return $call === $needle;
+        }));
     }
 }

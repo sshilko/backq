@@ -5,6 +5,7 @@ namespace BackQ\Tests\Adapter;
 use BackQ\Adapter\ConnectionState;
 use BackQ\Adapter\Nsq;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 use ReflectionProperty;
 use RuntimeException;
 use function dirname;
@@ -18,9 +19,14 @@ use function pack;
 use function proc_close;
 use function proc_open;
 use function proc_terminate;
+use function restore_error_handler;
+use function set_error_handler;
 use function str_pad;
 use function str_starts_with;
+use function stream_socket_get_name;
+use function stream_socket_server;
 use function strlen;
+use function strrpos;
 use function substr;
 use function trim;
 use const JSON_THROW_ON_ERROR;
@@ -233,6 +239,303 @@ class NsqAdapterCoreTest extends TestCase
         } finally {
             $nsq->disconnect();
             $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testPingReportsSocketHealthWhenConnected(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('idle');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+            $this->assertFalse($nsq->ping());
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testAfterWorkFailedRequeuesMessage(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('requeue');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+            $this->assertTrue($nsq->bindRead('requeue-topic'));
+            $this->assertTrue($nsq->afterWorkFailed('msgid01234567890'));
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testPickTaskLogsDeprecatedTimeoutAndReturnsMessage(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('message');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+            $this->assertTrue($nsq->bindRead('message-queue'));
+
+            $task = $nsq->pickTask(3);
+
+            $this->assertIsArray($task);
+            $this->assertSame('the-payload', $task[1]);
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testPickTaskThrowsOnNonMessageFrame(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('non-message');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+            $this->assertTrue($nsq->bindRead('non-message-topic'));
+
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('was expecting a message frame');
+
+            $nsq->pickTask();
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testPutTaskRejectsTtrBeyondHeartbeatRatio(): void
+    {
+        $nsq = new Nsq(self::TEST_HOST, self::TEST_PORT);
+        $this->setState($nsq, true, ConnectionState::BindWrite);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('heartbeat');
+
+        $nsq->putTask('body', [Nsq::PARAM_JOBTTR => 8]);
+    }
+
+    public function testPutTaskWritesDelayedPublishFromReadyWait(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('pubdelay');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+            $this->assertTrue($nsq->bindWrite('pubdelay-topic'));
+            $this->assertTrue($nsq->putTask('payload', [Nsq::PARAM_READYWAIT => 5]));
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testConnectReturnsFalseWhenPeerIsDown(): void
+    {
+        $temp        = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
+        $this->assertNotFalse($temp);
+        $name        = stream_socket_get_name($temp, false);
+        $tempPort    = (int) substr((string) $name, (int) strrpos((string) $name, ':') + 1);
+        fclose($temp);
+
+        $nsq = new Nsq(self::TEST_HOST, $tempPort);
+        $nsq->setTriggerErrorOnError(false);
+
+        $this->assertFalse($nsq->connect());
+    }
+
+    public function testConnectTwiceRebindsConnection(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('multi');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+            $this->assertTrue($nsq->connect());
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testConnectThrowsWhenIdentifyReplyIsNotAResponse(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('identify-error');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testConnectThrowsWhenFeatureListIsNotAnArray(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('identify-null');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testConnectThrowsWhenAuthRequiredButMissing(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('identify-auth');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testConnectAuthenticatesWhenAuthProvided(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('auth-ok');
+        $nsq = new Nsq(self::TEST_HOST, $port, ['auth' => 'secret']);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+            $this->assertNotEmpty((new ReflectionProperty(Nsq::class, 'authentication'))->getValue($nsq));
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testConnectThrowsWhenAuthReplyIsNotAResponse(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('auth-error');
+        $nsq = new Nsq(self::TEST_HOST, $port, ['auth' => 'secret']);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testConnectThrowsWhenAuthReplyIsNotJson(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('auth-badjson');
+        $nsq = new Nsq(self::TEST_HOST, $port, ['auth' => 'secret']);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testBindReadThrowsOnUnexpectedSubscribeResponse(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('sub-bad');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('expecting Success');
+
+            $nsq->bindRead('sub-bad-topic');
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testIdentifyHeartbeatIsRepliedWithNoop(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('identify-heartbeat');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testConnectThrowsWhenFrameIsTruncated(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('short-frame');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testWriteIdentifyThrowsWhenAlreadyBound(): void
+    {
+        $nsq    = new Nsq(self::TEST_HOST, self::TEST_PORT);
+        $this->setState($nsq, false, ConnectionState::BindWrite);
+        $method = new ReflectionMethod(Nsq::class, 'writeIdentify');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Incorrect protocol usage while writeIdentify');
+
+        $method->invoke($nsq);
+    }
+
+    public function testWriteReadyReturnsFalseWhenNotSubscribed(): void
+    {
+        $nsq    = new Nsq(self::TEST_HOST, self::TEST_PORT);
+        $method = new ReflectionMethod(Nsq::class, 'writeReady');
+
+        $this->assertFalse($method->invoke($nsq, 1));
+    }
+
+    public function testUnpackFieldThrowsOnUndecodableData(): void
+    {
+        $nsq    = new Nsq(self::TEST_HOST, self::TEST_PORT);
+        $method = new ReflectionMethod(Nsq::class, 'unpackField');
+
+        set_error_handler(static function (int $severity, string $message): bool {
+            return true;
+        });
+        try {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Failed to unpack frame data');
+
+            $method->invoke($nsq, 'N', 'ab');
+        } finally {
+            restore_error_handler();
         }
     }
 

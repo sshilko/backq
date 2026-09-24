@@ -10,6 +10,7 @@ use function fclose;
 use function fread;
 use function fwrite;
 use function is_resource;
+use function stream_context_create;
 use function stream_set_timeout;
 use function stream_socket_accept;
 use function stream_socket_get_name;
@@ -86,6 +87,68 @@ class StreamIOTest extends TestCase
         $this->expectException(TimeoutException::class);
 
         $this->io->read(4);
+    }
+
+    public function testConstructorThrowsOnTlsContextWhenPeerUnreachable(): void
+    {
+        $temp        = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
+        $this->assertNotFalse($temp);
+        $name        = stream_socket_get_name($temp, false);
+        $tempPort    = (int) substr((string) $name, (int) strrpos((string) $name, ':') + 1);
+        fclose($temp);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Error Connecting to server');
+
+        new StreamIO('127.0.0.1', $tempPort, 1, 1, stream_context_create(), false, true);
+    }
+
+    public function testTimedOutSocketThrowsOnReadsAndWrites(): void
+    {
+        $io = new StreamIO('127.0.0.1', $this->port, 1, 1, null, true);
+
+        try {
+            $io->read(8);
+            $this->fail('expected a RuntimeException');
+        } catch (RuntimeException $e) {
+            $this->assertSame('Failed to fread() from socket', $e->getMessage());
+        }
+
+        $operations = [
+            static function () use ($io): mixed {
+                return $io->read(8);
+            },
+            static function () use ($io): mixed {
+                return $io->write('x');
+            },
+            static function () use ($io): mixed {
+                return $io->stream_get_line(8);
+            },
+            static function () use ($io): mixed {
+                return $io->stream_get_contents(8);
+            },
+        ];
+        foreach ($operations as $operation) {
+            try {
+                $operation();
+                $this->fail('expected a TimeoutException');
+            } catch (TimeoutException $e) {
+                $this->assertStringContainsString('TIME', $e->getMessage());
+            }
+        }
+
+        $io->close();
+    }
+
+    public function testStreamGetLineThrowsOnEof(): void
+    {
+        fclose($this->accepted);
+        $this->accepted = null;
+
+        $this->expectException(TimeoutException::class);
+        $this->expectExceptionMessage('Socket connection EOF');
+
+        $this->io->stream_get_line(8);
     }
 
     public function testCloseIsRepeatedSafe(): void

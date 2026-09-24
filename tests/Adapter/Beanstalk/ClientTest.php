@@ -260,6 +260,65 @@ class ClientTest extends TestCase
         // After unset, destructor runs but skips disconnect for persistent
     }
 
+    public function testConnectWhenAlreadyConnectedRebinds(): void
+    {
+        $client = $this->connectClient();
+
+        $this->assertTrue($client->connect());
+        $this->assertSame("quit\r\n", $this->server->readRequest(6));
+        $this->server->accept();
+
+        $client->disconnect();
+    }
+
+    public function testReserveThrowsWhenDisconnected(): void
+    {
+        $client = $this->connectClient();
+        $client->disconnect();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active connection, call connect() first');
+
+        $client->reserve(1);
+    }
+
+    public function testReserveWithoutTimeoutRoundTrip(): void
+    {
+        $client = $this->connectClient();
+
+        $this->server->queueResponse("RESERVED 7 5\r\nhello\r\n");
+
+        $reserved = $client->reserve();
+        $this->assertIsArray($reserved);
+        $this->assertSame(7, $reserved['id']);
+        $this->assertSame('hello', $reserved['body']);
+        $this->assertSame("reserve\r\n", $this->server->readRequest(9));
+
+        $client->disconnect();
+    }
+
+    public function testReserveWithoutTimeoutOnTimedOutReturnsFalse(): void
+    {
+        $client = $this->connectClient();
+
+        $this->server->queueResponse("TIMED_OUT\r\n");
+
+        $this->assertFalse($client->reserve());
+
+        $client->disconnect();
+    }
+
+    public function testReserveOnDeadlineSoonReturnsFalse(): void
+    {
+        $client = $this->connectClient();
+
+        $this->server->queueResponse("DEADLINE_SOON\r\n");
+
+        $this->assertFalse($client->reserve(1));
+
+        $client->disconnect();
+    }
+
     public function testWriteThrowsWhenNotConnected(): void
     {
         $client = new Client();
@@ -269,6 +328,30 @@ class ClientTest extends TestCase
         $this->expectExceptionMessage('No connecting found while writing data to socket.');
 
         $method->invoke($client, 'hello');
+    }
+
+    public function testWriteThrowsWhenIoMissingButConnected(): void
+    {
+        $client           = new Client();
+        $client->connected = true;
+        $method           = new ReflectionMethod(Client::class, '_write');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active connection, call connect() first');
+
+        $method->invoke($client, 'hello');
+    }
+
+    public function testReadThrowsWhenIoMissingButConnected(): void
+    {
+        $client           = new Client();
+        $client->connected = true;
+        $method           = new ReflectionMethod(Client::class, '_read');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No active connection, call connect() first');
+
+        $method->invoke($client);
     }
 
     public function testReadThrowsWhenNotConnected(): void

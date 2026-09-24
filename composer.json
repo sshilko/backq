@@ -89,7 +89,8 @@
     "scripts": {
         "app-tests": [
             "docker compose -f build/docker-compose.yaml up -d --wait redis nsq app-php83",
-            "docker compose -f build/docker-compose.yaml exec -T app-php83 php ./vendor/bin/phpunit --configuration=phpunit.xml"
+            "docker compose -f build/docker-compose.yaml exec -T app-php83 php ./vendor/bin/phpunit --configuration=phpunit.xml",
+            "docker compose -f build/docker-compose.yaml down --remove-orphans redis nsq app-php83"
         ],
         "app-tests-local": [
             "@putenv XDEBUG_MODE=off",

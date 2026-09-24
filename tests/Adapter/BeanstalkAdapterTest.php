@@ -4,14 +4,18 @@ namespace BackQ\Tests\Adapter;
 
 use BackQ\Adapter\Beanstalk;
 use BackQ\Adapter\Beanstalk\Client;
+use BackQ\Tests\Support\FakeBeanstalkServer;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use RuntimeException;
 use function fclose;
+use function restore_error_handler;
+use function set_error_handler;
 use function stream_socket_get_name;
 use function stream_socket_server;
 use function strrpos;
 use function substr;
+use const E_USER_WARNING;
 
 class BeanstalkAdapterTest extends TestCase
 {
@@ -191,6 +195,39 @@ class BeanstalkAdapterTest extends TestCase
         $adapter->setTriggerErrorOnError(false);
 
         $this->assertFalse($adapter->connect('127.0.0.1', $port));
+    }
+
+    public function testConnectLogsExceptionWhenErrorHandlerThrows(): void
+    {
+        $adapter = new Beanstalk();
+        set_error_handler(static function (): bool {
+            throw new RuntimeException('error handler boom');
+        }, E_USER_WARNING);
+
+        $message = null;
+        try {
+            $adapter->connect('127.0.0.1', 1);
+        } catch (RuntimeException $e) {
+            $message = $e->getMessage();
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame('error handler boom', $message);
+    }
+
+    public function testConnectSucceedsAgainstFakeServer(): void
+    {
+        $server = new FakeBeanstalkServer();
+        try {
+            $adapter = new Beanstalk();
+            $adapter->setTriggerErrorOnError(false);
+
+            $this->assertTrue($adapter->connect('127.0.0.1', $server->getPort()));
+            $server->accept();
+        } finally {
+            $server->close();
+        }
     }
 
     public function testErrorPathLogsWithoutWarningWhenDisabled(): void

@@ -18,7 +18,7 @@ class TestWorker extends AbstractWorker
 
     protected $queueName = 'testqueue';
 
-    private int $index = 0;
+    protected int $index = 0;
 
     public function __construct(AbstractAdapter $adapter, public array $responses = [true])
     {
@@ -33,6 +33,11 @@ class TestWorker extends AbstractWorker
     public function doFinish(): bool
     {
         return $this->finish();
+    }
+
+    public function doWork(): \Generator
+    {
+        return $this->work();
     }
 
     #[Override]
