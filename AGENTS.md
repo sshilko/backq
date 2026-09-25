@@ -13,28 +13,45 @@ and runs OS processes via `symfony/process`.
 
 - `src/` — library code, PSR-4 namespace `BackQ\` (see `autoload` in `composer.json`)
   - `src/Adapter/` — queue adapters. `AbstractAdapter` is the base contract; concrete:
-    `Redis`, `Nsq`, `DynamoSQS`, `Beanstalk`
+    `Redis`, `Nsq`, `DynamoSQS`, `Beanstalk`. Shared pieces live alongside: the
+    `ConnectionState` enum (Redis/Nsq state machine), `Redis/` (`App`, `Manager`,
+    `Connector`, `Queue`), `Amazon/DynamoDb/QueueTableRow`, and `IO/` (`StreamIO`,
+    `AbstractIO`)
   - `src/Worker/` — job workers. Extend `AbstractWorker`, implement `run(): void`
   - `src/Publisher/` — job publishers. Extend `AbstractPublisher`, implement `setupAdapter()`
   - `src/Message/` — job payloads implementing `ConsumeInterface`
-- `example/` — runnable publisher/worker examples (not shipped)
-- `build/` — code-quality configuration: `psalm.xml`, `phpstan.neon`, `phpcs-ruleset.xml`,
-  `phan.php`, `phpmd-rulesets.xml`, Dockerfiles
-- `plans/` — design/modernization plans to be implemented in future changes
+- `example/` — runnable publisher/worker examples (`adapter/`, `http/`, `publishers/`,
+  `workers/`; not shipped)
+- `build/` — code-quality configuration and the dockerized dev environment: `psalm.xml`,
+  `phpstan.neon`, `phpcs-ruleset.xml`, `phan.php`, `phpmd-rulesets.xml`, `pdepend.xml`,
+  `phpdoc.xml`, `stubs/` (Psalm stub for `Illuminate\Redis\RedisManager`), `.pre-commit-config.yaml`,
+  `php.ini`, `Dockerfile.php83`, `docker-compose.yaml`
+- `plans/` — analysis-based implementation plans. `plan-1-protocol-tcp-frame-handling.md`,
+  `plan-2-network-ssl-disconnects.md` and `plan-3-connection-liveness-resilience.md` are
+  documented plans pending implementation; `plan-4-minor-notes-behavior.md` has been
+  implemented (merged via PR #11)
+- `.github/workflows/` — `ci.yml` (dockerized test + quality suite) and `opencode.yml`
+  (comment-triggered OpenCode runs)
 
 ## Environment
 
-- PHP >= 8.3 (see `plans/php-8.3-and-repository-review-improvement-plan.md`, the current
-  top-level modernization plan; `plans/php-8.1-modernization.md` records the 4.0 work);
-  `vendor/` and `composer.lock` are gitignored; install and verify via composer
+- PHP >= 8.3 (`platform.php` pinned to 8.3 in `composer.json`); `vendor/` and
+  `composer.lock` are gitignored; install and verify via composer
 - Changes are made on dedicated branches and land as pull requests
-- Integration tests for the `Redis` and `Nsq` adapters (`tests/Adapter/RedisAdapterTest.php`,
-  `tests/Adapter/NsqAdapterTest.php`) require running services; they are exercised via the
-  dockerized app in `build/` and skip themselves when the services are unreachable
-- CI: `.github/workflows/ci.yml` builds the php83 dockerized app and runs
-  `app-tests` + `app-code-quality` on every PR and merge to master
+- The dev environment is the dockerized app in `build/` (`Dockerfile.php83` +
+  `docker-compose.yaml`) with `redis` and `nsq` services. The app container is named
+  **`app-php83`** (`container_name` in the compose file); the repo is mounted at `/app`
+- The Redis and Nsq adapters have two test layers: `tests/Adapter/RedisAdapterTest.php` +
+  `tests/Adapter/NsqAdapterTest.php` are integration tests that need a live redis/nsqd,
+  while `tests/Adapter/RedisAdapterCoreTest.php` + `tests/Adapter/NsqAdapterCoreTest.php`
+  are unit tests that inject state via reflection and need no service
+- CI: `.github/workflows/ci.yml` builds the php83 dockerized app (with GitHub Actions
+  build cache), pulls `redis:7-alpine` + `nsqio/nsq:v1.3.0`, installs deps inside
+  `app-php83`, and runs `app-tests` + `app-code-quality` on every PR and merge to master.
+  `.github/workflows/opencode.yml` runs OpenCode on `/oc`/`/opencode` comments from
+  OWNER/MEMBER/COLLABORATOR accounts
 - All lint, code-quality, static-analysis and test commands must run **inside** the
-  `backq.php83` docker container (PHP 8.3, repo mounted at `/app`, `vendor/` installed,
+  `app-php83` docker container (PHP 8.3, repo mounted at `/app`, `vendor/` installed,
   `redis` + `nsq` services healthy). Host PHP must not be used for these checks.
 
 ## Commands
@@ -42,12 +59,14 @@ and runs OS processes via `symfony/process`.
 - `composer install` — install dependencies
 - `composer app-tests` — run the PHPUnit suite inside the dockerized app (`build/Dockerfile.php83`)
   with `redis` + `nsq` services from `build/docker-compose.yaml`; requires Docker
-- `composer app-tests-local` — run the PHPUnit suite on the host (Redis/Nsq integration
-  tests skip without the services)
+- `composer app-tests-local` — run the PHPUnit suite on the host. Caveat: `phpunit.xml` sets
+  `failOnSkipped="true"`, and the Redis/Nsq integration tests skip when no service is
+  reachable — so a bare host run fails on skipped tests. The dockerized `composer app-tests`
+  is the reliable path
 - `docker compose -f build/docker-compose.yaml up -d --build` — build and start app-php83,
   redis, nsq containers
-- `composer app-code-quality` — run the full quality suite (phpcs, phpcbf, phpstan, psalm,
-  phan, phpmd, pdepend)
+- `composer app-code-quality` (alias `composer app-quality`) — run the full quality suite:
+  phpcbf, phpcs, pdepend, phpmd, phpstan, psalm (plain + `--alter` + taint analysis), phan
 - Syntax check: `php -l <file>`
 
 ## Code quality inside the container
@@ -65,13 +84,13 @@ php -l src/Adapter/Beanstalk.php
 php -d memory_limit=-1 vendor/bin/phpcs --standard=build/phpcs-ruleset.xml --no-cache -s src/Adapter/Beanstalk.php --report=full
 php -d memory_limit=-1 vendor/bin/phpstan analyse --memory-limit=-1 --no-progress -c build/phpstan.neon src/Adapter/Beanstalk.php
 '@
-$script | docker exec -i backq.php83 bash -s
+$script | docker exec -i app-php83 bash -s
 ```
 
 or one-shot:
 
 ```bash
-docker exec backq.php83 bash -c "cd /app && php -l src/Adapter/Beanstalk.php"
+docker exec app-php83 bash -c "cd /app && php -l src/Adapter/Beanstalk.php"
 ```
 
 Per changed file, run in order:
@@ -81,6 +100,8 @@ Per changed file, run in order:
    (always pass `--no-cache`; otherwise stale `tmp/phpcs-tempfile` results are returned)
 3. `phpstan analyse --memory-limit=-1 --no-progress -c build/phpstan.neon <file>...` —
    static analysis (see the quirks below: the file set passed changes what PHPStan reports)
+4. `psalm.phar --config build/psalm.xml --no-diff --show-info=true <file>...` — type checks
+   (mirrors the `php-code-psalm-single-changed-file-check` pre-commit hook)
 
 Full sweep before considering work done:
 
@@ -88,7 +109,10 @@ Full sweep before considering work done:
 - `phpcbf --standard=build/phpcs-ruleset.xml --no-cache src tests` — expect
   **"No violations were found"** (idempotency check; any output means unfixed violations remain)
 - `phpstan analyse --memory-limit=-1 --no-progress -c build/phpstan.neon` — expect no errors
+- `php ./vendor/bin/psalm.phar --config build/psalm.xml --memory-limit=-1 --no-diff
+  --show-info=true --stats` — expect no errors
 - `php ./vendor/bin/phpunit --configuration=phpunit.xml` — expect the full suite (see Testing quirks)
+- `composer app-code-quality` — remaining tools (phan, phpmd, pdepend) in one pass
 
 Notes:
 
@@ -101,7 +125,7 @@ Notes:
 
 - **Always run PHPUnit inside the container** — never on the host. The host environment
   (PHP version, missing extensions, different `vendor/` layout) will produce misleading
-  results. Use `docker exec backq.php83 sh -c 'cd /app && php ./vendor/bin/phpunit
+  results. Use `docker exec app-php83 sh -c 'cd /app && php ./vendor/bin/phpunit
   --configuration=phpunit.xml'` or `composer app-tests` from within the repo root.
 - **The host shell is PowerShell, not bash.** Any command block that contains bash syntax
   (`$var`, backticks, `&&`, `|` piped to `docker exec -i … bash -s`) must be sent as a
@@ -109,6 +133,9 @@ Notes:
   One-shot `docker exec … bash -c "…"` commands work too as long as no host `$` variables
   are present. Do not paste bare bash into a PowerShell prompt.
 - Always run PHPUnit inside the container: `php ./vendor/bin/phpunit --configuration=phpunit.xml`
+- `phpunit.xml` sets `failOnSkipped="true"` — any skipped test fails the run. The dockerized
+  run never skips (redis + nsqd are up); a host-side run without reachable services fails
+  rather than silently passing.
 - `php -l` does **not** catch all load-time errors. A class file that fails to compile —
   e.g. a redundant union type such as `string|false|bool` ("Duplicate type false is
   redundant", fatal on PHP 8.2+) — can make PHPUnit **die silently mid-run**: output stops,
@@ -135,7 +162,8 @@ Notes:
   and `__serialize()`/`__unserialize()` so queue payloads stay compatible with both old and
   new PHP serialization. Keep it as-is — with both paths present PHP 8.3 emits no
   deprecation; do not migrate it to one or the other.
-- `tests/Adapter/Beanstalk/ClientTest.php` uses an in-process fake server
+- The Beanstalk tests (`tests/Adapter/BeanstalkAdapterTest.php` and
+  `tests/Adapter/Beanstalk/ClientTest.php`) use an in-process fake server
   (`tests/Support/FakeBeanstalkServer.php`) and must pass without a real beanstalkd service.
 - The Beanstalk tests assert **array key order**: the config `$defaults` in
   `src/Adapter/Beanstalk/Client.php` must stay in alphabetical order
@@ -152,6 +180,8 @@ Notes:
   `orderAlphabetically=true` configuration, and `DisallowTrailingCommaInDeclaration` +
   `DisallowNonCapturingCatch` are excluded because they conflict with the matching "Require"
   sniffs. Do not re-enable them.
+- `build/stubs/RedisManager.stub` is a Psalm stub for `Illuminate\Redis\RedisManager`
+  (referenced from `build/psalm.xml`); keep it in sync if the illuminate/redis API changes.
 
 ## Conventions
 
@@ -164,5 +194,5 @@ Notes:
 ## Verification
 
 - After changing code run `php -l` on touched files and the relevant code-quality tool(s)
-  (phpcs/phpstan) per the "Code quality inside the container" section, then the full sweep,
-  before considering work done
+  (phpcs/phpstan/psalm) per the "Code quality inside the container" section, then the full
+  sweep, before considering work done
