@@ -151,6 +151,32 @@ class StreamIOTest extends TestCase
         $this->io->stream_get_line(8);
     }
 
+    public function testCloseIsQuietOnDeadSocket(): void
+    {
+        fclose($this->accepted);
+        $this->accepted = null;
+
+        try {
+            $this->io->read(4);
+        } catch (\BackQ\Adapter\IO\Exception\TimeoutException) {
+            // expected: peer closed
+        }
+
+        $warnings = [];
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = $message;
+
+            return true;
+        });
+        try {
+            $this->io->close();
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame([], $warnings);
+    }
+
     public function testCloseIsRepeatedSafe(): void
     {
         $this->io->close();

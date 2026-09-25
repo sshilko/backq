@@ -147,12 +147,18 @@ class Nsq extends AbstractAdapter
         if (true === $this->connected) {
             try {
                 if (ConnectionState::BindRead === $this->state) {
-                    /**
-                     * When subscribed to receive new messages, nice way of closing the connection
-                     * is "RDY 0" (pause messages) followed by "CLS" (cleanly close connection)
-                     */
-                    $this->writeCommand(self::PROTO_CLOSE);
-                    $this->readSuccessResponse(self::RESPONSE_CLOSED);
+                    $io = $this->_io;
+                    \assert($io instanceof IO\StreamIO);
+                    if ($io->isSocketReady()) {
+                        $this->logDebug(__FUNCTION__ . ' socket is not healthy, skipping graceful close');
+                    } else {
+                        /**
+                         * When subscribed to receive new messages, nice way of closing the connection
+                         * is "RDY 0" (pause messages) followed by "CLS" (cleanly close connection)
+                         */
+                        $this->writeCommand(self::PROTO_CLOSE);
+                        $this->readSuccessResponse(self::RESPONSE_CLOSED);
+                    }
                 }
                 $io = $this->_io;
                 \assert($io instanceof IO\StreamIO);
@@ -452,6 +458,8 @@ class Nsq extends AbstractAdapter
             $this->write(self::PROTO_VERSION);
             $this->writeIdentify();
         } catch (Throwable $ex) {
+            $this->_io       = null;
+            $this->connected = false;
             $this->logError($ex->getCode() . ': ' . $ex->getMessage());
         }
 

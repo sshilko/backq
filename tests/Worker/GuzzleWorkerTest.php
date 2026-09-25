@@ -259,8 +259,8 @@ class GuzzleWorkerTest extends TestCase
         $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
         unlink($errorLog);
 
-        $this->assertStringContainsString('Error while sending FCM', $loggedErrors);
-        $this->assertContains(['afterWorkSuccess', 16], $adapter->calls);
+        $this->assertContains(['afterWorkFailed', 16], $adapter->calls);
+        $this->assertNotContains(['afterWorkSuccess', 16], $adapter->calls);
     }
 
     public function testAckFailureTriggersOuterCatch(): void

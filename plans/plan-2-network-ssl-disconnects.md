@@ -1,6 +1,12 @@
 # Plan 2 — Network & SSL disconnect handling (findings 2.1 – 2.3)
 
-> Status: **documented only** — no code changes made. Intended for implementation by another agent.
+> Status: **implemented** — completed in the current working tree.
+>
+> **Implementation notes (current checkout):**
+> - `src/Worker/Guzzle.php`: rejection handler now catches `Throwable` (not just `RequestException`) and marks transport/connect failures as processed=false (with `error_log` for connect failures); HTTP errors that return a response are logged but not marked as failure. `processed` set to false on catch.
+> - `src/Adapter/Nsq.php`: `connect()` rolls back state (`_io=null`, `connected=false`) on handshake failures; `disconnect()` skips graceful CLS/CLOSE_WAIT when socket is broken (`isSocketReady()` true).
+> - `src/Adapter/IO/StreamIO.php`: `close()` suppresses shutdown/fclose warnings with `@`.
+> - Tests: Guzzle connect-refused failure now expects `afterWorkFailed` and no `afterWorkSuccess`; Nsq connect handshake failures renamed/assert rollback; StreamIO adds `testCloseIsQuietOnDeadSocket`. All targeted tests pass. PHPCS/PHPStan clean on changed files.
 > Scope: section 2 of the analysis report (network / SSL disconnects).
 > Companion plans: `plan-1-protocol-tcp-frame-handling.md`, `plan-3-connection-liveness-resilience.md`,
 > `plan-4-minor-notes-behavior.md`.

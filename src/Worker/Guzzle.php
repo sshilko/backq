@@ -16,7 +16,6 @@ use Override;
 use Psr\Http\Message\ResponseInterface;
 use Throwable;
 use function date;
-use function error_log;
 use function gettype;
 use function is_string;
 use function json_encode;
@@ -107,14 +106,17 @@ final class Guzzle extends AbstractWorker
                                              JSON_THROW_ON_ERROR
                                          ));
                             },
-                            static function (RequestException $rejectedResponse) use ($me): void {
+                            static function (Throwable $rejectedResponse) use ($me, &$processed): void {
                                 $me->logDebug('Request sent, FAILED with ' . $rejectedResponse->getMessage());
+                                if (!($rejectedResponse instanceof RequestException && $rejectedResponse->getResponse() !== null)) {
+                                    $processed = false;
+                                }
                             }
                         );
 
                         $promise->wait();
                     } catch (Throwable $e) {
-                        error_log('Error while sending FCM: ' . $e->getMessage());
+                        $processed = false;
                     } finally {
                         /**
                          * If using Beanstalk and not returned success after TTR time,

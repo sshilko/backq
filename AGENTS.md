@@ -26,9 +26,9 @@ and runs OS processes via `symfony/process`.
   `phpstan.neon`, `phpcs-ruleset.xml`, `phan.php`, `phpmd-rulesets.xml`, `pdepend.xml`,
   `phpdoc.xml`, `stubs/` (Psalm stub for `Illuminate\Redis\RedisManager`), `.pre-commit-config.yaml`,
   `php.ini`, `Dockerfile.php83`, `docker-compose.yaml`
-- `plans/` — analysis-based implementation plans. `plan-1-protocol-tcp-frame-handling.md` and
-  `plan-2-network-ssl-disconnects.md` are documented plans pending implementation;
-  `plan-3-connection-liveness-resilience.md` and `plan-4-minor-notes-behavior.md` have been
+- `plans/` — analysis-based implementation plans. `plan-1-protocol-tcp-frame-handling.md` is
+  documented pending implementation; `plan-2-network-ssl-disconnects.md`,
+  `plan-3-connection-liveness-resilience.md`, and `plan-4-minor-notes-behavior.md` have been
   implemented (plan 4 was merged via PR #11)
 - `.github/workflows/` — `ci.yml` (dockerized test + quality suite) and `opencode.yml`
   (comment-triggered OpenCode runs)

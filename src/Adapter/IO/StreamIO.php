@@ -328,8 +328,8 @@ class StreamIO extends AbstractIO
     {
         if (is_resource($this->sock)) {
             $resource = $this->sock;
-            stream_socket_shutdown($resource, STREAM_SHUT_RDWR);
-            fclose($resource);
+            @stream_socket_shutdown($resource, STREAM_SHUT_RDWR);
+            @fclose($resource);
         }
         $this->sock = null;
     }

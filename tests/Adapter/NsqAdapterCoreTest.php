@@ -418,44 +418,47 @@ class NsqAdapterCoreTest extends TestCase
         }
     }
 
-    public function testConnectThrowsWhenIdentifyReplyIsNotAResponse(): void
+    public function testConnectReturnsFalseOnIdentifyError(): void
     {
         [$process, $pipes, $port] = $this->startFakeServer('identify-error');
         $nsq = new Nsq(self::TEST_HOST, $port);
         $nsq->setTriggerErrorOnError(false);
 
         try {
-            $this->assertTrue($nsq->connect());
+            $this->assertFalse($nsq->connect());
+            $this->assertFalse((new ReflectionProperty(Nsq::class, 'connected'))->getValue($nsq));
+            $this->assertNull((new ReflectionProperty(Nsq::class, '_io'))->getValue($nsq));
         } finally {
-            $nsq->disconnect();
             $this->stopFakeServer($process, $pipes);
         }
     }
 
-    public function testConnectThrowsWhenFeatureListIsNotAnArray(): void
+    public function testConnectReturnsFalseOnUnknownFeatureList(): void
     {
         [$process, $pipes, $port] = $this->startFakeServer('identify-null');
         $nsq = new Nsq(self::TEST_HOST, $port);
         $nsq->setTriggerErrorOnError(false);
 
         try {
-            $this->assertTrue($nsq->connect());
+            $this->assertFalse($nsq->connect());
+            $this->assertFalse((new ReflectionProperty(Nsq::class, 'connected'))->getValue($nsq));
+            $this->assertNull((new ReflectionProperty(Nsq::class, '_io'))->getValue($nsq));
         } finally {
-            $nsq->disconnect();
             $this->stopFakeServer($process, $pipes);
         }
     }
 
-    public function testConnectThrowsWhenAuthRequiredButMissing(): void
+    public function testConnectReturnsFalseOnMissingAuth(): void
     {
         [$process, $pipes, $port] = $this->startFakeServer('identify-auth');
         $nsq = new Nsq(self::TEST_HOST, $port);
         $nsq->setTriggerErrorOnError(false);
 
         try {
-            $this->assertTrue($nsq->connect());
+            $this->assertFalse($nsq->connect());
+            $this->assertFalse((new ReflectionProperty(Nsq::class, 'connected'))->getValue($nsq));
+            $this->assertNull((new ReflectionProperty(Nsq::class, '_io'))->getValue($nsq));
         } finally {
-            $nsq->disconnect();
             $this->stopFakeServer($process, $pipes);
         }
     }
@@ -475,30 +478,32 @@ class NsqAdapterCoreTest extends TestCase
         }
     }
 
-    public function testConnectThrowsWhenAuthReplyIsNotAResponse(): void
+    public function testConnectReturnsFalseOnAuthError(): void
     {
         [$process, $pipes, $port] = $this->startFakeServer('auth-error');
         $nsq = new Nsq(self::TEST_HOST, $port, ['auth' => 'secret']);
         $nsq->setTriggerErrorOnError(false);
 
         try {
-            $this->assertTrue($nsq->connect());
+            $this->assertFalse($nsq->connect());
+            $this->assertFalse((new ReflectionProperty(Nsq::class, 'connected'))->getValue($nsq));
+            $this->assertNull((new ReflectionProperty(Nsq::class, '_io'))->getValue($nsq));
         } finally {
-            $nsq->disconnect();
             $this->stopFakeServer($process, $pipes);
         }
     }
 
-    public function testConnectThrowsWhenAuthReplyIsNotJson(): void
+    public function testConnectReturnsFalseOnAuthBadJson(): void
     {
         [$process, $pipes, $port] = $this->startFakeServer('auth-badjson');
         $nsq = new Nsq(self::TEST_HOST, $port, ['auth' => 'secret']);
         $nsq->setTriggerErrorOnError(false);
 
         try {
-            $this->assertTrue($nsq->connect());
+            $this->assertFalse($nsq->connect());
+            $this->assertFalse((new ReflectionProperty(Nsq::class, 'connected'))->getValue($nsq));
+            $this->assertNull((new ReflectionProperty(Nsq::class, '_io'))->getValue($nsq));
         } finally {
-            $nsq->disconnect();
             $this->stopFakeServer($process, $pipes);
         }
     }
@@ -536,16 +541,17 @@ class NsqAdapterCoreTest extends TestCase
         }
     }
 
-    public function testConnectThrowsWhenFrameIsTruncated(): void
+    public function testConnectReturnsFalseOnTruncatedFrame(): void
     {
         [$process, $pipes, $port] = $this->startFakeServer('short-frame');
         $nsq = new Nsq(self::TEST_HOST, $port);
         $nsq->setTriggerErrorOnError(false);
 
         try {
-            $this->assertTrue($nsq->connect());
+            $this->assertFalse($nsq->connect());
+            $this->assertFalse((new ReflectionProperty(Nsq::class, 'connected'))->getValue($nsq));
+            $this->assertNull((new ReflectionProperty(Nsq::class, '_io'))->getValue($nsq));
         } finally {
-            $nsq->disconnect();
             $this->stopFakeServer($process, $pipes);
         }
     }
