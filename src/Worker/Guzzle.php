@@ -108,7 +108,11 @@ final class Guzzle extends AbstractWorker
                             },
                             static function (Throwable $rejectedResponse) use ($me, &$processed): void {
                                 $me->logDebug('Request sent, FAILED with ' . $rejectedResponse->getMessage());
-                                if (!($rejectedResponse instanceof RequestException && $rejectedResponse->getResponse() !== null)) {
+                                if (!(
+                                        $rejectedResponse instanceof RequestException
+                                        && null !== $rejectedResponse->getResponse()
+                                    )
+                                ) {
                                     $processed = false;
                                 }
                             }

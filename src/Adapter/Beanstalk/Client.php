@@ -243,15 +243,17 @@ class Client extends \Beanstalk\Client
     }
 
     /**
+     * @param int|null $length
+     *
      * @throws RuntimeException
      *
      * @return string|false
      *
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
-     * @suppress PhanUndeclaredTypeReturnType, PhanParamSignatureRealMismatchHasParamType, PhanParamSignatureMismatch 
+     * @suppress PhanUndeclaredTypeReturnType
      */
     #[Override]
-    protected function _read(int|null $length = null)
+    protected function _read($length = null)
     {
         if (!$this->connected) {
             $message = 'No connection found while reading data from socket.';

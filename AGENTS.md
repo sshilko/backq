@@ -57,6 +57,9 @@ and runs OS processes via `symfony/process`.
 ## Commands
 
 - `composer install` — install dependencies
+- `composer app-classes` — check that every class file under `src/` and `tests/` links
+  (see "Testing quirks"); runs on the host PHP, `composer app-classes-docker` runs it in
+  the container
 - `composer app-tests` — run the PHPUnit suite inside the dockerized app (`build/Dockerfile.php83`)
   with `redis` + `nsq` services from `build/docker-compose.yaml`; requires Docker
 - `composer app-tests-local` — run the PHPUnit suite on the host. Caveat: `phpunit.xml` sets
@@ -108,6 +111,7 @@ Full sweep before considering work done:
 - `phpcs --standard=build/phpcs-ruleset.xml --no-cache src tests --report=full` — expect 0 errors
 - `phpcbf --standard=build/phpcs-ruleset.xml --no-cache src tests` — expect
   **"No violations were found"** (idempotency check; any output means unfixed violations remain)
+- `php build/check-classes.php` — expect "OK, every class file loads"
 - `phpstan analyse --memory-limit=-1 --no-progress -c build/phpstan.neon` — expect no errors
 - `php ./vendor/bin/psalm.phar --config build/psalm.xml --memory-limit=-1 --no-diff
   --show-info=true --stats` — expect no errors
@@ -138,26 +142,38 @@ Notes:
   rather than silently passing.
 - `php -l` does **not** catch all load-time errors. A class file that fails to compile —
   e.g. a redundant union type such as `string|false|bool` ("Duplicate type false is
-  redundant", fatal on PHP 8.2+) — can make PHPUnit **die silently mid-run**: output stops,
-  usually after a run of dots, with no summary and exit code 255. `php -l` still reports
-  "No syntax errors". Detect such files by force-loading every class, e.g. loop over
-  `src/` and `tests/` calling `class_exists()` (skip `tests/Support/FakeNsqdServer.php` —
-  it is a procedural CLI script, not a class).
+  redundant", fatal on PHP 8.2+), or a parameter type that narrows an inherited method
+  ("Declaration of X::_read(?int $length) must be compatible with Y::_read($length)") — can
+  make PHPUnit **die silently mid-run**: output stops, usually after a run of dots, with no
+  summary and exit code 255. `php -l` still reports "No syntax errors". Run
+  `php build/check-classes.php` (`composer app-classes`, or `composer app-classes-docker`
+  inside the container) to link every class in an isolated child process and get the
+  offending files with the fatal message. It runs as the pre-commit hook
+  `php-code-class-load-check`, as a CI step before PHPUnit, and as the first entry of
+  `app-code-quality`. The script skips procedural files without a class declaration, such as
+  `tests/Support/FakeNsqdServer.php`.
 - A PHPUnit run that stops at a dot with no summary is a load-time crash, not a normal test
   failure. The suite is healthy only when it prints the final summary (`OK` or
   `OK, but there were issues!`, exit 0).
+- `--testdox` does not print test names while the suite runs. PHPUnit 10 buffers the whole
+  testdox report and writes it after the run finishes, so the live output is the progress
+  dots and a crashed run shows dots without names. Use `--debug` or `--log-junit` when
+  per-test output is needed before the run ends.
 - The `php-code-phpstan` pre-commit hook can report **"file(s) were modified by this hook"**
   with a `Failed` status even though its analysis output shows `[OK] No errors`. This is a
   benign false positive (pre-commit re-stages files it believes changed during the run).
   Ignore the hook status and judge the run by the analysis output: only a real
   `[ERROR]` findings block means the code is wrong.
 - PHPStan's findings depend on which files are passed to it. The pre-commit hook passes only
-  the **changed** PHP files, so analyzing a child class without its parent file in the set
-  flags child-parameter narrowing that PHP itself allows (untyped parent param `read($n)` vs
-  child `read(int $n)` → `method.childParameterType`, non-ignorable). When a child's narrow
-  parameter is flagged, type the parent's signature to match the child (the parent is the
-  contract). A clean full-project run is not sufficient — also run PHPStan on the changed
-  file alone to reproduce the hook's file set.
+  the **changed** PHP files, so analysing a child class can flag a parameter that narrows the
+  signature it inherits (untyped parent `read($n)` vs child `read(int $n)` →
+  `method.childParameterType`, non-ignorable). That narrowing is a hard PHP fatal ("must be
+  compatible with"), not a style issue, so the child has to match the parent. If the parent
+  lives in this repository, type the parent to match the child; if the parent is a vendor
+  class — such as `vendor/davidpersson/beanstalk` for `src/Adapter/Beanstalk/Client.php` —
+  remove the type from the child and keep it in the docblock. Psalm does not report this at
+  all, which is why `build/check-classes.php` exists. A clean full-project run is not
+  sufficient — also run PHPStan on the changed file alone to reproduce the hook's file set.
 - `src/Message/Generic.php` intentionally implements **both** the `Serializable` interface
   and `__serialize()`/`__unserialize()` so queue payloads stay compatible with both old and
   new PHP serialization. Keep it as-is — with both paths present PHP 8.3 emits no

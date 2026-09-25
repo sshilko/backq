@@ -87,8 +87,16 @@
         }
     },
     "scripts": {
+        "app-classes": [
+            "@putenv XDEBUG_MODE=off",
+            "php build/check-classes.php"
+        ],
+        "app-classes-docker": [
+            "docker compose -f build/docker-compose.yaml exec -T app-php83 php build/check-classes.php"
+        ],
         "app-tests": [
             "docker compose -f build/docker-compose.yaml up -d --wait redis nsq app-php83",
+            "@app-classes-docker",
             "docker compose -f build/docker-compose.yaml exec -T app-php83 php ./vendor/bin/phpunit --configuration=phpunit.xml",
             "docker compose -f build/docker-compose.yaml down --remove-orphans redis nsq app-php83"
         ],
@@ -100,6 +108,7 @@
             "@app-code-quality"
         ],
         "app-code-quality": [
+            "@app-classes",
             "@app-phpcbf",
             "@app-phpcs",
             "@app-pdepend",

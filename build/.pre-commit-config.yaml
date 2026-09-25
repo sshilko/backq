@@ -21,6 +21,13 @@ repos:
         entry: php -l -d display_errors=0
         language: system
         types: [php]
+      - id: php-code-class-load-check
+        name: php-code-class-load-check
+        entry: php build/check-classes.php
+        language: system
+        files: ^(src|tests)/.*\.php$|^composer\.json$
+        pass_filenames: false
+        verbose: true
       - id: php-code-phpcbf
         name: php-code-phpcbf
         entry: sh -c 'printf "%s\n" "$@" | xargs -r -n 1 -P 2 php -d memory_limit=-1 ./vendor/bin/phpcbf -v --standard=build/phpcs-ruleset.xml || exit 0' _

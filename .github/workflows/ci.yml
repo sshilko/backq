@@ -47,6 +47,9 @@ jobs:
       - name: Install dependencies inside the container
         run: docker compose -f build/docker-compose.yaml exec -T app-php83 composer install --no-interaction --prefer-dist
 
+      - name: Check that every class file compiles
+        run: docker compose -f build/docker-compose.yaml exec -T app-php83 php build/check-classes.php
+
       - name: Run the PHPUnit suite (Redis + NSQ integration)
         run: docker compose -f build/docker-compose.yaml exec -T app-php83 php ./vendor/bin/phpunit --testdox --configuration=phpunit.xml
 
