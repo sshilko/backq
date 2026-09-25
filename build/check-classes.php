@@ -30,7 +30,6 @@ use JsonException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
-use SplFileInfo;
 use Throwable;
 
 const EXIT_OK = 0;
@@ -73,6 +72,7 @@ while ([] !== $pending) {
 
     if (null === $broken) {
         $checked += count($pending);
+
         break;
     }
 
@@ -192,8 +192,8 @@ function phpFiles(string $root): array
             new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS)
         );
 
-        /** @var SplFileInfo $file */
         foreach ($iterator as $file) {
+            \assert($file instanceof SplFileInfo);
             if ($file->isFile() && 'php' === strtolower($file->getExtension())) {
                 $files[] = substr(str_replace('\\', '/', $file->getPathname()), strlen($root) + 1);
             }
@@ -301,6 +301,7 @@ function linkClasses(string $root, array $classes): array
 
         if (str_starts_with($line, MARKER)) {
             $last = trim(substr($line, strlen(MARKER)));
+
             break;
         }
     }

@@ -259,6 +259,11 @@ class GuzzleWorkerTest extends TestCase
         $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
         unlink($errorLog);
 
+        $this->assertSame(
+            '',
+            $loggedErrors,
+            'A refused connection must be handled by the worker, not reported as a PHP error'
+        );
         $this->assertContains(['afterWorkFailed', 16], $adapter->calls);
         $this->assertNotContains(['afterWorkSuccess', 16], $adapter->calls);
     }
