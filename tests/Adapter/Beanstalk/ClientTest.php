@@ -321,6 +321,18 @@ class ClientTest extends TestCase
         $client->disconnect();
     }
 
+    public function testReserveThrowsOnUnexpectedStatus(): void
+    {
+        $client = $this->connectClient();
+
+        $this->server->queueResponse("NOT_FOUND\r\n");
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('connection failure');
+
+        $client->reserve(1);
+    }
+
     public function testWriteThrowsWhenNotConnected(): void
     {
         $client = new Client();

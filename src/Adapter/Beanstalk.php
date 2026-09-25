@@ -226,6 +226,8 @@ class Beanstalk extends AbstractAdapter
                 }
             } catch (Throwable $e) {
                 $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+
+                throw $e;
             }
         }
 

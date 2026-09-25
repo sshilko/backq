@@ -12,7 +12,6 @@ use BackQ\Tests\Support\ThrowingPickAdapter;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
-use Throwable;
 use function restore_error_handler;
 use function set_error_handler;
 use const E_USER_WARNING;
@@ -103,16 +102,38 @@ class AbstractWorkerTest extends TestCase
         $this->assertNotContains(['afterWorkSuccess', 42], $this->adapter->calls);
     }
 
-    public function testWorkThrowsWhenNoJobAndNoTimeout(): void
+    public function testWorkIdlesWhenNoJobAndNoTimeout(): void
     {
-        $this->adapter->pickTaskResult = false;
-        $worker = $this->makeWorker();
-        $worker->workTimeout = 0;
-
-        $this->expectException(Throwable::class);
-        $this->expectExceptionMessage('Worker failed to fetch new job');
+        $adapter                = new SleepingPickAdapter();
+        $adapter->pickTaskResult = false;
+        $logger                 = new RecordingLogger();
+        $worker                 = new TestWorker($adapter);
+        $worker->setLogger($logger);
+        $worker->setTriggerErrorOnError(false);
+        $worker->setWorkTimeout(null);
+        $worker->setIdleTimeout(1);
 
         $worker->run();
+
+        $wholeLog = implode("\n", array_column($logger->records, 1));
+        $this->assertStringNotContainsString('Worker failed to fetch new job', $wholeLog);
+        $this->assertContains('disconnect', $adapter->calls);
+    }
+
+    public function testHeartbeatStyleIdleWithoutTimeoutDoesNotKillWorker(): void
+    {
+        $adapter = new SleepingPickAdapter();
+        $logger  = new RecordingLogger();
+        $worker  = new ConfigurableWorker($adapter);
+        $worker->setLogger($logger);
+        $worker->setTriggerErrorOnError(false);
+        $worker->setWorkTimeout(null);
+        $worker->setIdleTimeout(1);
+
+        $worker->run();
+
+        $wholeLog = implode("\n", array_column($logger->records, 1));
+        $this->assertStringNotContainsString('Worker failed to fetch new job', $wholeLog);
     }
 
     public function testLogErrorTriggerSuppressedViaSetter(): void

@@ -197,10 +197,13 @@ class Client extends \Beanstalk\Client
                  */
                 return false;
             case 'DEADLINE_SOON':
-            default:
                 $this->_error(__FUNCTION__ . " status = '" . $status . "', timeout=" . $streamTimeout);
 
                 return false;
+            default:
+                throw new RuntimeException(
+                    __FUNCTION__ . " connection failure, status = '" . $status . "', timeout=" . $streamTimeout
+                );
         }
     }
 
@@ -248,7 +251,7 @@ class Client extends \Beanstalk\Client
      * @suppress PhanUndeclaredTypeReturnType, PhanParamSignatureRealMismatchHasParamType, PhanParamSignatureMismatch 
      */
     #[Override]
-    protected function _read($length = null)
+    protected function _read(int|null $length = null)
     {
         if (!$this->connected) {
             $message = 'No connection found while reading data from socket.';

@@ -298,15 +298,17 @@ class BeanstalkAdapterTest extends TestCase
         $this->assertFalse($adapter->bindWrite('tube'));
     }
 
-    public function testPickTaskExceptionReturnsFalse(): void
+    public function testPickTaskPropagatesClientFailure(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
-        $client
-            ->expects($this->once())
+        $client->expects($this->once())
             ->method('reserve')
-            ->willThrowException(new RuntimeException('boom'));
+            ->willThrowException(new RuntimeException('connection lost'));
 
-        $this->assertFalse($adapter->pickTask());
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('connection lost');
+
+        $adapter->pickTask();
     }
 
     public function testPickTaskForwardsTimeoutArgument(): void

@@ -261,16 +261,20 @@ class Redis extends AbstractAdapter
     public function ping(bool $reconnect = true): bool
     {
         if ($this->connected) {
-            $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
-            assert($redisQueue instanceof Queue);
-            $redis = $redisQueue->getRedis();
-            assert($redis instanceof \Redis);
-            $pong  = $redis->ping();
+            try {
+                $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
+                assert($redisQueue instanceof Queue);
+                $redis = $redisQueue->getRedis();
+                assert($redis instanceof \Redis);
+                $pong  = $redis->ping();
 
-            if (in_array($pong, [true, '+PONG'], true)) {
-                $this->logDebug(__FUNCTION__ . ' successful');
+                if (in_array($pong, [true, '+PONG'], true)) {
+                    $this->logDebug(__FUNCTION__ . ' successful');
 
-                return true;
+                    return true;
+                }
+            } catch (Throwable $ex) {
+                $this->logError(self::class . ' ' . __FUNCTION__ . ' exception: ' . $ex->getMessage());
             }
         }
         $this->logDebug(__FUNCTION__ . ' failed');

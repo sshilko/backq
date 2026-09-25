@@ -53,6 +53,7 @@ class Nsq extends AbstractAdapter
     protected final const string RESPONSE_HEARTBEAT = "_heartbeat_";
     protected final const string RESPONSE_SUCCESS   = "OK";
     protected final const string RESPONSE_CLOSED    = "CLOSE_WAIT";
+    protected final const int REQUEUE_DELAY_MS = 1000;
     protected final const int FRAME_TYPE_RESPONSE = 0;
     protected final const int FRAME_TYPE_ERROR    = 1;
     protected final const int FRAME_TYPE_MESSAGE  = 2;
@@ -178,7 +179,14 @@ class Nsq extends AbstractAdapter
     public function ping(bool $reconnect = true): bool
     {
         if ($this->connected && $this->_io) {
-            return $this->_io->isSocketReady();
+            try {
+                /**
+                 * isSocketReady() returns TRUE when the socket is broken (EOF/timed out)
+                 */
+                return !$this->_io->isSocketReady();
+            } catch (RuntimeException $e) {
+                $this->logError(self::class . ' ' . __FUNCTION__ . ': ' . $e->getMessage());
+            }
         }
 
         return false;
@@ -192,7 +200,7 @@ class Nsq extends AbstractAdapter
     public function afterWorkFailed(int|string|null $workId): bool
     {
         if ($this->connected && ConnectionState::BindRead === $this->state) {
-            $this->writeCommand(sprintf(self::PROTO_REQUEUE, (string) $workId, 0));
+            $this->writeCommand(sprintf(self::PROTO_REQUEUE, (string) $workId, self::REQUEUE_DELAY_MS));
 
             return true;
         }

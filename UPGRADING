@@ -25,6 +25,17 @@
   - `ping(bool $reconnect = true)`
   Subclasses overriding these methods and callers must match the new argument
   types.
+- `BackQ\Worker\AbstractWorker::work()` now treats `pickTask() === false` as
+  an idle cycle, including when no work timeout is configured. Adapters must
+  throw on real connection failures instead of returning `false`; Beanstalk
+  and DynamoSQS transport failures now propagate to the worker.
+- `BackQ\Adapter\Nsq::ping()` now reports a healthy socket as `true` and a
+  broken socket as `false`. Failed NSQ jobs are requeued with a 1-second delay
+  instead of immediately.
+- `BackQ\Adapter\Redis::ping()` returns `false` when the Redis connection
+  check fails. `BackQ\Adapter\DynamoSQS::afterWorkSuccess()` returns `false`
+  when SQS cannot delete the message, so the worker can restart and retry
+  instead of treating the acknowledgement as successful.
 - `BackQ\Publisher\AbstractPublisher::ready()` is narrowed to `bool` (was
   untyped; it returned `null` before `start()`). The bound path is unchanged;
   callers and subclasses overriding `ready()` must use a `bool` return type.

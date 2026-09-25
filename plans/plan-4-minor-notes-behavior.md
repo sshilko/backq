@@ -1,6 +1,6 @@
 # Plan 4 — Minor notes & API behavior (findings 4.1 – 4.3)
 
-> Status: **documented only** — no code changes made. Intended for implementation by another agent.
+> Status: **implemented** — completed and merged in PR #11.
 > Scope: section 4 of the analysis report (minor defects / contract mismatches).
 > Companion plans: `plan-1-protocol-tcp-frame-handling.md`, `plan-2-network-ssl-disconnects.md`,
 > `plan-3-connection-liveness-resilience.md`.

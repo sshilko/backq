@@ -183,14 +183,17 @@ class DynamoSQSAdapterTest extends TestCase
         $this->assertFalse($adapter->pickTask());
     }
 
-    public function testPickTaskReturnsFalseOnAwsException(): void
+    public function testPickTaskPropagatesAwsException(): void
     {
         $exception = new AwsException('queue down', new Command('ReceiveMessage'));
         $sqs       = new MockHandler([$exception]);
         $adapter   = $this->makeAdapter(new MockHandler([]), $sqs);
         $adapter->setTriggerErrorOnError(false);
 
-        $this->assertFalse($adapter->pickTask());
+        $this->expectException(AwsException::class);
+        $this->expectExceptionMessage('queue down');
+
+        $adapter->pickTask();
     }
 
     public function testAfterWorkSuccessDeletesByReceiptHandle(): void
@@ -244,14 +247,14 @@ class DynamoSQSAdapterTest extends TestCase
         $this->assertFalse($adapter->pickTask());
     }
 
-    public function testAfterWorkSuccessLogsOnAwsException(): void
+    public function testAfterWorkSuccessReturnsFalseOnAwsException(): void
     {
         $exception = new AwsException('queue gone', new Command('DeleteMessage'));
         $sqs       = new MockHandler([$exception]);
         $adapter   = $this->makeAdapter(new MockHandler([]), $sqs);
         $adapter->setTriggerErrorOnError(false);
 
-        $this->assertTrue($adapter->afterWorkSuccess('rh-9'));
+        $this->assertFalse($adapter->afterWorkSuccess('rh-9'));
     }
 
     public function testPingAlwaysTrue(): void

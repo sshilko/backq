@@ -1,6 +1,17 @@
 # Plan 3 — Connection liveness & worker resilience (findings 3.1 – 3.6)
 
-> Status: **documented only** — no code changes made. Intended for implementation by another agent.
+> Status: **implemented** — completed in the current working tree.
+>
+> **Implementation notes (current checkout):**
+> - Applied items 3.1–3.6 in code.
+> - `src/Adapter/Nsq.php`: added `REQUEUE_DELAY_MS = 1000`, inverted `ping()` (treat broken socket as false), requeue uses positive delay. `ping()` catches `RuntimeException` and returns `false`.
+> - `src/Adapter/Redis.php`: `ping()` wrapped in try/catch; Redis connection exceptions return `false`.
+> - `src/Adapter/Beanstalk/Client.php`: `reserve()` throws `RuntimeException` on unexpected status instead of returning `false`; `TIMED_OUT`/`DEADLINE_SOON` remain `false`.
+> - `src/Adapter/Beanstalk.php`: `pickTask()` rethrows adapter/client failures after logging.
+> - `src/Adapter/DynamoSQS.php`: `pickTask()` rethrows `AwsException` after logging; `afterWorkSuccess()` returns `false` on `AwsException`.
+> - `src/Worker/AbstractWorker.php`: removed fatal throw when `pickTask()` returns `false` without timeout; `false` is treated as idle (two `yield null;`).
+> - Tests updated: `NsqAdapterCoreTest` flips ping expectation, adds dead-socket and throw cases, adds positive-delay requeue test; `RedisAdapterCoreTest` adds ping exception test; `BeanstalkAdapterTest` expects propagation; `Beanstalk/ClientTest` adds unexpected status test; `Worker/AbstractWorkerTest` flips idle tests (with `SleepingPickAdapter`, `idleTimeout=1`); `DynamoSQSAdapterTest` expects propagation on pickTask and `false` on ack failure.
+> - Full suite: 358 tests, 799 assertions pass (3 deprecations expected). PHPCS clean (disabled classes unchanged), PHPStan and Psalm pass on changed code. Plan 4 status remains as previously merged.
 > Scope: section 3 of the analysis report (liveness / worker resilience).
 > Companion plans: `plan-1-protocol-tcp-frame-handling.md`, `plan-2-network-ssl-disconnects.md`,
 > `plan-4-minor-notes-behavior.md`.

@@ -180,6 +180,8 @@ class DynamoSQS extends AbstractAdapter
                 'VisibilityTimeout' => $this->calculateVisibilityTimeout()]);
         } catch (AwsException $e) {
             $this->logError($e->getMessage());
+
+            throw $e;
         }
 
         if ($result && $result->hasKey('Messages')) {
@@ -281,6 +283,8 @@ class DynamoSQS extends AbstractAdapter
                 return true;
             } catch (AwsException $e) {
                 $this->logError($e->getMessage());
+
+                return false;
             }
         }
 

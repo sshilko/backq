@@ -193,6 +193,22 @@ class RedisAdapterCoreTest extends TestCase
         $this->assertTrue($redis->ping());
     }
 
+    public function testPingReturnsFalseWhenRedisThrows(): void
+    {
+        $redis = new Redis();
+        $this->setState($redis, true, ConnectionState::BindRead);
+        $redis->setTriggerErrorOnError(false);
+
+        $redisClient = $this->createMock(\Redis::class);
+        $redisClient->method('ping')->willThrowException(new \RedisException('Lost connection'));
+
+        $queue = $this->createMock(Queue::class);
+        $queue->method('getRedis')->willReturn($redisClient);
+        $this->wireManager($redis, $queue);
+
+        $this->assertFalse($redis->ping());
+    }
+
     public function testDisconnectReleasesReservedJobs(): void
     {
         $redis = new Redis();

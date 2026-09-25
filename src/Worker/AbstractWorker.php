@@ -312,14 +312,8 @@ abstract class AbstractWorker
                 }
             } else {
                 /**
-                 * Job is a lie
-                 */
-                if (!$timeout) {
-                    throw new Exception('Worker failed to fetch new job');
-                }
-
-                /**
-                 * Two yield's are not mistake
+                 * No job was available this cycle (heartbeat / idle poll).
+                 * Not an error: adapters surface real connection failures by throwing.
                  */
                 yield null;
                 yield null;

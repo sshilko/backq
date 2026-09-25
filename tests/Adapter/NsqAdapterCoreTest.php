@@ -3,6 +3,7 @@
 namespace BackQ\Tests\Adapter;
 
 use BackQ\Adapter\ConnectionState;
+use BackQ\Adapter\IO\StreamIO;
 use BackQ\Adapter\Nsq;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
@@ -16,6 +17,7 @@ use function json_decode;
 use function json_encode;
 use function microtime;
 use function pack;
+use function preg_match;
 use function proc_close;
 use function proc_open;
 use function proc_terminate;
@@ -29,6 +31,7 @@ use function strlen;
 use function strrpos;
 use function substr;
 use function trim;
+use function usleep;
 use const JSON_THROW_ON_ERROR;
 use const PHP_BINARY;
 
@@ -242,7 +245,7 @@ class NsqAdapterCoreTest extends TestCase
         }
     }
 
-    public function testPingReportsSocketHealthWhenConnected(): void
+    public function testPingReportsTrueWhenConnectedAndHealthy(): void
     {
         [$process, $pipes, $port] = $this->startFakeServer('idle');
         $nsq = new Nsq(self::TEST_HOST, $port);
@@ -250,11 +253,57 @@ class NsqAdapterCoreTest extends TestCase
 
         try {
             $this->assertTrue($nsq->connect());
+            $this->assertTrue($nsq->ping());
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testPingReportsFalseWhenSocketDead(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('idle');
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $nsq->setTriggerErrorOnError(false);
+
+        try {
+            $this->assertTrue($nsq->connect());
+            usleep(3200000);
+
             $this->assertFalse($nsq->ping());
         } finally {
             $nsq->disconnect();
             $this->stopFakeServer($process, $pipes);
         }
+    }
+
+    public function testPingReturnsFalseWhenSocketCheckThrows(): void
+    {
+        $io = $this->createMock(StreamIO::class);
+        $io->method('isSocketReady')->willThrowException(new RuntimeException('closed'));
+
+        $nsq = new Nsq(self::TEST_HOST, self::TEST_PORT);
+        $nsq->setTriggerErrorOnError(false);
+        $this->setState($nsq, true, ConnectionState::Nothing);
+        (new ReflectionProperty(Nsq::class, '_io'))->setValue($nsq, $io);
+
+        $this->assertFalse($nsq->ping());
+    }
+
+    public function testAfterWorkFailedRequeuesWithPositiveDelay(): void
+    {
+        $io = $this->createMock(StreamIO::class);
+        $io->expects($this->once())
+            ->method('write')
+            ->with($this->callback(static function (string $data): bool {
+                return 1 === preg_match('#^REQ msgid01234567890 [1-9][0-9]*\n$#', $data);
+            }));
+
+        $nsq = new Nsq(self::TEST_HOST, self::TEST_PORT);
+        $this->setState($nsq, true, ConnectionState::BindRead);
+        (new ReflectionProperty(Nsq::class, '_io'))->setValue($nsq, $io);
+
+        $this->assertTrue($nsq->afterWorkFailed('msgid01234567890'));
     }
 
     public function testAfterWorkFailedRequeuesMessage(): void
