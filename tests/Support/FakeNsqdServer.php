@@ -30,6 +30,8 @@
  *   sub-bad            - answer SUB with an error frame
  *   identify-heartbeat - answer IDENTIFY with a heartbeat, then features
  *   short-frame        - answer IDENTIFY with a truncated frame
+ *   bad-framesize      - answer IDENTIFY with an oversized frame size
+ *   bad-framesize-tiny - answer IDENTIFY with a frame size below the 4 byte minimum
  *   multi              - accept two consecutive connections
  *
  * Usage: php FakeNsqdServer.php <mode>
@@ -348,6 +350,32 @@ switch ($mode) {
             $exit(3);
         }
         fwrite($conn, pack('N', 100) . pack('N', 0) . 'abc');
+        fflush($conn);
+        fclose($conn);
+        $exit(0);
+
+        break;
+    case 'bad-framesize':
+        $conn = $accept();
+        if (!$handshake($conn)) {
+            fclose($conn);
+            $exit(3);
+        }
+        // frame size 0xFFFFFFF0 (4-byte body field), frame type 0, 4 bytes of junk, then close
+        fwrite($conn, pack('N', 0xFFFFFFF0) . pack('N', 0) . 'junk');
+        fflush($conn);
+        fclose($conn);
+        $exit(0);
+
+        break;
+    case 'bad-framesize-tiny':
+        $conn = $accept();
+        if (!$handshake($conn)) {
+            fclose($conn);
+            $exit(3);
+        }
+        // frame size < 4 is invalid per the NSQ spec
+        fwrite($conn, pack('N', 3) . pack('N', 0));
         fflush($conn);
         fclose($conn);
         $exit(0);

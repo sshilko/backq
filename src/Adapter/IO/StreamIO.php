@@ -202,9 +202,11 @@ class StreamIO extends AbstractIO
         $fread_result = '';
         while (!@feof($sock) && strlen($fread_result) < $n) {
             /**
-             * Up to $n number of bytes read.
+             * Read only what is still missing, otherwise a second fread() that
+             * races the first one eats into the next protocol field.
              */
-            $fdata = @fread($sock, $n);
+            $remaining = $n - strlen($fread_result);
+            $fdata     = @fread($sock, $remaining);
             if (false === $fdata) {
                 throw new RuntimeException("Failed to fread() from socket", self::READ_ERR_CODE);
             }
@@ -219,6 +221,22 @@ class StreamIO extends AbstractIO
                  * Nothing to read
                  */
                 break;
+            }
+        }
+
+        if (strlen($fread_result) < $n) {
+            /**
+             * A short read means the frame never completed. Report why instead of
+             * silently handing back a partial payload to the caller.
+             */
+            $info = stream_get_meta_data($sock);
+
+            if ($info['eof'] || @feof($sock)) {
+                throw new TimeoutException('Error reading data. Socket connection EOF', self::READ_EOF_CODE);
+            }
+
+            if ($info['timed_out']) {
+                throw new TimeoutException('Error reading data. Socket connection TIME OUT', self::READ_TIME_CODE);
             }
         }
 

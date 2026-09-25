@@ -59,6 +59,22 @@
   overrides (PHP 8.3). Subclasses that override a method that already carries
   the attribute only need to keep their own signatures compatible — the
   attribute is not inherited and is not required on child overrides.
+- Protocol reads no longer return truncated payloads:
+  - `BackQ\Adapter\Beanstalk\Client::_read($length)` (and therefore
+    `reserve()`) throws a `RuntimeException` when the peer disconnects
+    mid-body, instead of handing back the partial bytes as a complete job.
+    `Beanstalk::pickTask()` already propagates transport failures.
+  - `BackQ\Adapter\Beanstalk\Client::_read($length)` strips exactly the 2-byte
+    `\r\n` protocol terminator, so job bodies that legitimately end with
+    `\r`, `\n` or `\r\n` are no longer silently truncated.
+  - `BackQ\Adapter\IO\StreamIO::read()` throws a `TimeoutException`
+    (`READ_EOF_CODE` / `READ_TIME_CODE`) on a short read instead of silently
+    returning fewer than the requested number of bytes, and never reads past
+    the requested length.
+  - `BackQ\Adapter\Nsq` rejects a frame whose declared size is `< 4` or
+    greater than `MAX_FRAME_SIZE` (16 MiB) with an `Invalid frame size`
+    `RuntimeException`, instead of attempting the read and desynchronising or
+    exhausting memory.
 
 ========================================
 2. New Features

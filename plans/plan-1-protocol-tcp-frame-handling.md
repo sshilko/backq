@@ -1,6 +1,6 @@
 # Plan 1 — Protocol / TCP frame handling (findings 1.1 – 1.4)
 
-> Status: **documented only** — no code changes made. Intended for implementation by another agent.
+> Status: **implemented** - completed in the current working tree.
 > Scope: section 1 of the analysis report (protocol / TCP frame errors).
 > Companion plans: `plan-2-network-ssl-disconnects.md`, `plan-3-connection-liveness-resilience.md`,
 > `plan-4-minor-notes-behavior.md`.
