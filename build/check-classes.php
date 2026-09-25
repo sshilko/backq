@@ -30,6 +30,7 @@ use JsonException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
+use SplFileInfo;
 use Throwable;
 
 const EXIT_OK = 0;
