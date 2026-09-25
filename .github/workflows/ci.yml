@@ -48,7 +48,7 @@ jobs:
         run: docker compose -f build/docker-compose.yaml exec -T app-php83 composer install --no-interaction --prefer-dist
 
       - name: Run the PHPUnit suite (Redis + NSQ integration)
-        run: docker compose -f build/docker-compose.yaml exec -T app-php83 php ./vendor/bin/phpunit --configuration=phpunit.xml
+        run: docker compose up -d && docker compose -f build/docker-compose.yaml exec -T app-php83 php ./vendor/bin/phpunit --testdox --configuration=phpunit.xml
 
       - name: Restore tool caches into container
         if: steps.cache-restore.outputs.cache-hit == 'true'
