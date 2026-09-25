@@ -89,6 +89,27 @@ class StreamIOTest extends TestCase
         $this->io->read(4);
     }
 
+    public function testReadThrowsWhenPeerClosesMidRead(): void
+    {
+        // only 2 of the requested 4 bytes arrive, then the peer closes
+        fwrite($this->accepted, '12');
+        fclose($this->accepted);
+        $this->accepted = null;
+
+        $this->expectException(TimeoutException::class);
+        $this->expectExceptionMessage('Socket connection EOF');
+
+        $this->io->read(4);
+    }
+
+    public function testReadReturnsExactlyRequestedLengthAtFrameBoundary(): void
+    {
+        fwrite($this->accepted, '12345678');
+
+        $this->assertSame('1234', $this->io->read(4));
+        $this->assertSame('5678', $this->io->read(4));
+    }
+
     public function testConstructorThrowsOnTlsContextWhenPeerUnreachable(): void
     {
         $temp        = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);

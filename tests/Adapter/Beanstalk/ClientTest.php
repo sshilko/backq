@@ -138,6 +138,50 @@ class ClientTest extends TestCase
         $client->disconnect();
     }
 
+    public function testReservePreservesBodyTrailingCrlf(): void
+    {
+        $client = $this->connectClient();
+
+        // body of 7 bytes = "hello\r\n", followed by the protocol terminator "\r\n"
+        $this->server->queueResponse("RESERVED 7 7\r\nhello\r\n\r\n");
+
+        $reserved = $client->reserve(5);
+        $this->assertIsArray($reserved);
+        $this->assertSame(7, $reserved['id']);
+        $this->assertSame("hello\r\n", $reserved['body']);
+
+        $client->disconnect();
+    }
+
+    public function testReservePreservesBodyTrailingLf(): void
+    {
+        $client = $this->connectClient();
+
+        // body of 2 bytes = "x\n", followed by the protocol terminator "\r\n"
+        $this->server->queueResponse("RESERVED 1 2\r\nx\n\r\n");
+
+        $reserved = $client->reserve(5);
+        $this->assertIsArray($reserved);
+        $this->assertSame(1, $reserved['id']);
+        $this->assertSame("x\n", $reserved['body']);
+
+        $client->disconnect();
+    }
+
+    public function testReserveThrowsOnTruncatedBody(): void
+    {
+        $client = $this->connectClient();
+
+        // status says 100-byte body but only "partial" arrives before the peer closes
+        $this->server->queueResponse("RESERVED 7 100\r\npartial");
+        $this->server->close();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to read complete job body');
+
+        $client->reserve(5);
+    }
+
     public function testReserveWithTimeoutReturnsFalseOnTimeout(): void
     {
         $client = $this->connectClient();

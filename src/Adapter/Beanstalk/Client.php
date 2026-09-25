@@ -22,7 +22,6 @@ use function intval;
 use function is_numeric;
 use function is_string;
 use function ltrim;
-use function rtrim;
 use function sprintf;
 use function strlen;
 use function strpos;
@@ -278,8 +277,24 @@ class Client extends \Beanstalk\Client
                      */
                     throw new RuntimeException('Failed to io.stream_get_contents on ' . __FUNCTION__);
                 }
-                if ('' !== $packet) {
-                    $packet = rtrim($packet, "\r\n");
+                if (strlen($packet) < $length + 2) {
+                    /**
+                     * The peer went away mid-body: stream_get_contents() hands back
+                     * whatever arrived. Accepting it would hand the caller a truncated
+                     * job, which then gets processed and deleted -> payload loss.
+                     */
+                    throw new RuntimeException(sprintf(
+                        'Failed to read complete job body, expected %d bytes, got %d',
+                        $length + 2,
+                        strlen($packet)
+                    ));
+                }
+                /**
+                 * Strip the 2 byte protocol terminator only. A job body is allowed to
+                 * end with "\r", "\n" or "\r\n", so rtrim() would corrupt it.
+                 */
+                if ("\r\n" === substr($packet, -2)) {
+                    $packet = substr($packet, 0, -2);
                 }
             } catch (IO\Exception\TimeoutException $ex) {
                 if (IO\StreamIO::READ_EOF_CODE === $ex->getCode()) {

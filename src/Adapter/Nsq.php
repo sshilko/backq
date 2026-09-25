@@ -57,6 +57,13 @@ class Nsq extends AbstractAdapter
     protected final const int FRAME_TYPE_RESPONSE = 0;
     protected final const int FRAME_TYPE_ERROR    = 1;
     protected final const int FRAME_TYPE_MESSAGE  = 2;
+
+    /**
+     * Upper bound accepted for the 32bit frame size field. Generous compared to the
+     * nsqd default of --max-msg-size (1 MiB) while still rejecting a corrupt size
+     * before it turns into a huge blocking read.
+     */
+    protected final const int MAX_FRAME_SIZE = 16777216;
     protected final const float HEARTBEAT_TTR_RATION = 1.5;
     protected final const string IDENTIFY_USER_AGENT = "BackQ\Nsq";
     protected final const int STATE_BINDWRITE = 1;
@@ -630,6 +637,14 @@ class Nsq extends AbstractAdapter
 
         while (true) {
             $frameSize = $this->readInt();
+            if ($frameSize < 4 || $frameSize > self::MAX_FRAME_SIZE) {
+                /**
+                 * A frame carries at least its own 4 byte type field, and anything
+                 * beyond MAX_FRAME_SIZE is corrupt. Fail fast: reading it would
+                 * either desync the stream or block until the read timeout.
+                 */
+                throw new RuntimeException(sprintf('Invalid frame size %d', $frameSize));
+            }
             $frameType = $this->readInt();
 
             $frameData = $this->read($frameSize - 4);

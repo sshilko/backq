@@ -556,6 +556,42 @@ class NsqAdapterCoreTest extends TestCase
         }
     }
 
+    public function testReadFrameRejectsHugeFrameSize(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('bad-framesize');
+        $nsq                       = $this->handshakenNsq($port);
+
+        try {
+            $method = new ReflectionMethod(Nsq::class, 'readFrame');
+
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Invalid frame size');
+
+            $method->invoke($nsq, true);
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
+    public function testReadFrameRejectsTinyFrameSize(): void
+    {
+        [$process, $pipes, $port] = $this->startFakeServer('bad-framesize-tiny');
+        $nsq                       = $this->handshakenNsq($port);
+
+        try {
+            $method = new ReflectionMethod(Nsq::class, 'readFrame');
+
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Invalid frame size');
+
+            $method->invoke($nsq, true);
+        } finally {
+            $nsq->disconnect();
+            $this->stopFakeServer($process, $pipes);
+        }
+    }
+
     public function testWriteIdentifyThrowsWhenAlreadyBound(): void
     {
         $nsq    = new Nsq(self::TEST_HOST, self::TEST_PORT);
@@ -599,6 +635,23 @@ class NsqAdapterCoreTest extends TestCase
         (new ReflectionProperty(Nsq::class, 'connected'))->setValue($nsq, $connected);
         (new ReflectionProperty(Nsq::class, 'state'))->setValue($nsq, $state);
         (new ReflectionProperty(Nsq::class, 'stateData'))->setValue($nsq, $stateData);
+    }
+
+    /**
+     * Wires a Nsq to a blocking StreamIO that already played the magic +
+     * IDENTIFY handshake against the fake nsqd, so readFrame() can be driven
+     * directly instead of through connect(), which swallows exceptions.
+     */
+    private function handshakenNsq(int $port): Nsq
+    {
+        $nsq = new Nsq(self::TEST_HOST, $port);
+        $this->setState($nsq, true, ConnectionState::Nothing);
+
+        $io = new StreamIO(self::TEST_HOST, $port, 1, 2, null, true);
+        $io->write("  V2IDENTIFY\n" . pack('N', 0));
+        (new ReflectionProperty(Nsq::class, '_io'))->setValue($nsq, $io);
+
+        return $nsq;
     }
 
     /**
