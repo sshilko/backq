@@ -22,7 +22,7 @@ class Closure extends AbstractWorker
 
     public ?int $workTimeout = 5;
 
-    protected $queueName = 'closure';
+    protected string $queueName = 'closure';
 
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh

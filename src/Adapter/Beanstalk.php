@@ -13,6 +13,7 @@ namespace BackQ\Adapter;
 use BackQ\Adapter\Beanstalk\Client;
 use Override;
 use RuntimeException;
+use Stringable;
 use Throwable;
 use function is_array;
 
@@ -25,8 +26,6 @@ use function is_array;
 class Beanstalk extends AbstractAdapter
 {
     public const ADAPTER_NAME = 'beanstalk';
-
-    public const PARAM_PRIORITY  = 'priority';
 
     public const PRIORITY_DEFAULT = 1024;
 
@@ -237,42 +236,48 @@ class Beanstalk extends AbstractAdapter
     /**
      * Put task into queue
      *
-     * @param string $body The job body.
+     * @param string|Stringable $body     The job body.
+     * @param int               $readyWait Seconds the job may sit in the queue before a worker may take it.
+     * @param int|null          $jobTtr    Seconds a reserved job may run before it is released again.
+     * @param int|null          $priority  Lower runs first, 1024 is the beanstalkd default.
      *
-     * @return false|numeric-string `false` on otherwise an integer indicating the job id.
+     * @return string|Throwable the job id, or the failure
      */
     #[Override]
-    public function putTask(string $body, array $params = []): string|false
-    {
-        if ($this->connected) {
-            try {
-                $priority  = self::PRIORITY_DEFAULT;
-                $readywait = 0;
-                $jobttr    = self::JOBTTR_DEFAULT;
+    public function putTask(
+        string|Stringable $body,
+        int $readyWait = 0,
+        ?int $jobTtr = null,
+        ?int $priority = null
+    ): string|Throwable {
+        if (!$this->connected) {
+            $error = new RuntimeException(self::class . ' adapter ' . __FUNCTION__ . ': not connected');
+            $this->logError($error->getMessage());
 
-                if (isset($params[self::PARAM_PRIORITY])) {
-                    $priority  = $params[self::PARAM_PRIORITY];
-                }
-
-                if (isset($params[self::PARAM_READYWAIT])) {
-                    $readywait = $params[self::PARAM_READYWAIT];
-                }
-
-                if (isset($params[self::PARAM_JOBTTR])) {
-                    $jobttr    = $params[self::PARAM_JOBTTR];
-                }
-
-                $result = $this->client->put($priority, $readywait, $jobttr, $body);
-
-                if (false !== $result) {
-                    return (string) $result;
-                }
-            } catch (Throwable $e) {
-                $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
-            }
+            return $error;
         }
 
-        return false;
+        try {
+            $result = $this->client->put(
+                $priority ?? self::PRIORITY_DEFAULT,
+                $readyWait,
+                $jobTtr ?? self::JOBTTR_DEFAULT,
+                (string) $body
+            );
+        } catch (Throwable $e) {
+            $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+
+            return $e;
+        }
+
+        if (false === $result) {
+            $error = new RuntimeException(self::class . ' adapter ' . __FUNCTION__ . ': beanstalkd rejected the job');
+            $this->logError($error->getMessage());
+
+            return $error;
+        }
+
+        return (string) $result;
     }
 
     /**

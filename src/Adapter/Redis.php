@@ -21,6 +21,7 @@ use Illuminate\Queue\Jobs\RedisJob;
 use InvalidArgumentException;
 use Override;
 use RuntimeException;
+use Stringable;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 use Throwable;
 use function assert;
@@ -485,49 +486,45 @@ class Redis extends AbstractAdapter
     /**
      * Put task into queue
      *
-     * @param  string $data The job body.
-     * @return string|false job-id on success
+     * A TTR is deliberately not accepted: this adapter applies the timeout on pick, because
+     * migrate() only reaps rotten reserved and delayed jobs on pop/pick, never on put.
+     *
+     * @param  string|Stringable $body     The job body.
+     * @param  int               $readyWait Seconds to keep the job out of reach before a worker may take it.
+     *
+     * @return string|Throwable the job id, or the failure
      */
     #[Override]
-    public function putTask(string $body, array $params = []): string|int|bool
+    public function putTask(string|Stringable $body, int $readyWait = 0): string|Throwable
     {
         $this->logDebug(__FUNCTION__);
 
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
-                ConnectionState::BindWrite === $this->state)
+        if (!$this->connected || (ConnectionState::BindRead !== $this->state
+                && ConnectionState::BindWrite !== $this->state)
         ) {
-            $this->logDebug(
-                __FUNCTION__ . ' is connected and ready to: ' . (ConnectionState::BindRead === $this->state ? 'read' : 'write')
+            $error = new RuntimeException(
+                self::class . ' adapter ' . __FUNCTION__ . ': not connected to a bound queue'
             );
-            $instance = $this->queue->getConnection(self::CONNECTION_NAME);
-            assert($instance instanceof Queue);
-            $jobName  = $this->queueName;
+            $this->logError($error->getMessage());
 
-            /**
-             * Can put real job objects, or just data, just data for now
-             * @see \Illuminate\Queue\Jobs\Job
-             */
-            //\Illuminate\Queue\SerializableClosure::removeSecurityProvider();
-            //\Illuminate\Queue\SerializableClosure::setSecretKey(self::ENCRYPTION_KEY);
-            //$dummyClosure = function() use ($body) { return $body; };
-            //$jobName = \Illuminate\Queue\SerializableClosure::from($dummyClosure);
-            //$jobName = \Illuminate\Queue\CallQueuedClosure::class;
+            return $error;
+        }
 
-            //if (isset($params[self::PARAM_JOBTTR]) && $params[self::PARAM_JOBTTR] > 0) {
-            /**
-             * TTR is only used on picking in Redis adapter,
-             * migrate() that moves rotten reserved or delayed jobs only happen on pop/pick
-             * NOT in put
-             * Ignoring TTR
-             */
-            //}
+        $this->logDebug(
+            __FUNCTION__ . ' is connected and ready to: ' . (ConnectionState::BindRead === $this->state ? 'read' : 'write')
+        );
+        $instance = $this->queue->getConnection(self::CONNECTION_NAME);
+        assert($instance instanceof Queue);
+        $jobName  = $this->queueName;
+        $body     = (string) $body;
 
-            if (isset($params[self::PARAM_READYWAIT]) && $params[self::PARAM_READYWAIT] > 0) {
-                $delay = new DateInterval('PT' . ((int) $params[self::PARAM_READYWAIT]) . 'S');
+        try {
+            if ($readyWait > 0) {
+                $delay  = new DateInterval('PT' . $readyWait . 'S');
                 $taskId = $instance->later($delay, $jobName, $body, $this->queueName);
 
                 $this->logDebug(
-                    __FUNCTION__ . ' ' . ($taskId ? 'pushed' : 'failed push') . ' delayed job (' . (int) $params[self::PARAM_READYWAIT] . ' seconds) ' . $taskId
+                    __FUNCTION__ . ' ' . ($taskId ? 'pushed' : 'failed push') . ' delayed job (' . $readyWait . ' seconds) ' . $taskId
                 );
             } else {
                 $taskId = $instance->push($jobName, $body, $this->queueName);
@@ -535,20 +532,22 @@ class Redis extends AbstractAdapter
                     __FUNCTION__ . ' ' . ($taskId ? 'pushed' : 'failed push') . ' task without delay ' . $taskId
                 );
             }
+        } catch (Throwable $e) {
+            $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
 
-            if (null === $taskId) {
-                $this->logDebug(__FUNCTION__ . ' return false');
-
-                return false;
-            }
-
-            $this->logDebug(__FUNCTION__ . ' return ' . var_export($taskId, true));
-
-            return $taskId;
+            return $e;
         }
-        $this->logDebug(__FUNCTION__ . ' return false');
 
-        return false;
+        if (null === $taskId) {
+            $error = new RuntimeException(self::class . ' adapter ' . __FUNCTION__ . ': push failed');
+            $this->logError($error->getMessage());
+
+            return $error;
+        }
+
+        $this->logDebug(__FUNCTION__ . ' return ' . var_export($taskId, true));
+
+        return (string) $taskId;
     }
 
     /**
@@ -575,7 +574,9 @@ class Redis extends AbstractAdapter
         //    return new \Illuminate\Encryption\Encrypter('383baa56ab');
         //});
 
-        $this->app->bind('redis', function () {
+        $persistentId = $this->persistent && $this->persistent_id ? getmypid() : 0;
+
+        $this->app->bind('redis', function () use ($persistentId) {
             return new Redis\Manager(
                 /** @phan-suppress-next-line PhanTypeMismatchArgument */
                 $this->app,
@@ -589,7 +590,7 @@ class Redis extends AbstractAdapter
                     'prefix'        => $this->prefix,
                     'timeout'       => $this->timeout,
                     'read_timeout'  => $this->read_timeout,
-                    'persistent_id' => $this->persistent_id,
+                    'persistent_id' => $persistentId,
                     'port'       => $this->port,
                     'persistent' => $this->persistent,
                     'database'   => $this->database_id,

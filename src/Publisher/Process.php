@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -13,5 +14,5 @@ namespace BackQ\Publisher;
 abstract class Process extends AbstractPublisher
 {
 
-    protected $queueName = 'process';
+    protected string $queueName = 'process';
 }

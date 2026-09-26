@@ -11,20 +11,12 @@
 namespace BackQ\Adapter;
 
 use Psr\Log\LoggerInterface;
-use function trigger_error;
-use const E_USER_WARNING;
+use Stringable;
+use Throwable;
 
 abstract class AbstractAdapter
 {
-    public const string PARAM_JOBTTR    = 'jobttr';
-    public const string PARAM_READYWAIT = 'readywait';
-
-    public const int JOBTTR_DEFAULT  = 60;
-
-    /**
-     * Whether logError should always call trigger_error
-     */
-    protected bool $triggerErrorOnError = true;
+    public const int JOBTTR_DEFAULT = 60;
 
     protected ?LoggerInterface $logger = null;
 
@@ -64,12 +56,20 @@ abstract class AbstractAdapter
     /**
      * Put job to process
      *
-     * @param string $body
-     * @param array $params
+     * An adapter may widen this signature by appending its own optional parameters. It may not
+     * append a required one, narrow a parameter, or add to the return union: PHP rejects all
+     * three as an incompatible declaration.
      *
-     * @return bool|string|int job id or false on failure
+     * A transport or storage failure is returned as the Throwable rather than raised, so the
+     * caller can log it and keep the original type, message and previous chain. An invalid
+     * argument is a bug in the caller and is raised.
+     *
+     * @param string|Stringable $body
+     *
+     * @return string|Throwable|null the job id, null when this adapter reports no ids,
+     *                              the failure otherwise
      */
-    abstract public function putTask(string $body, array $params = []): bool|string|int;
+    abstract public function putTask(string|Stringable $body): null|string|Throwable;
 
     /**
      * Acknowledge server: callback after successfully processing job
@@ -114,14 +114,6 @@ abstract class AbstractAdapter
     }
 
     /**
-     * @param bool $triggerError
-     */
-    public function setTriggerErrorOnError(bool $triggerError): void
-    {
-        $this->triggerErrorOnError = $triggerError;
-    }
-
-    /**
      * @param string $message
      */
     public function logInfo(string $message): void
@@ -148,10 +140,6 @@ abstract class AbstractAdapter
     {
         if (isset($this->logger)) {
             $this->logger->error($message);
-        }
-
-        if ($this->triggerErrorOnError) {
-            trigger_error($message, E_USER_WARNING);
         }
     }
 }

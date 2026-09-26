@@ -11,6 +11,7 @@
 use BackQ\Adapter\Redis;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
+use Throwable;
 
 /**
  * Example publisher using
@@ -37,10 +38,11 @@ if ($redispub->bindWrite($queue)) {
     $i = 100;
     while ($i > 0) {
         $randomMessage = 'Payload body of message ' . time();
-        if ($redispub->putTask($randomMessage)) {
-            $redispub->logInfo('Pushed message');
+        $jobId         = $redispub->putTask($randomMessage);
+        if ($jobId instanceof Throwable) {
+            $redispub->logError('Failed pushing message: ' . $jobId->getMessage());
         } else {
-            $redispub->logError('Failed pushing message');
+            $redispub->logInfo('Pushed message ' . $jobId);
         }
         $i--;
         sleep(1);

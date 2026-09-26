@@ -42,7 +42,7 @@ class NsqAdapterTest extends TestCase
         $publisher = new Nsq($host, $port);
         $this->assertTrue($publisher->connect());
         $this->assertTrue($publisher->bindWrite($queue));
-        $this->assertTrue($publisher->putTask($body));
+        $this->assertNull($publisher->putTask($body));
         $publisher->disconnect();
 
         $consumer = new Nsq($host, $port);

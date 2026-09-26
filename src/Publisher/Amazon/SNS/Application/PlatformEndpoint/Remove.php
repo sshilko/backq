@@ -18,5 +18,5 @@ abstract class Remove extends AbstractPublisher
     /**
      * The queue will be used to delete remote endpoints that are disabled/inactive
      */
-    protected $queueName = 'aws_sns_endpoints_remove_';
+    protected string $queueName = 'aws_sns_endpoints_remove_';
 }

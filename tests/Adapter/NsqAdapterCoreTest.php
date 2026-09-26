@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use ReflectionProperty;
 use RuntimeException;
+use Throwable;
 use function dirname;
 use function fclose;
 use function fgets;
@@ -124,7 +125,7 @@ class NsqAdapterCoreTest extends TestCase
         $nsq = new Nsq(self::TEST_HOST, self::TEST_PORT);
         $this->setState($nsq, true, ConnectionState::BindRead);
 
-        $this->assertFalse($nsq->putTask('body'));
+        $this->assertInstanceOf(Throwable::class, $nsq->putTask('body'));
     }
 
     public function testPutTaskRejectsTooLargeTtr(): void
@@ -135,7 +136,7 @@ class NsqAdapterCoreTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('msg_timeout');
 
-        $nsq->putTask('body', [Nsq::PARAM_JOBTTR => Nsq::JOBTTR_DEFAULT + 1]);
+        $nsq->putTask('body', jobTtr: Nsq::JOBTTR_DEFAULT + 1);
     }
 
     public function testPutTaskRejectsTooLargeDelay(): void
@@ -146,7 +147,7 @@ class NsqAdapterCoreTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('max_req_timeout');
 
-        $nsq->putTask('body', [Nsq::PARAM_READYWAIT => 61]);
+        $nsq->putTask('body', readyWait: 61);
     }
 
     public function testPickTaskReturnsFalseWhenNotSubscribed(): void
@@ -176,7 +177,6 @@ class NsqAdapterCoreTest extends TestCase
     public function testHasWorkersReportsNotSupported(): void
     {
         $nsq = new Nsq(self::TEST_HOST, self::TEST_PORT);
-        $nsq->setTriggerErrorOnError(false);
 
         $this->assertFalse($nsq->hasWorkers('queue'));
     }
@@ -204,7 +204,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('heartbeat');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -225,7 +224,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('message');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -249,7 +247,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('idle');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -264,7 +261,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('idle');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -283,7 +279,6 @@ class NsqAdapterCoreTest extends TestCase
         $io->method('isSocketReady')->willThrowException(new RuntimeException('closed'));
 
         $nsq = new Nsq(self::TEST_HOST, self::TEST_PORT);
-        $nsq->setTriggerErrorOnError(false);
         $this->setState($nsq, true, ConnectionState::Nothing);
         (new ReflectionProperty(Nsq::class, '_io'))->setValue($nsq, $io);
 
@@ -310,7 +305,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('requeue');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -326,7 +320,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('message');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -346,7 +339,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('non-message');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -370,19 +362,18 @@ class NsqAdapterCoreTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('heartbeat');
 
-        $nsq->putTask('body', [Nsq::PARAM_JOBTTR => 8]);
+        $nsq->putTask('body', jobTtr: 8);
     }
 
     public function testPutTaskWritesDelayedPublishFromReadyWait(): void
     {
         [$process, $pipes, $port] = $this->startFakeServer('pubdelay');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
             $this->assertTrue($nsq->bindWrite('pubdelay-topic'));
-            $this->assertTrue($nsq->putTask('payload', [Nsq::PARAM_READYWAIT => 5]));
+            $this->assertNull($nsq->putTask('payload', readyWait: 5));
         } finally {
             $nsq->disconnect();
             $this->stopFakeServer($process, $pipes);
@@ -398,7 +389,6 @@ class NsqAdapterCoreTest extends TestCase
         fclose($temp);
 
         $nsq = new Nsq(self::TEST_HOST, $tempPort);
-        $nsq->setTriggerErrorOnError(false);
 
         $this->assertFalse($nsq->connect());
     }
@@ -407,7 +397,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('multi');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -422,7 +411,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('identify-error');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertFalse($nsq->connect());
@@ -437,7 +425,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('identify-null');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertFalse($nsq->connect());
@@ -452,7 +439,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('identify-auth');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertFalse($nsq->connect());
@@ -467,7 +453,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('auth-ok');
         $nsq = new Nsq(self::TEST_HOST, $port, ['auth' => 'secret']);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -482,7 +467,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('auth-error');
         $nsq = new Nsq(self::TEST_HOST, $port, ['auth' => 'secret']);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertFalse($nsq->connect());
@@ -497,7 +481,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('auth-badjson');
         $nsq = new Nsq(self::TEST_HOST, $port, ['auth' => 'secret']);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertFalse($nsq->connect());
@@ -512,7 +495,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('sub-bad');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -531,7 +513,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('identify-heartbeat');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertTrue($nsq->connect());
@@ -545,7 +526,6 @@ class NsqAdapterCoreTest extends TestCase
     {
         [$process, $pipes, $port] = $this->startFakeServer('short-frame');
         $nsq = new Nsq(self::TEST_HOST, $port);
-        $nsq->setTriggerErrorOnError(false);
 
         try {
             $this->assertFalse($nsq->connect());

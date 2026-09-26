@@ -8,7 +8,6 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
-use BackQ\Adapter\AbstractAdapter;
 use BackQ\Adapter\Nsq;
 use BackQ\Publisher\Process;
 use Symfony\Component\Console\Logger\ConsoleLogger;
@@ -22,15 +21,21 @@ use Symfony\Component\Console\Output\ConsoleOutput;
  */
 final class MyNsqProcessPublisher extends Process
 {
-    public const PARAM_READYWAIT = Nsq::PARAM_READYWAIT;
+    protected string $queueName = 'process';
 
-    protected $queueName = 'process';
-
-    protected function setupAdapter(): AbstractAdapter
+    /**
+     * This publisher is embedded into a `Message\Serialized` payload, an adapter
+     * is not serializable so it has to be rebuilt when the worker restores it
+     */
+    public function __wakeup(): void
     {
-        $output  = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
-        $logger  = new ConsoleLogger($output);
+        $this->adapter = self::createAdapter();
+    }
 
+    public static function createAdapter(): Nsq
+    {
+        $output   = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
+        $logger   = new ConsoleLogger($output);
         $nsqdHost = getenv('BACKQ_NSQD_HOST') ?: '127.0.0.1';
         $nsqdPort = (int) (getenv('BACKQ_NSQD_PORT') ?: 4150);
 

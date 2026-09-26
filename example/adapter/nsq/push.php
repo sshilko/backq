@@ -11,6 +11,7 @@
 use BackQ\Adapter\Nsq;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
+use Throwable;
 
 /**
  * Example publisher using
@@ -37,10 +38,11 @@ if ($nsqpub->bindWrite($queue)) {
         $i = 100;
         while ($i > 0) {
             $randomMessage = 'Payload body of message ' . time();
-            if ($nsqpub->putTask($randomMessage)) {
-                $nsqpub->logInfo('Pushed message');
+            $error         = $nsqpub->putTask($randomMessage);
+            if ($error instanceof Throwable) {
+                $nsqpub->logError('Failed pushing message: ' . $error->getMessage());
             } else {
-                $nsqpub->logError('Failed pushing message message');
+                $nsqpub->logInfo('Pushed message');
             }
             $i--;
             sleep(1);

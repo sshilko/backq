@@ -19,12 +19,83 @@
   - `bindRead(string $queue)`, `bindWrite(string $queue)`,
     `hasWorkers(string $queue)`
   - `pickTask(?int $timeout = null)`
-  - `putTask(string $body, array $params = [])`
+  - `putTask(string|Stringable $body)` — see the `putTask()` contract below
   - `afterWorkSuccess(int|string|null $workId)`,
     `afterWorkFailed(int|string|null $workId)`
   - `ping(bool $reconnect = true)`
   Subclasses overriding these methods and callers must match the new argument
   types.
+- `putTask()` takes one parameter, not an options array, and reports failure as a
+  `Throwable` instead of `false`:
+
+  ```php
+  abstract public function putTask(string|Stringable $body): null|string|Throwable;
+  ```
+
+  Each adapter widens that signature by appending its own **optional** parameters.
+  PHP allows this; it rejects a required extra parameter, a narrowed parameter
+  type, and `false` added to the return union, all three as an incompatible
+  declaration. Read the signature to learn what an adapter accepts.
+
+  | Adapter | signature | result |
+  |---|---|---|
+  | `Beanstalk` | `putTask($body, int $readyWait = 0, ?int $jobTtr = null, ?int $priority = null)` | `string\|Throwable` |
+  | `Redis` | `putTask($body, int $readyWait = 0)` | `string\|Throwable` |
+  | `Nsq` | `putTask($body, int $readyWait = 0, ?int $jobTtr = null)` | `null\|Throwable` |
+  | `DynamoSQS` | `putTask($body, int $readyWait = 0, int\|string\|null $messageId = null)` | `null\|Throwable` |
+  | `MySql` | `putTask($body, int\|string\|null $jobId = null, bool $putAsDone = false, bool $noSleep = false)` | `string\|Throwable` |
+
+  Migration:
+
+  ```php
+  // was: $publisher->publish($message, [AbstractAdapter::PARAM_READYWAIT => 5]);
+  $publisher->publish($message, readyWait: 5);
+  $publisher->publish($message, ...$options);   // $options = ['readyWait' => 5]
+  ```
+
+  - **The `$params` array is gone, with no compatibility shim.** A wrong name is
+    now reported by the engine as `Error: Unknown named parameter $jobttr`.
+  - `AbstractPublisher::publish()` is variadic and forwards named arguments to
+    `putTask()`. It throws `InvalidArgumentException` if an options array is
+    passed, so the old form fails with a migration message instead of a
+    confusing `TypeError` deep in the stack.
+  - `publish()` before `start()` **returns** a `RuntimeException` (was
+    `false`). It is a failure like any other, and `publish()` already has a
+    channel for it. It does not throw, so a single `try` around the call covers
+    every failure mode.
+  - `false` is no longer a put result anywhere. A transport or storage failure
+    comes back as the `Throwable`, so the type, message and previous chain
+    survive. An **invalid argument still throws** (an out-of-range `jobTtr`, a
+    `$readyWait` above `max_req_timeout`, an unprocessable DynamoDB TTL, a
+    missing `MySql` job id), because that is a bug in the caller.
+  - **A `Throwable` is truthy.** `if ($publisher->publish($m))` now reads a
+    failure as success. Test `instanceof Throwable` instead:
+
+    ```php
+    $result = $publisher->publish($message);
+    if ($result instanceof Throwable) {
+        $logger->error('publish failed: ' . $result->getMessage(), ['exception' => $result]);
+    }
+    ```
+
+  - `Message\Serialized::$publishOptions` is still an array (the payload is
+    serialized into the queue) but is now a **named-argument map**, replayed
+    with a splat: `new Serialized($message, $publisher, ['readyWait' => 5])`.
+    **A delayed job already in a queue when you upgrade no longer replays**: its
+    payload holds the retired `jobttr` / `readywait` keys and the worker logs
+    `Error: Unknown named parameter`. Drain or purge the `serialized` queue
+    across the upgrade.
+  - `MySql::putTask()` `$jobId` is nullable only because PHP forbids appending a
+    required parameter to an inherited method; a call without a usable id returns
+    an `InvalidArgumentException`. Callers that always hold an id should call the
+    new `MySql::putTaskTo(int|string $jobId, string|Stringable $body, bool $putAsDone = false, bool $noSleep = false)`.
+  - Constants removed, all replaced by the parameter of the same meaning:
+    `AbstractAdapter::PARAM_JOBTTR`, `AbstractAdapter::PARAM_READYWAIT`,
+    `Beanstalk::PARAM_PRIORITY`, `DynamoSQS::PARAM_MESSAGE_ID`.
+    `AbstractAdapter::JOBTTR_DEFAULT` and `Beanstalk::PRIORITY_DEFAULT` stay and
+    now seed the `$jobTtr` / `$priority` defaults.
+  - `Redis::putTask()` still accepts no TTR: the adapter applies the timeout on
+    pick, because `migrate()` only reaps rotten and delayed jobs on pop/pick.
 - `BackQ\Worker\AbstractWorker::work()` now treats `pickTask() === false` as
   an idle cycle, including when no work timeout is configured. Adapters must
   throw on real connection failures instead of returning `false`; Beanstalk
@@ -42,11 +113,36 @@
 - `BackQ\Worker\AbstractWorker::$workTimeout` is now typed `?int` (was untyped,
   default `null`). Child classes that assign an `int` (such as the SNS workers'
   `= 5`) must declare `?int $workTimeout`.
+- `BackQ\Publisher\AbstractPublisher` takes the adapter through the constructor,
+  mirroring `AbstractWorker`:
+  - `__construct(?AbstractAdapter $adapter = null)` is now
+    `__construct(AbstractAdapter $adapter)` — the adapter is required.
+  - `setupAdapter()` is removed. Publishers that used to build their adapter in
+    that override now receive it from the caller: `new MyPublisher($adapter)`.
+    Implementations that need extra constructor arguments can still declare
+    `__construct(AbstractAdapter $adapter, ...)` and call
+    `parent::__construct($adapter)`.
+  - `AbstractPublisher::$adapter` is now `protected` (was `private`) so a
+    publisher can rebuild it after `unserialize()`.
+  - `getInstance()` is `@deprecated`, triggers `E_USER_DEPRECATED` and throws
+    `BadMethodCallException`: it can no longer build a publisher, because no
+    adapter can be supplied without one.
+  - `__wakeup()` is removed. The adapter is not serializable, so a publisher that
+    travels through a queue (`BackQ\Message\Serialized` payloads) must restore it
+    in its own `__wakeup()` — see `example/publishers/lib/*processpublisher.php`.
 - Deprecated/dead API removed:
   - `BackQ\Worker\AbstractWorker::debug()` (use `logDebug()`)
   - NSQ `info()`/`error()` aliases on `BackQ\Adapter\Nsq` (use the PSR-3
     `logInfo()`/`logError()` methods)
   - `BackQ\Adapter\Beanstalk::pickTasks()` (dead, unused)
+  - `BackQ\Adapter\AbstractAdapter::setTriggerErrorOnError()` and
+    `BackQ\Worker\AbstractWorker::setTriggerErrorOnError()`, together with the
+    `triggerErrorOnError` property of both classes. `logError()` now reports to
+    the PSR-3 logger only and no longer raises an `E_USER_WARNING`: remove the
+    `setTriggerErrorOnError(false)` calls from your bootstrap, code that
+    depended on the warning has to watch the logger instead. The
+    `trigger_error()` calls of `BackQ\Worker\AProcess` and
+    `BackQ\Worker\GuzzleForwarder` are unchanged.
 - `BackQ\Message\Generic` keeps `Serializable` for backward compatibility but
   now also implements the native `__serialize()`/`__unserialize()` magic
   methods (removing the PHP 8.1+ interface deprecation). The legacy
@@ -85,6 +181,34 @@
   adapters for the connection state machine. The legacy `STATE_*` integer
   constants on both adapters are kept for backward compatibility.
 - `BackQ\Message\Generic::$data` and `getData()` are typed (`mixed`).
+- `BackQ\Adapter\MySql`: new adapter that keeps the queue in a MySQL table
+  instead of a queue server. It receives an established `mysqli` link through
+  the constructor and never opens or closes it, so the application keeps
+  control over the connection options, charset and pooling (needs the
+  `ext-mysqli` extension). The job table and the throttling sleeps are passed
+  as a `BackQ\Adapter\MySql\JobConfig` value object, the logger is the last
+  argument, so a fully configured adapter is built with
+  `new MySqlAdapter($db, new JobConfig(), $logger)`. Query failures surface as
+  `mysqli_sql_exception`, the default error mode of the driver since PHP 8.1:
+  `pickTask()` catches them, rolls the transaction back and returns `false`,
+  while `putTask()` catches them, rolls the transaction back and returns the
+  exception. `afterWorkSuccess()` and `afterWorkFailed()` report `false`
+  instead of throwing, so an acknowledgement never breaks the worker loop. The
+  inherited `setLogger()` still works.
+- `BackQ\Adapter\MySql\JobState` and `BackQ\Adapter\MySql\JobColumn`: backed
+  `string` enums for the job states of the `sync` column (`Wait` = `WAIT`,
+  `Lock` = `LOCK`, `Done` = `DONE`, `Hold` = `HOLD`) and for the columns the
+  adapter owns (`State` = `sync`, `Time` = `time_sync`). They replace the
+  private `MySql::STATE_*` and `MySql::COLUMN_*` constants. The produced SQL did
+  not change.
+- `BackQ\Adapter\MySql\JobConfig`: a `final readonly` value object carrying the
+  job columns, the job table and the three throttling sleeps that used to be
+  the `$jobIdColumn`, `$jobDataColumn`, `$jobTable`, `$pickMissSleep`,
+  `$pickSuccessSleep` and `$putTaskSleep` constructor arguments and properties
+  of `MySql`. It is injected as the second constructor argument
+  (`new MySqlAdapter($db, new JobConfig(), $logger)`). All defaults are
+  unchanged. Subclasses that overrode the sleep properties now pass a
+  `JobConfig` with their own values instead.
 - `json_validate()` in place of `@json_decode(...)` + `is_array` checks in
   `BackQ\Adapter\DynamoSQS` and `BackQ\Adapter\Amazon\DynamoDb\QueueTableRow`.
 

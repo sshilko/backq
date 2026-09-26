@@ -8,10 +8,8 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
-use BackQ\Adapter\Beanstalk;
 use BackQ\Message\Process;
-use Symfony\Component\Console\Logger\ConsoleLogger;
-use Symfony\Component\Console\Output\ConsoleOutput;
+use Throwable;
 
 /**
  * Publisher
@@ -23,15 +21,15 @@ use Symfony\Component\Console\Output\ConsoleOutput;
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/lib/myprocesspublisher.php';
 
-$publisher = MyProcessPublisher::getInstance();
+$publisher = new MyProcessPublisher(MyProcessPublisher::createAdapter());
 if ($publisher->start()) {
     for ($i = 0; $i < 5; $i++) {
         $message = new \BackQ\Message\Process('echo ' . time() . '; echo $( date +%s ) >> /tmp/test');
-        $result = $publisher->publish($message);
-        if ($result) {
-            echo 'Published `' . $message->getCommandline() . '`` as ID=' . $result . ", check /tmp/test\n";
+        $result  = $publisher->publish($message);
+        if ($result instanceof Throwable) {
+            echo 'Failed to publish: ' . $result->getMessage() . "\n";
         } else {
-            echo 'Failed to publish' . "\n";
+            echo 'Published `' . $message->getCommandline() . '`` as ID=' . $result . ", check /tmp/test\n";
         }
         sleep(1);
     }

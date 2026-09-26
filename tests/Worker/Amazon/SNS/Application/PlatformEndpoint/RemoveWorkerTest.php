@@ -158,7 +158,6 @@ class RemoveWorkerTest extends TestCase
         $worker = new Remove($this->adapter);
         $worker->setClient($this->client);
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(4);
 
         $worker->run();
@@ -181,7 +180,6 @@ class RemoveWorkerTest extends TestCase
         };
         $worker->setClient($this->client);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();
@@ -233,7 +231,6 @@ class RemoveWorkerTest extends TestCase
         $worker = new Remove($this->adapter);
         $worker->setClient($this->client);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         return $worker;

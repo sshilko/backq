@@ -4,16 +4,30 @@ namespace BackQ\Tests\Adapter;
 
 use BackQ\Adapter\AbstractAdapter;
 use BackQ\Tests\Support\TestAdapter;
+use Error;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class AbstractAdapterTest extends TestCase
 {
-    public function testConstants(): void
+    public function testJobTtrDefaultConstant(): void
     {
-        $this->assertSame('jobttr', AbstractAdapter::PARAM_JOBTTR);
-        $this->assertSame('readywait', AbstractAdapter::PARAM_READYWAIT);
         $this->assertSame(60, AbstractAdapter::JOBTTR_DEFAULT);
+    }
+
+    public function testStringBodyIsAcceptedByTheStringableParameter(): void
+    {
+        // A bare Stringable would raise a TypeError here, because a raw string does not
+        // implement it. publish() feeds serialize() output, which is a string.
+        $this->assertNull((new TestAdapter())->putTask('a plain string'));
+    }
+
+    public function testPutTaskRejectsRetiredKeyName(): void
+    {
+        $this->expectException(Error::class);
+        $this->expectExceptionMessage('Unknown named parameter $jobttr');
+
+        (new TestAdapter())->putTask('body', jobttr: 5);
     }
 
     public function testLogInfoForwardsToLogger(): void
@@ -43,46 +57,13 @@ class AbstractAdapterTest extends TestCase
 
         $adapter = new TestAdapter();
         $adapter->setLogger($logger);
-        $adapter->setTriggerErrorOnError(false);
         $adapter->logError('failure');
     }
 
-    public function testLogErrorTriggersWarningWhenEnabled(): void
+    public function testLogErrorIsSilentWithoutLogger(): void
     {
-        $triggered = false;
-        set_error_handler(static function () use (&$triggered): bool {
-            $triggered = true;
-
-            return true;
-        }, E_USER_WARNING);
-
-        try {
-            $adapter = new TestAdapter();
-            $adapter->logError('warning');
-        } finally {
-            restore_error_handler();
-        }
-
-        $this->assertTrue($triggered);
-    }
-
-    public function testLogErrorDoesNotTriggerWhenDisabled(): void
-    {
-        $triggered = false;
-        set_error_handler(static function () use (&$triggered): bool {
-            $triggered = true;
-
-            return true;
-        }, E_USER_WARNING);
-
-        try {
-            $adapter = new TestAdapter();
-            $adapter->setTriggerErrorOnError(false);
-            $adapter->logError('warning');
-        } finally {
-            restore_error_handler();
-        }
-
-        $this->assertFalse($triggered);
+        $adapter = new TestAdapter();
+        $adapter->logError('no logger attached');
+        $this->expectNotToPerformAssertions();
     }
 }

@@ -41,7 +41,6 @@ class PublishWorkerTest extends TestCase
         $worker = new Publish($this->adapter);
         $worker->setClient($this->client);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         return $worker;
@@ -77,7 +76,6 @@ class PublishWorkerTest extends TestCase
         $worker = new Publish($this->adapter);
         $worker->setClient($this->client);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();
@@ -163,7 +161,6 @@ class PublishWorkerTest extends TestCase
         };
         $worker->setClient($this->client);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();

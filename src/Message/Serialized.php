@@ -23,12 +23,24 @@ class Serialized extends AbstractMessage
     protected ?AbstractPublisher $publisher = null;
 
     /**
-     * @var array
+     * Named arguments the worker replays on AbstractPublisher::publish(), keyed by parameter name
+     *
+     * It has to stay an array, because the payload is serialized into the queue:
+     *
+     *     new Serialized($message, $publisher, ['readyWait' => 5, 'jobTtr' => 30]);
+     *
+     * @var array<string, mixed>
      */
     protected array $publishOptions = [];
 
-    public function __construct(AbstractMessage $message, AbstractPublisher $publisher, array $publishOptions = [])
-    {
+    /**
+     * @param array<string, mixed> $publishOptions named arguments for publish()
+     */
+    public function __construct(
+        AbstractMessage $message,
+        AbstractPublisher $publisher,
+        array $publishOptions = []
+    ) {
         $this->message        = $message;
         $this->publisher      = $publisher;
         $this->publishOptions = $publishOptions;
@@ -52,9 +64,9 @@ class Serialized extends AbstractMessage
     }
 
     /**
-     * Return options to be used when publisher publishes
+     * Return the named arguments the worker replays on publish()
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public function getPublishOptions(): array
     {

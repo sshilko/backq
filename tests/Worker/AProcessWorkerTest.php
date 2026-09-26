@@ -40,7 +40,6 @@ class AProcessWorkerTest extends TestCase
         try {
             $worker = new AProcess($adapter);
             $worker->setLogger(new NullLogger());
-            $worker->setTriggerErrorOnError(false);
             $worker->setRestartThreshold(1);
 
             $worker->run();
@@ -62,7 +61,6 @@ class AProcessWorkerTest extends TestCase
 
         $worker = new AProcess($adapter);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();
@@ -86,7 +84,6 @@ class AProcessWorkerTest extends TestCase
 
         $worker = new AProcess($adapter);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();
@@ -189,7 +186,6 @@ class AProcessWorkerTest extends TestCase
         try {
             $worker = new AProcess($adapter);
             $worker->setLogger(new NullLogger());
-            $worker->setTriggerErrorOnError(false);
             $worker->setRestartThreshold(2);
 
             $worker->run();
@@ -221,7 +217,6 @@ class AProcessWorkerTest extends TestCase
         try {
             $worker = new AProcess($adapter);
             $worker->setLogger(new NullLogger());
-            $worker->setTriggerErrorOnError(false);
             $worker->setRestartThreshold(1);
 
             $worker->run();
@@ -299,7 +294,6 @@ class AProcessWorkerTest extends TestCase
         try {
             $worker = new AProcess($adapter);
             $worker->setLogger(new NullLogger());
-            $worker->setTriggerErrorOnError(false);
             $worker->setRestartThreshold(1);
 
             $worker->run();
@@ -328,7 +322,6 @@ class AProcessWorkerTest extends TestCase
         try {
             $worker = new AProcess($adapter);
             $worker->setLogger(new NullLogger());
-            $worker->setTriggerErrorOnError(false);
             $worker->setRestartThreshold(1);
 
             $worker->run();
@@ -358,7 +351,6 @@ class AProcessWorkerTest extends TestCase
         try {
             $worker = new AProcess($adapter);
             $worker->setLogger(new NullLogger());
-            $worker->setTriggerErrorOnError(false);
             $worker->setRestartThreshold(2);
 
             $worker->run();
@@ -384,7 +376,6 @@ class AProcessWorkerTest extends TestCase
         $logger ??= new NullLogger();
         $worker = new AProcess($adapter);
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold($restartThreshold);
 
         $worker->run();

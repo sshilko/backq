@@ -17,6 +17,9 @@ use Aws\Sqs\SqsClient;
 use BackQ\Adapter\Amazon\DynamoDb\QueueTableRow;
 use InvalidArgumentException;
 use Override;
+use RuntimeException;
+use Stringable;
+use Throwable;
 use function assert;
 use function count;
 use function crc32;
@@ -38,11 +41,6 @@ use function time;
  */
 class DynamoSQS extends AbstractAdapter
 {
-    /**
-     * Some identifier whatever it is
-     */
-    public const PARAM_MESSAGE_ID = 'msgid';
-
     protected const API_VERSION_DYNAMODB  = '2012-08-10';
     protected const API_VERSION_SQS       = '2012-11-05';
 
@@ -221,19 +219,30 @@ class DynamoSQS extends AbstractAdapter
         return false;
     }
 
+    /**
+     * Put task into queue
+     *
+     * @param  string|Stringable  $body      The job body.
+     * @param  int                $readyWait Seconds before the row becomes eligible. DynamoDB caps a
+     *                                           TTL at five years, so a longer wait is clamped.
+     * @param  int|string|null    $messageId Prefix of the composite id. Defaults to a crc32 of the
+     *                                           worker identity, so an unrelated publisher cannot guess it.
+     *
+     * @return null|Throwable null on success: the id is a transport detail, not a job handle
+     */
     #[Override]
-    public function putTask(string $body, array $params = []): bool
+    public function putTask(string|Stringable $body, int $readyWait = 0, int|string|null $messageId = null): null|Throwable
     {
         $this->logDebug(__FUNCTION__);
 
         if (!$this->dynamoDBClient) {
-            return false;
+            $error = new RuntimeException(self::class . ' adapter ' . __FUNCTION__ . ': no DynamoDB client');
+            $this->logError($error->getMessage());
+
+            return $error;
         }
 
-        $readyTime = time();
-        if (isset($params[self::PARAM_READYWAIT])) {
-            $readyTime += $this->getEstimatedTTL($params[self::PARAM_READYWAIT]);
-        }
+        $readyTime = time() + $this->getEstimatedTTL($readyWait);
 
         /**
          * Make sure the TTL can be processed by Dynamo
@@ -244,11 +253,11 @@ class DynamoSQS extends AbstractAdapter
         }
 
         $msgid = (string) crc32((string) getmypid() . (string) gethostname());
-        if (isset($params[self::PARAM_MESSAGE_ID])) {
-            $msgid = (string) $params[self::PARAM_MESSAGE_ID];
+        if (null !== $messageId) {
+            $msgid = (string) $messageId;
         }
 
-        $item = new QueueTableRow($body, $readyTime, $msgid);
+        $item = new QueueTableRow((string) $body, $readyTime, $msgid);
         try {
             $response = $this->dynamoDBClient->putItem(['Item'      => $item->toArray(),
                 'TableName' => $this->dynamoDbTableName]);
@@ -260,14 +269,19 @@ class DynamoSQS extends AbstractAdapter
                 if (isset($metadata['statusCode']) && 200 === $metadata['statusCode']) {
                     $this->logDebug(__FUNCTION__ . ' success');
 
-                    return true;
+                    return null;
                 }
             }
         } catch (DynamoDbException $e) {
             $this->logError(__FUNCTION__ . ' service failed: ' . $e->getMessage());
+
+            return $e;
         }
 
-        return false;
+        $error = new RuntimeException(self::class . ' adapter ' . __FUNCTION__ . ': putItem was not acknowledged');
+        $this->logError($error->getMessage());
+
+        return $error;
     }
 
     /**

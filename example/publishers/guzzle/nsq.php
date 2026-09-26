@@ -8,12 +8,12 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
-use BackQ\Adapter\AbstractAdapter;
 use BackQ\Adapter\Nsq;
 use BackQ\Publisher\Guzzle;
 use GuzzleHttp\Psr7\Request;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
+use Throwable;
 
 /**
  * Publisher
@@ -26,20 +26,14 @@ require_once __DIR__ . '/../../../vendor/autoload.php';
 
 final class MyNsqGuzzlePublisher extends Guzzle
 {
-    protected function setupAdapter(): AbstractAdapter
-    {
-        $output  = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
-        $logger  = new ConsoleLogger($output);
-
-        $nsqdHost = getenv('BACKQ_NSQD_HOST') ?: '127.0.0.1';
-        $nsqdPort = (int) (getenv('BACKQ_NSQD_PORT') ?: 4150);
-
-        $adapter = new Nsq($nsqdHost, $nsqdPort, ['persistent' => false]);
-        $adapter->setLogger($logger);
-
-        return $adapter;
-    }
 }
+
+$logger   = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
+$nsqdHost = getenv('BACKQ_NSQD_HOST') ?: '127.0.0.1';
+$nsqdPort = (int) (getenv('BACKQ_NSQD_PORT') ?: 4150);
+
+$adapter = new Nsq($nsqdHost, $nsqdPort, ['persistent' => false]);
+$adapter->setLogger($logger);
 
 /**
  * The Guzzle worker sends the request asynchronously.
@@ -51,7 +45,7 @@ final class MyNsqGuzzlePublisher extends Guzzle
  */
 $target = getenv('BACKQ_GUZZLE_TARGET') ?: 'http://127.0.0.1:18080/ping';
 
-$publisher = MyNsqGuzzlePublisher::getInstance();
+$publisher = new MyNsqGuzzlePublisher($adapter);
 if (!$publisher->start()) {
     echo 'Failed to start publisher, is nsqd at BACKQ_NSQD_HOST:BACKQ_NSQD_PORT (default 127.0.0.1:4150) reachable?' . "\n";
     exit(1);
@@ -59,17 +53,16 @@ if (!$publisher->start()) {
 
 $message = new \BackQ\Message\Guzzle(new Request('GET', $target));
 try {
-    $result = $publisher->publish($message);
+    $error = $publisher->publish($message);
 } catch (Throwable $e) {
     echo 'Failed to publish guzzle message via nsq adapter: ' . $e->getMessage() . "\n";
     exit(1);
 }
-if ($result) {
-    /**
-     * NSQ acknowledges a publish without returning a job id, so this is a boolean success
-     */
-    echo 'Published guzzle request to ' . $target . ' via nsq adapter' . "\n";
-} else {
-    echo 'Failed to publish guzzle message via nsq adapter' . "\n";
+if ($error instanceof Throwable) {
+    echo 'Failed to publish guzzle message via nsq adapter: ' . $error->getMessage() . "\n";
     exit(1);
 }
+/**
+ * NSQ acknowledges a publish without returning a job id, so a null result is the success
+ */
+echo 'Published guzzle request to ' . $target . ' via nsq adapter' . "\n";

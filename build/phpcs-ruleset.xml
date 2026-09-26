@@ -65,6 +65,13 @@
         <exclude name="SlevomatCodingStandard.Classes.ForbiddenPublicProperty.ForbiddenPublicProperty" />
         <exclude name="SlevomatCodingStandard.Functions.StrictCall.StrictParameterMissing" />
         <exclude name="SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter" />
+        <!--
+            Named arguments are the public calling convention since plan 5: putTask() is
+            one parameter and each adapter widens it, so a caller has to name the
+            parameter it means (publish($message, readyWait: 5)). The sniff would forbid
+            the only form that works.
+        -->
+        <exclude name="SlevomatCodingStandard.Functions.DisallowNamedArguments" />
         <exclude name="SlevomatCodingStandard.PHP.DisallowReference.DisallowedAssigningByReference" />
         <exclude name="SlevomatCodingStandard.Operators.DisallowIncrementAndDecrementOperators.DisallowedPostIncrementOperator" />
         <exclude name="SlevomatCodingStandard.Operators.DisallowIncrementAndDecrementOperators.DisallowedPostDecrementOperator" />

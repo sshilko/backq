@@ -27,7 +27,7 @@ final class Guzzle extends AbstractWorker
 
     public ?int $workTimeout = 4;
 
-    protected $queueName = 'guzzle';
+    protected string $queueName = 'guzzle';
     
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh

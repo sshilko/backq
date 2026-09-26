@@ -144,7 +144,6 @@ class ClosureWorkerTest extends TestCase
     {
         $worker = new ClosureWorker($this->adapter);
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         return $worker;
