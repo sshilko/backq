@@ -44,6 +44,9 @@ jobs:
       - name: Start services
         run: docker compose -f build/docker-compose.yaml up -d --pull never --wait redis nsq app-php83
 
+      - name: Let Redis and NSQ accept connections
+        run: sleep 5
+
       - name: Install dependencies inside the container
         run: docker compose -f build/docker-compose.yaml exec -T app-php83 composer install --no-interaction --prefer-dist
 

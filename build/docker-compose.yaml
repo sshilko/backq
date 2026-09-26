@@ -50,9 +50,9 @@ services:
       dockerfile: Dockerfile.php83
     depends_on:
       redis:
-        condition: service_healthy
+        condition: service_started
       nsq:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD", "php", "-v"]
       interval: 10s
@@ -70,12 +70,6 @@ services:
         max-file: "2"
     tmpfs:
       - /data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-      start_period: 5s
     ports:
       - "127.0.0.1:16379:6379"
 
@@ -90,13 +84,6 @@ services:
         max-file: "2"
     tmpfs:
       - /data
-    healthcheck:
-      test:
-        ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4151/ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-      start_period: 5s
     ports:
       - "127.0.0.1:14150:4150"
       - "127.0.0.1:14151:4151"
