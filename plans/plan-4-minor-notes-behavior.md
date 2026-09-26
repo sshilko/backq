@@ -219,11 +219,11 @@ a related change makes them natural:
 | `tests/Publisher/AbstractPublisherTest.php` | `testReadyPingsOnlyWhenBound` | `assertNull($this->publisher->ready())` | `assertFalse($this->publisher->ready())` |
 | `tests/Adapter/BeanstalkAdapterTest.php` | (new) `testPickTaskForwardsTimeoutArgument` | — | — |
 
-## Verification (run inside the `backq.php83` container per AGENTS.md)
+## Verification (run inside the `app-php83` container per AGENTS.md)
 
 ```bash
-$script = @'
-cd /app
+task=$(cat <<'EOF'
+cd /app || exit 1
 php -l src/Adapter/Beanstalk.php
 php -l src/Adapter/Beanstalk/Client.php
 php -l src/Publisher/AbstractPublisher.php
@@ -234,8 +234,10 @@ php -d memory_limit=-1 vendor/bin/phpcs --standard=build/phpcs-ruleset.xml --no-
 php -d memory_limit=-1 vendor/bin/phpstan analyse --memory-limit=-1 --no-progress -c build/phpstan.neon src/Adapter/Beanstalk.php src/Adapter/Beanstalk/Client.php src/Publisher/AbstractPublisher.php
 php ./vendor/bin/phpunit --configuration=phpunit.xml --filter 'Beanstalk|Publisher'
 php ./vendor/bin/phpunit --configuration=phpunit.xml
-'@
-$script | docker exec -i backq.php83 bash -s
+echo "SENTINEL: reached end"
+EOF
+)
+docker exec app-php83 bash -c "$task"
 ```
 
 Notes:

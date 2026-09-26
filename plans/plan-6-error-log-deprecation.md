@@ -497,8 +497,8 @@ And in the `plans/` bullet of the layout section, add plan 6 to the implemented 
 ## Verification (run inside the `app-php83` container per AGENTS.md)
 
 ```bash
-$script = @'
-cd /app
+task=$(cat <<'EOF'
+cd /app || exit 1
 php -l src/Worker/AbstractWorker.php
 php -l src/Worker/AProcess.php
 php -l src/Worker/Amazon/SNS/Application/PlatformEndpoint/Publish.php
@@ -519,9 +519,14 @@ grep -rn "error_log" src/ || echo "OK: no error_log left in src/"
 grep -rn "ini_set..error_log" tests/ || echo "OK: no test reads the PHP error log"
 php ./vendor/bin/phpunit --configuration=phpunit.xml
 composer app-code-quality
-'@
-$script | docker exec -i app-php83 bash -s
+echo "SENTINEL: reached end"
+EOF
+)
+docker exec app-php83 bash -c "$task"
 ```
+
+No `set -e`: every step must report even after an earlier one fails. Confirm the sentinel
+printed before trusting the run.
 
 Baseline before the change, so the diff in the test count is attributable: the 78 tests in
 `AProcess|GuzzleWorker|PlatformEndpoint|LoggerTest` pass today (164 assertions, `OK`). The full suite

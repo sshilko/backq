@@ -371,12 +371,11 @@ unchanged.
 |---|---|---|
 | (none in this plan assert the bug; 1.2 interacts with Plan 3 item 3.3) | — | — |
 
-## Verification (run inside the `backq.php83` container per AGENTS.md)
+## Verification (run inside the `app-php83` container per AGENTS.md)
 
 ```bash
-# Windows PowerShell: single-quoted here-string so $vars reach bash intact
-$script = @'
-cd /app
+task=$(cat <<'EOF'
+cd /app || exit 1
 php -l src/Adapter/Beanstalk/Client.php
 php -l src/Adapter/IO/StreamIO.php
 php -l src/Adapter/Nsq.php
@@ -388,8 +387,10 @@ php -d memory_limit=-1 vendor/bin/phpcs --standard=build/phpcs-ruleset.xml --no-
 php -d memory_limit=-1 vendor/bin/phpstan analyse --memory-limit=-1 --no-progress -c build/phpstan.neon src/Adapter/Beanstalk/Client.php src/Adapter/IO/StreamIO.php src/Adapter/Nsq.php
 php ./vendor/bin/phpunit --configuration=phpunit.xml --filter 'Beanstalk|StreamIO|NsqAdapter'
 php ./vendor/bin/phpunit --configuration=phpunit.xml
-'@
-$script | docker exec -i backq.php83 bash -s
+echo "SENTINEL: reached end"
+EOF
+)
+docker exec app-php83 bash -c "$task"
 ```
 
 Notes:

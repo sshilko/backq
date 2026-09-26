@@ -348,8 +348,8 @@ checks, so `'nosleep' => null` no longer silently means "sleep".
 ### Verification (inside the `app-php83` container per AGENTS.md)
 
 ```bash
-$script = @'
-cd /app
+task=$(cat <<'EOF'
+cd /app || exit 1
 php -l src/Adapter/AbstractAdapter.php
 php -l src/Adapter/Beanstalk.php
 php -l src/Adapter/Redis.php
@@ -365,8 +365,10 @@ php -d memory_limit=-1 vendor/bin/phpstan analyse --memory-limit=-1 --no-progres
 php ./vendor/bin/psalm.phar --config build/psalm.xml --no-diff --show-info=true src/Adapter/AbstractAdapter.php src/Publisher/AbstractPublisher.php
 php ./vendor/bin/phpunit --configuration=phpunit.xml --filter 'Adapter|Publisher|Serialized'
 php ./vendor/bin/phpunit --configuration=phpunit.xml
-'@
-$script | docker exec -i app-php83 bash -s
+echo "SENTINEL: reached end"
+EOF
+)
+docker exec app-php83 bash -c "$task"
 ```
 
 Then the full sweep from `AGENTS.md` ("Code quality inside the container"): `phpcs src tests`,

@@ -26,7 +26,7 @@ BackQ separates job **publication** from job **processing**:
 - **Workers** are long-running processes that pull jobs off the queue and execute
   them — as OS processes, asynchronous PSR-7 HTTP requests, or closure payloads.
 
-Two queue backends are production-ready: **Beanstalkd** and **Redis**. 
+Two queue backends are production-ready: **Beanstalkd** and **Redis**.
 
 Two more ship as **beta** — NSQ and DynamoDB + SQS (`DynamoSQS`); see
 [Experimental backends](#experimental-backends-beta)
@@ -175,12 +175,12 @@ under [Experimental backends (beta)](#experimental-backends-beta).
 | [NSQ](https://nsq.io/) — beta | ✓ | * | * |
 | [DynamoSQS](https://aws.amazon.com/) — beta | * | * | ✓ |
 
-`*` — unsupported/partial: 
+`*` — unsupported/partial:
 - `NSQ::ping()` only reflects an already-open connection;
 - `NSQ::setWorkTimeout()` is accepted but not applied by the
 server protocol.
 
-- `DynamoSQS::ping()` always returns `true`. 
+- `DynamoSQS::ping()` always returns `true`.
 - `Redis::hasWorkers()` is a stub,
 
 ### Worker controls
@@ -211,7 +211,7 @@ still works downstream — `Serialized` only handles the hand-off.
 
 ## Releases and version history
 
-The latest **published** release on Packagist is `3.0.2` (2022-01-12). 
+The latest **published** release on Packagist is `3.0.2` (2022-01-12).
 
 The next
 major — **v5** — is the upcoming release; it is not tagged yet.
@@ -275,16 +275,33 @@ The project ships a PHPUnit suite under `tests/` covering adapters, workers,
 publishers and messages.
 
 ```bash
-# dockerized — redis + nsq services from build/docker-compose.yaml (requires Docker)
-composer app-tests
+# start / stop the dev stack: the app-php83 container plus redis and nsq
+composer app-up
+composer app-down
 
-# host-side — Redis/NSQ integration tests skip when the services are unreachable
-composer app-tests-local
+# dockerized — brings the stack up, checks every class file loads, runs the suite
+composer app-tests
 ```
 
 `composer app-code-quality` runs the full static-analysis stack (phpcs, phpstan,
-psalm, phan, phpmd, pdepend) inside the dockerized app. The same suite runs on
-every pull request in [GitHub Actions](https://github.com/sshilko/backq/actions/workflows/ci.yml).
+psalm, phan, phpmd, pdepend). It is a **container-side** script, so invoke it through the
+stack rather than on the host:
+
+```bash
+docker compose -f build/docker-compose.yaml exec -T app-php83 composer app-code-quality
+```
+
+`composer app-tests-local` runs the suite against whatever PHP is on the host. It needs
+`mbstring` and a reachable Redis and NSQ; `phpunit.xml` sets `failOnSkipped="true"`, so an
+unreachable service fails the run rather than skipping. Point the tests at the ports
+`build/docker-compose.yaml` publishes on the host:
+
+```bash
+BACKQ_REDIS_PORT=16379 BACKQ_NSQD_HOST=127.0.0.1 BACKQ_NSQD_PORT=14150 composer app-tests-local
+```
+
+The same suite runs on every pull request in
+[GitHub Actions](https://github.com/sshilko/backq/actions/workflows/ci.yml).
 
 ## Examples
 

@@ -56,6 +56,8 @@
         "ext-redis": "*",
         "ext-xml": "*",
         "ext-dom": "*",
+        "ext-mbstring": "*",
+        "ext-mysqli": "*",
         "aws/aws-sdk-php": "^3",
         "davidpersson/beanstalk": "^2",
         "guzzlehttp/psr7": "^2",
@@ -68,6 +70,7 @@
         "symfony/process": "^5 | ^6 | ^7"
     },
     "require-dev": {
+        "ext-xdebug": "*",
         "nikic/php-parser": "*",
         "pdepend/pdepend": "*",
         "phan/phan": "*",
@@ -92,6 +95,12 @@
         }
     },
     "scripts": {
+        "app-up": [
+            "docker compose -f build/docker-compose.yaml up -d --wait --remove-orphans redis nsq app-php83"
+        ],
+        "app-down": [
+            "docker compose -f build/docker-compose.yaml down --remove-orphans redis nsq app-php83"
+        ],
         "app-classes": [
             "@putenv XDEBUG_MODE=off",
             "php build/check-classes.php"
@@ -100,10 +109,10 @@
             "docker compose -f build/docker-compose.yaml exec -T app-php83 php build/check-classes.php"
         ],
         "app-tests": [
-            "docker compose -f build/docker-compose.yaml up -d --wait redis nsq app-php83",
+            "@app-up",
             "@app-classes-docker",
             "docker compose -f build/docker-compose.yaml exec -T app-php83 php ./vendor/bin/phpunit --configuration=phpunit.xml",
-            "docker compose -f build/docker-compose.yaml down --remove-orphans redis nsq app-php83"
+            "@app-down"
         ],
         "app-tests-local": [
             "@putenv XDEBUG_MODE=off",

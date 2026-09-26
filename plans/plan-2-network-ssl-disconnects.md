@@ -345,11 +345,11 @@ existing `catch (Throwable)` outer guard.
 | `tests/Worker/GuzzleWorkerTest.php` | `testLogsConnectRefusedFailure` | `assertContains(['afterWorkSuccess', 16], ...)` | `afterWorkFailed` + no success ack |
 | `tests/Adapter/NsqAdapterCoreTest.php` | 6 handshake-failure connect tests (identify-error, identify-null, identify-auth, auth-error, auth-badjson, short-frame) | `assertTrue($nsq->connect())` | `assertFalse` + `connected=false` + `_io=null` |
 
-## Verification (run inside the `backq.php83` container per AGENTS.md)
+## Verification (run inside the `app-php83` container per AGENTS.md)
 
 ```bash
-$script = @'
-cd /app
+task=$(cat <<'EOF'
+cd /app || exit 1
 php -l src/Worker/Guzzle.php
 php -l src/Adapter/Nsq.php
 php -l src/Adapter/IO/StreamIO.php
@@ -360,8 +360,10 @@ php -d memory_limit=-1 vendor/bin/phpcs --standard=build/phpcs-ruleset.xml --no-
 php -d memory_limit=-1 vendor/bin/phpstan analyse --memory-limit=-1 --no-progress -c build/phpstan.neon src/Worker/Guzzle.php src/Adapter/Nsq.php src/Adapter/IO/StreamIO.php
 php ./vendor/bin/phpunit --configuration=phpunit.xml --filter 'GuzzleWorker|NsqAdapter|StreamIO'
 php ./vendor/bin/phpunit --configuration=phpunit.xml
-'@
-$script | docker exec -i backq.php83 bash -s
+echo "SENTINEL: reached end"
+EOF
+)
+docker exec app-php83 bash -c "$task"
 ```
 
 Notes:

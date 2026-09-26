@@ -5,6 +5,13 @@
 # For the full copyright and license information, please view the LICENSE
 # file that was distributed with this source code.
 # @license https://opensource.org/licenses/mit-license.php MIT
+# Pins the project name so the container_name values below stay stable no matter which
+# directory compose is invoked from. Without it, `cd build && docker compose up` derives
+# the project name from the directory ("build") and then collides with the containers the
+# root invocation created. COMPOSE_PROJECT_NAME still takes precedence over this field;
+# .env sets it to "backq", so both agree.
+name: backq
+
 x-app: &app
   tty: true
   dns: 1.1.1.1
