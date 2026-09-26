@@ -11,6 +11,7 @@
 use BackQ\Adapter\Beanstalk;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
+use Throwable;
 
 /**
  * Example publisher using
@@ -37,10 +38,11 @@ if ($beanstalkdpub->bindWrite($queue)) {
     $i = 100;
     while ($i > 0) {
         $randomMessage = 'Payload body of message ' . time();
-        if ($beanstalkdpub->putTask($randomMessage)) {
-            $beanstalkdpub->logInfo('Pushed message');
+        $jobId         = $beanstalkdpub->putTask($randomMessage);
+        if ($jobId instanceof Throwable) {
+            $beanstalkdpub->logError('Failed pushing message: ' . $jobId->getMessage());
         } else {
-            $beanstalkdpub->logError('Failed pushing message');
+            $beanstalkdpub->logInfo('Pushed message ' . $jobId);
         }
         $i--;
         sleep(1);

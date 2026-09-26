@@ -42,7 +42,6 @@ class GuzzleWorkerTest extends TestCase
 
         $worker = new Guzzle($adapter);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();
@@ -58,7 +57,6 @@ class GuzzleWorkerTest extends TestCase
 
         $worker = new Guzzle($adapter);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();
@@ -82,7 +80,6 @@ class GuzzleWorkerTest extends TestCase
 
         $worker = new Guzzle($adapter);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();
@@ -100,7 +97,6 @@ class GuzzleWorkerTest extends TestCase
 
         $worker = new Guzzle($adapter);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();
@@ -117,7 +113,6 @@ class GuzzleWorkerTest extends TestCase
 
         $worker = new Guzzle($adapter);
         $worker->setLogger(new NullLogger());
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();
@@ -165,7 +160,6 @@ class GuzzleWorkerTest extends TestCase
             $logger = new RecordingLogger();
             $worker = new Guzzle($adapter);
             $worker->setLogger($logger);
-            $worker->setTriggerErrorOnError(false);
             $worker->setRestartThreshold(1);
 
             $worker->run();
@@ -222,7 +216,6 @@ class GuzzleWorkerTest extends TestCase
             $logger = new RecordingLogger();
             $worker = new Guzzle($adapter);
             $worker->setLogger($logger);
-            $worker->setTriggerErrorOnError(false);
             $worker->setRestartThreshold(1);
 
             $worker->run();
@@ -248,7 +241,6 @@ class GuzzleWorkerTest extends TestCase
 
             $worker = new Guzzle($adapter);
             $worker->setLogger(new NullLogger());
-            $worker->setTriggerErrorOnError(false);
             $worker->setRestartThreshold(1);
 
             $worker->run();
@@ -277,7 +269,6 @@ class GuzzleWorkerTest extends TestCase
         $logger = new RecordingLogger();
         $worker = new Guzzle($adapter);
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         $worker->run();

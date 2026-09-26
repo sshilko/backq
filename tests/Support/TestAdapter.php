@@ -4,10 +4,17 @@ namespace BackQ\Tests\Support;
 
 use BackQ\Adapter\AbstractAdapter;
 use Override;
+use Stringable;
+use Throwable;
+use function array_filter;
 
 /**
  * Configurable AbstractAdapter double used to drive workers/publishers
  * without touching any external queue service.
+ *
+ * It widens putTask() with the parameters of every shipped adapter, so a test
+ * can assert what AbstractPublisher::publish() forwarded without caring which
+ * adapter is behind it.
  */
 class TestAdapter extends AbstractAdapter
 {
@@ -26,7 +33,11 @@ class TestAdapter extends AbstractAdapter
 
     public $pickTaskResult    = false;
 
-    public $putTaskResult     = false;
+    /**
+     * What putTask() hands back: a job id, null for an adapter that stores the job
+     * without reporting an id, or the Throwable that stands in for a failure
+     */
+    public null|string|Throwable $putTaskResult = null;
 
     public $afterWorkSuccessResult = true;
 
@@ -74,10 +85,35 @@ class TestAdapter extends AbstractAdapter
         return $this->pickTaskResult;
     }
 
+    /**
+     * Widened with the parameters of every shipped adapter, so a test can assert what
+     * publish() forwarded. Only the parameters the caller actually passed are recorded.
+     */
     #[Override]
-    public function putTask(string $body, array $params = []): string|bool
-    {
-        $this->calls[] = ['putTask', $body, $params];
+    public function putTask(
+        string|Stringable $body,
+        int $readyWait = 0,
+        ?int $jobTtr = null,
+        ?int $priority = null,
+        int|string|null $messageId = null,
+        int|string|null $jobId = null,
+        bool $putAsDone = false,
+        bool $noSleep = false,
+    ): null|string|Throwable {
+        $this->calls[] = ['putTask', $body, array_filter(
+            [
+                'jobId'     => $jobId,
+                'jobTtr'    => $jobTtr,
+                'messageId' => $messageId,
+                'noSleep'   => $noSleep,
+                'priority'  => $priority,
+                'putAsDone' => $putAsDone,
+                'readyWait' => $readyWait,
+            ],
+            static function (mixed $value): bool {
+                return null !== $value && false !== $value;
+            }
+        )];
 
         return $this->putTaskResult;
     }

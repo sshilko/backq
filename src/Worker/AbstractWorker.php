@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
@@ -21,8 +22,6 @@ use function pcntl_async_signals;
 use function pcntl_signal;
 use function pcntl_signal_dispatch;
 use function time;
-use function trigger_error;
-use const E_USER_WARNING;
 use const SIGHUP;
 use const SIGINT;
 use const SIGTERM;
@@ -43,12 +42,7 @@ abstract class AbstractWorker
 
     protected $delaySignalPending = 0;
 
-    /**
-     * Whether logError should always call trigger_error
-     */
-    protected bool $triggerErrorOnError = true;
-
-    protected $queueName;
+    protected string $queueName;
 
     /**
      * Quit after processing X amount of pushes
@@ -64,15 +58,12 @@ abstract class AbstractWorker
 
     protected ?LoggerInterface $logger = null;
 
-    private $adapter;
-
-    private $bind;
+    private bool $bind = false;
 
     abstract public function run(): void;
 
-    public function __construct(AbstractAdapter $adapter)
+    public function __construct(private AbstractAdapter $adapter)
     {
-        $this->adapter = $adapter;
         $output        = new ConsoleOutput(ConsoleOutput::VERBOSITY_NORMAL);
         $this->setLogger(new ConsoleLogger($output));
     }
@@ -135,14 +126,6 @@ abstract class AbstractWorker
     }
 
     /**
-     * @param bool $triggerError
-     */
-    public function setTriggerErrorOnError(bool $triggerError): void
-    {
-        $this->triggerErrorOnError = $triggerError;
-    }
-
-    /**
      * @param string $message
      */
     public function logInfo(string $message): void
@@ -169,10 +152,6 @@ abstract class AbstractWorker
     {
         if (isset($this->logger)) {
             $this->logger->error($message);
-        }
-
-        if ($this->triggerErrorOnError) {
-            trigger_error($message, E_USER_WARNING);
         }
     }
 
@@ -367,7 +346,8 @@ abstract class AbstractWorker
         if ($this->delaySignalPending > 0) {
             if (SIGTERM === $this->delaySignalPending ||
                 SIGINT === $this->delaySignalPending ||
-                SIGHUP === $this->delaySignalPending) {
+                SIGHUP === $this->delaySignalPending
+            ) {
                 /**
                  * Received request to stop/terminate process
                  */

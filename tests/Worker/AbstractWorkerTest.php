@@ -12,9 +12,6 @@ use BackQ\Tests\Support\ThrowingPickAdapter;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
-use function restore_error_handler;
-use function set_error_handler;
-use const E_USER_WARNING;
 use const SIGINT;
 
 class AbstractWorkerTest extends TestCase
@@ -109,7 +106,6 @@ class AbstractWorkerTest extends TestCase
         $logger                 = new RecordingLogger();
         $worker                 = new TestWorker($adapter);
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setWorkTimeout(null);
         $worker->setIdleTimeout(1);
 
@@ -126,7 +122,6 @@ class AbstractWorkerTest extends TestCase
         $logger  = new RecordingLogger();
         $worker  = new ConfigurableWorker($adapter);
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setWorkTimeout(null);
         $worker->setIdleTimeout(1);
 
@@ -136,24 +131,15 @@ class AbstractWorkerTest extends TestCase
         $this->assertStringNotContainsString('Worker failed to fetch new job', $wholeLog);
     }
 
-    public function testLogErrorTriggerSuppressedViaSetter(): void
+    public function testLogErrorForwardsToLogger(): void
     {
-        $triggered = false;
-        set_error_handler(static function () use (&$triggered): bool {
-            $triggered = true;
+        $logger = new RecordingLogger();
+        $worker = $this->makeWorker();
+        $worker->setLogger($logger);
+        $worker->logError('attention required');
 
-            return true;
-        }, E_USER_WARNING);
-
-        try {
-            $worker = $this->makeWorker();
-            $worker->setTriggerErrorOnError(false);
-            $worker->logError('something failed');
-        } finally {
-            restore_error_handler();
-        }
-
-        $this->assertFalse($triggered);
+        $this->assertContains('error', array_column($logger->records, 0));
+        $this->assertContains('attention required', array_column($logger->records, 1));
     }
 
     public function testSetIdleTimeout(): void
@@ -163,25 +149,6 @@ class AbstractWorkerTest extends TestCase
 
         $property = new \ReflectionProperty($worker, 'idleTimeout');
         $this->assertSame(7, $property->getValue($worker));
-    }
-
-    public function testLogErrorTriggersWarning(): void
-    {
-        $warnings = [];
-        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
-            $warnings[] = $message;
-
-            return true;
-        }, E_USER_WARNING);
-
-        try {
-            $worker = $this->makeWorker();
-            $worker->logError('attention required');
-        } finally {
-            restore_error_handler();
-        }
-
-        $this->assertContains('attention required', $warnings);
     }
 
     public function testWorkReturnsWithoutBinding(): void
@@ -210,7 +177,6 @@ class AbstractWorkerTest extends TestCase
         $logger                        = new RecordingLogger();
         $worker                        = new SignaledWorker($this->adapter);
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(3);
 
         $worker->run();
@@ -228,7 +194,6 @@ class AbstractWorkerTest extends TestCase
         $worker                        = new SignaledWorker($this->adapter);
         $worker->signal                = SIGINT;
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(3);
 
         $worker->run();
@@ -246,7 +211,6 @@ class AbstractWorkerTest extends TestCase
         $logger            = new RecordingLogger();
         $worker            = new TestWorker($adapter);
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(0);
         $worker->setIdleTimeout(2);
         $worker->setWorkTimeout(1);
@@ -267,7 +231,6 @@ class AbstractWorkerTest extends TestCase
         $worker                 = new ConfigurableWorker($adapter);
         $worker->idleTimeoutResult = false;
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(4);
         $worker->setIdleTimeout(2);
         $worker->setWorkTimeout(1);
@@ -289,7 +252,6 @@ class AbstractWorkerTest extends TestCase
         $worker                        = new ConfigurableWorker($adapter);
         $worker->restartThresholdResult = false;
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(2);
 
         try {

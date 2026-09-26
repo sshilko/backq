@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 /**
  * Unit tests for the Redis adapter that do not require a running Redis server.
@@ -78,7 +79,7 @@ class RedisAdapterCoreTest extends TestCase
     public function testPutTaskRequiresConnectedClient(): void
     {
         $redis = new Redis();
-        $this->assertFalse($redis->putTask('body'));
+        $this->assertInstanceOf(Throwable::class, $redis->putTask('body'));
     }
 
     public function testPickTaskRequiresConnectedClient(): void
@@ -102,7 +103,6 @@ class RedisAdapterCoreTest extends TestCase
     public function testHasWorkersReportsNotSupported(): void
     {
         $redis = new Redis();
-        $redis->setTriggerErrorOnError(false);
 
         $this->assertFalse($redis->hasWorkers('queue'));
     }
@@ -110,7 +110,6 @@ class RedisAdapterCoreTest extends TestCase
     public function testSetWorkTimeoutStoresSubReadTimeoutValue(): void
     {
         $redis = new Redis();
-        $redis->setTriggerErrorOnError(false);
 
         $redis->setWorkTimeout(5);
 
@@ -120,7 +119,6 @@ class RedisAdapterCoreTest extends TestCase
     public function testSetWorkTimeoutClampsBeyondReadTimeout(): void
     {
         $redis = new Redis();
-        $redis->setTriggerErrorOnError(false);
 
         $redis->setWorkTimeout(15);
 
@@ -130,7 +128,6 @@ class RedisAdapterCoreTest extends TestCase
     public function testSetWorkTimeoutFallsBackToSecondWhenReadTimeoutTooSmall(): void
     {
         $redis = new Redis('127.0.0.1', 6379, false, null, null, 10, 1);
-        $redis->setTriggerErrorOnError(false);
 
         $redis->setWorkTimeout(15);
 
@@ -197,7 +194,6 @@ class RedisAdapterCoreTest extends TestCase
     {
         $redis = new Redis();
         $this->setState($redis, true, ConnectionState::BindRead);
-        $redis->setTriggerErrorOnError(false);
 
         $redisClient = $this->createMock(\Redis::class);
         $redisClient->method('ping')->willThrowException(new \RedisException('Lost connection'));
@@ -213,7 +209,6 @@ class RedisAdapterCoreTest extends TestCase
     {
         $redis = new Redis();
         $this->setState($redis, true, ConnectionState::BindRead);
-        $redis->setTriggerErrorOnError(false);
 
         $redisManager = $this->createMock(Manager::class);
         $redisManager->method('isConnected')->willReturn(true);
@@ -234,7 +229,6 @@ class RedisAdapterCoreTest extends TestCase
     {
         $redis = new Redis();
         $this->setState($redis, true, ConnectionState::BindRead);
-        $redis->setTriggerErrorOnError(false);
 
         $redisManager = $this->createMock(Manager::class);
         $redisManager->method('isConnected')->willThrowException(new RuntimeException('boom'));
@@ -356,10 +350,11 @@ class RedisAdapterCoreTest extends TestCase
         $queue->method('later')->willReturn('delayed-1');
         $this->wireManager($redis, $queue);
 
-        $this->assertSame('delayed-1', $redis->putTask('body', [Redis::PARAM_READYWAIT => 5]));
+        $this->assertSame('delayed-1', $redis->putTask('body', 5));
+        $this->assertSame('delayed-1', $redis->putTask('body', readyWait: 5));
     }
 
-    public function testPutTaskReturnsFalseWhenPushFails(): void
+    public function testPutTaskReturnsThrowableWhenPushFails(): void
     {
         $redis = new Redis();
         $this->setState($redis, true, ConnectionState::BindWrite);
@@ -369,7 +364,7 @@ class RedisAdapterCoreTest extends TestCase
         $queue->method('push')->willReturn(null);
         $this->wireManager($redis, $queue);
 
-        $this->assertFalse($redis->putTask('body'));
+        $this->assertInstanceOf(Throwable::class, $redis->putTask('body'));
     }
 
     private function wireManager(Redis $redis, Queue $queue): void

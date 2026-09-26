@@ -15,7 +15,7 @@ class SerializedTest extends TestCase
     {
         $inner     = new NoopMessage();
         $publisher = new TestPublisher(new TestAdapter());
-        $options   = ['jobttr' => 5];
+        $options   = ['jobTtr' => 5, 'readyWait' => 3];
         $message   = new Serialized($inner, $publisher, $options);
 
         $this->assertSame($inner, $message->getMessage());

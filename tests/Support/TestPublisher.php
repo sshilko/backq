@@ -22,7 +22,7 @@ class TestPublisher extends AbstractPublisher
     {
         $this->testAdapter = $adapter;
 
-        parent::__construct();
+        parent::__construct($adapter);
     }
 
     public static function bindShared(?AbstractAdapter $adapter): void
@@ -30,8 +30,8 @@ class TestPublisher extends AbstractPublisher
         self::$sharedAdapter = $adapter;
     }
 
-    protected function setupAdapter(): AbstractAdapter
+    public function __wakeup(): void
     {
-        return self::$sharedAdapter ?? $this->testAdapter;
+        $this->adapter = self::$sharedAdapter ?? $this->testAdapter;
     }
 }

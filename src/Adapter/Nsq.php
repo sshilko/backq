@@ -14,6 +14,7 @@ namespace BackQ\Adapter;
 use DateTime;
 use Override;
 use RuntimeException;
+use Stringable;
 use Throwable;
 use function array_merge;
 use function floor;
@@ -361,83 +362,81 @@ class Nsq extends AbstractAdapter
     /**
      * Put task into queue
      *
-     * @param  string $data The job body.
+     * @param  string|Stringable $body     The job body.
+     * @param  int               $readyWait Seconds the message stays in the delayed set before it is published.
+     * @param  int|null          $jobTtr    Seconds a handler may run before nsqd re-queues the message.
+     *
+     * @return Throwable|null null on success: NSQ reports no job id, otherwise the failure
      */
     #[Override]
-    public function putTask(string $body, array $params = []): bool
+    public function putTask(string|Stringable $body, int $readyWait = 0, ?int $jobTtr = null): null|Throwable
     {
-        /**
-         * @todo add support fot $params args
-         */
-        if ($this->connected && ConnectionState::BindWrite === $this->state) {
-            if (isset($params[self::PARAM_JOBTTR])) {
-                if ($params[self::PARAM_JOBTTR] > $this->config['msg_timeout']) {
-                    /**
-                     * Too big TTR value for this worker
-                     * The in-flight timeout expires and nsqd automatically re-queues the message.
-                     * @see http://nsq.io/clients/building_client_libraries.html
-                     */
-                    throw new RuntimeException('Desired ' . self::PARAM_JOBTTR .
-                                               ' param ' . $params[self::PARAM_JOBTTR] .
-                                               '> ' . $this->config['msg_timeout'] . ' msg_timeout, ' .
-                                               'NSQ expects answer within ' . $this->config['msg_timeout'] . ' seconds');
-                }
+        if (!$this->connected || ConnectionState::BindWrite !== $this->state) {
+            $error = new RuntimeException(
+                self::class . ' adapter ' . __FUNCTION__ . ': not connected to a bound queue'
+            );
+            $this->logError($error->getMessage());
 
-                /**
-                 * After 2 unanswered _heartbeat_ responses,
-                 * nsqd will timeout and forcefully close a client connection that it has not heard from
-                 * @see http://nsq.io/clients/building_client_libraries.html
-                 */
-                if ($this->config['heartbeat_interval_ms'] &&
-                    (round($params[self::PARAM_JOBTTR] * 1000) > round(
-                        $this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION
-                    ))
-                ) {
-                    throw new RuntimeException('Desired ' . self::PARAM_JOBTTR .
-                                               ' param ' . $params[self::PARAM_JOBTTR] .
-                                               's > ' . (string) ($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION) . 'ms (x' . (string) self::HEARTBEAT_TTR_RATION . ' heartbeat), ' .
-                                               'NSQ expects answer within two hearbeats, but cannot guarantee that, ' .
-                                               'please configure your heartbeat_interval_ms to extend heartbeat intervals');
-                }
-            }
-
-            if (isset($params[self::PARAM_READYWAIT])) {
-                if ($this->config['max_req_timeout']
-                    && ($params[self::PARAM_READYWAIT] > $this->config['max_req_timeout'])
-                ) {
-                    /**
-                     * Too big delay value for this server, value is configured on server side
-                     * Preemptively decline sending jobs that server will reject
-                     */
-                    throw new RuntimeException('Desired ' . self::PARAM_READYWAIT . ' of ' .
-                                               $params[self::PARAM_READYWAIT] . ' seconds is longer ' .
-                                               'than specified server configured --max_req_timeout ' .
-                                               'of ' . $this->config['max_req_timeout']);
-                }
-                /**
-                 * Delay ready state by N seconds
-                 * maximum value is limited to `nsqd --max-req-timeout` value
-                 */
-                $this->writeCommandWithBody(
-                    sprintf(
-                        self::PROTO_PUBDELAY,
-                        $this->stateData['queue'],
-                        $params[self::PARAM_READYWAIT] * 1000
-                    ),
-                    $body
-                );
-            } else {
-                $this->writeCommandWithBody(
-                    sprintf(self::PROTO_PUBLISH, $this->stateData['queue']),
-                    $body
-                );
-            }
-            $this->readSuccessResponse();
-
-            return true;
+            return $error;
         }
 
-        return false;
+        if (null !== $jobTtr) {
+            if ($jobTtr > $this->config['msg_timeout']) {
+                /**
+                 * Too big TTR value for this worker
+                 * The in-flight timeout expires and nsqd automatically re-queues the message.
+                 * @see http://nsq.io/clients/building_client_libraries.html
+                 */
+                throw new RuntimeException('Desired jobTtr param ' . $jobTtr .
+                                           '> ' . $this->config['msg_timeout'] . ' msg_timeout, ' .
+                                           'NSQ expects answer within ' . $this->config['msg_timeout'] . ' seconds');
+            }
+
+            /**
+             * After 2 unanswered _heartbeat_ responses,
+             * nsqd will timeout and forcefully close a client connection that it has not heard from
+             * @see http://nsq.io/clients/building_client_libraries.html
+             */
+            if ($this->config['heartbeat_interval_ms'] &&
+                (round($jobTtr * 1000) > round($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION))
+            ) {
+                throw new RuntimeException('Desired jobTtr param ' . $jobTtr .
+                                           's > ' . (string) ($this->config['heartbeat_interval_ms'] * self::HEARTBEAT_TTR_RATION) . 'ms (x' . (string) self::HEARTBEAT_TTR_RATION . ' heartbeat), ' .
+                                           'NSQ expects answer within two hearbeats, but cannot guarantee that, ' .
+                                           'please configure your heartbeat_interval_ms to extend heartbeat intervals');
+            }
+        }
+
+        if ($readyWait > 0) {
+            if ($this->config['max_req_timeout'] && ($readyWait > $this->config['max_req_timeout'])) {
+                /**
+                 * Too big delay value for this server, value is configured on server side
+                 * Preemptively decline sending jobs that server will reject
+                 */
+                throw new RuntimeException('Desired readyWait of ' .
+                                           $readyWait . ' seconds is longer ' .
+                                           'than specified server configured --max_req_timeout ' .
+                                           'of ' . $this->config['max_req_timeout']);
+            }
+            /**
+             * Delay ready state by N seconds
+             * maximum value is limited to `nsqd --max-req-timeout` value
+             */
+            $command = sprintf(self::PROTO_PUBDELAY, $this->stateData['queue'], $readyWait * 1000);
+        } else {
+            $command = sprintf(self::PROTO_PUBLISH, $this->stateData['queue']);
+        }
+
+        try {
+            $this->writeCommandWithBody($command, (string) $body);
+            $this->readSuccessResponse();
+        } catch (Throwable $e) {
+            $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+
+            return $e;
+        }
+
+        return null;
     }
 
     /**

@@ -13,5 +13,5 @@ namespace BackQ\Publisher;
 abstract class Closure extends AbstractPublisher
 {
 
-    protected $queueName = 'closure';
+    protected string $queueName = 'closure';
 }

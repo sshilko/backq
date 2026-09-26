@@ -5,17 +5,18 @@ namespace BackQ\Tests\Adapter;
 use BackQ\Adapter\Beanstalk;
 use BackQ\Adapter\Beanstalk\Client;
 use BackQ\Tests\Support\FakeBeanstalkServer;
+use BackQ\Tests\Support\RecordingLogger;
+use Error;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use RuntimeException;
+use Throwable;
+use function array_column;
 use function fclose;
-use function restore_error_handler;
-use function set_error_handler;
 use function stream_socket_get_name;
 use function stream_socket_server;
 use function strrpos;
 use function substr;
-use const E_USER_WARNING;
 
 class BeanstalkAdapterTest extends TestCase
 {
@@ -52,7 +53,7 @@ class BeanstalkAdapterTest extends TestCase
         $this->assertSame('42', $adapter->putTask('body'));
     }
 
-    public function testPutTaskForwardsParams(): void
+    public function testPutTaskAcceptsWidenedArguments(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
         $client
@@ -61,21 +62,37 @@ class BeanstalkAdapterTest extends TestCase
             ->with(1, 2, 3, 'body')
             ->willReturn(42);
 
-        $params = [
-            Beanstalk::PARAM_JOBTTR    => 3,
-            Beanstalk::PARAM_PRIORITY  => 1,
-            Beanstalk::PARAM_READYWAIT => 2,
-        ];
-        $result = $adapter->putTask('body', $params);
-        $this->assertSame('42', $result);
+        $this->assertSame('42', $adapter->putTask('body', readyWait: 2, jobTtr: 3, priority: 1));
     }
 
-    public function testPutTaskReturnsFalseOnFailure(): void
+    public function testPutTaskAcceptsWidenedArgumentsPositionally(): void
+    {
+        [$adapter, $client] = $this->adapterWithConnectedClient();
+        $client
+            ->expects($this->once())
+            ->method('put')
+            ->with(1, 2, 3, 'body')
+            ->willReturn(42);
+
+        $this->assertSame('42', $adapter->putTask('body', 2, 3, 1));
+    }
+
+    public function testPutTaskRejectsRetiredKeyName(): void
+    {
+        [$adapter] = $this->adapterWithConnectedClient();
+
+        $this->expectException(Error::class);
+        $this->expectExceptionMessage('Unknown named parameter $jobttr');
+
+        $adapter->putTask('body', jobttr: 3);
+    }
+
+    public function testPutTaskReturnsThrowableOnRejection(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
         $client->expects($this->once())->method('put')->willReturn(false);
 
-        $this->assertFalse($adapter->putTask('body'));
+        $this->assertInstanceOf(Throwable::class, $adapter->putTask('body'));
     }
 
     public function testPickTaskReturnsWrappedJob(): void
@@ -171,8 +188,7 @@ class BeanstalkAdapterTest extends TestCase
     public function testDisconnectedInstanceGuards(): void
     {
         $adapter = new Beanstalk();
-        $adapter->setTriggerErrorOnError(false);
-        $this->assertFalse($adapter->putTask('body'));
+        $this->assertInstanceOf(Throwable::class, $adapter->putTask('body'));
         $this->assertFalse($adapter->pickTask());
         $this->assertFalse($adapter->afterWorkSuccess(1));
         $this->assertFalse($adapter->afterWorkFailed(1));
@@ -192,28 +208,26 @@ class BeanstalkAdapterTest extends TestCase
         fclose($server);
 
         $adapter = new Beanstalk();
-        $adapter->setTriggerErrorOnError(false);
 
         $this->assertFalse($adapter->connect('127.0.0.1', $port));
     }
 
-    public function testConnectLogsExceptionWhenErrorHandlerThrows(): void
+    public function testConnectLogsExceptionWhenPeerIsDown(): void
     {
+        $server = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
+        $this->assertNotFalse($server);
+        $name = stream_socket_get_name($server, false);
+        $port = (int) substr((string) $name, (int) strrpos((string) $name, ':') + 1);
+        fclose($server);
+
+        $logger = new RecordingLogger();
         $adapter = new Beanstalk();
-        set_error_handler(static function (): bool {
-            throw new RuntimeException('error handler boom');
-        }, E_USER_WARNING);
+        $adapter->setLogger($logger);
 
-        $message = null;
-        try {
-            $adapter->connect('127.0.0.1', 1);
-        } catch (RuntimeException $e) {
-            $message = $e->getMessage();
-        } finally {
-            restore_error_handler();
-        }
+        $this->assertFalse($adapter->connect('127.0.0.1', $port));
 
-        $this->assertSame('error handler boom', $message);
+        $this->assertNotEmpty($logger->records);
+        $this->assertContains('error', array_column($logger->records, 0));
     }
 
     public function testConnectSucceedsAgainstFakeServer(): void
@@ -221,7 +235,6 @@ class BeanstalkAdapterTest extends TestCase
         $server = new FakeBeanstalkServer();
         try {
             $adapter = new Beanstalk();
-            $adapter->setTriggerErrorOnError(false);
 
             $this->assertTrue($adapter->connect('127.0.0.1', $server->getPort()));
             $server->accept();
@@ -230,10 +243,9 @@ class BeanstalkAdapterTest extends TestCase
         }
     }
 
-    public function testErrorPathLogsWithoutWarningWhenDisabled(): void
+    public function testErrorPathLogsAndReturnsFalse(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
-        $adapter->setTriggerErrorOnError(false);
         $client
             ->expects($this->once())
             ->method('statsTube')
@@ -323,7 +335,7 @@ class BeanstalkAdapterTest extends TestCase
         $this->assertFalse($adapter->pickTask(7));
     }
 
-    public function testPutTaskExceptionReturnsFalse(): void
+    public function testPutTaskExceptionReturnsThrowable(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
         $client
@@ -331,7 +343,7 @@ class BeanstalkAdapterTest extends TestCase
             ->method('put')
             ->willThrowException(new RuntimeException('boom'));
 
-        $this->assertFalse($adapter->putTask('body'));
+        $this->assertInstanceOf(RuntimeException::class, $adapter->putTask('body'));
     }
 
     public function testAfterWorkSuccessExceptionReturnsFalse(): void
@@ -372,7 +384,6 @@ class BeanstalkAdapterTest extends TestCase
     private function adapterWithConnectedClient(): array
     {
         $adapter = new Beanstalk();
-        $adapter->setTriggerErrorOnError(false);
         $client  = $this->createMock(Client::class);
 
         $clientProp  = new ReflectionProperty(Beanstalk::class, 'client');

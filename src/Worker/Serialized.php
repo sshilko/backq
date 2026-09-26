@@ -123,19 +123,35 @@ class Serialized extends AbstractWorker
     }
 
     /**
+     * Republish the original message under the arguments it was published with
+     *
      * @param AbstractPublisher $publisher
-     * @param AbstractMessage $message
-     * @param array $publishOptions
+     * @param AbstractMessage   $message
+     * @param array<string, mixed> $publishOptions named arguments for publish()
+     *
+     * @return bool whether the message is on the queue again
      */
     private function dispatchOriginalMessage(
         AbstractPublisher $publisher,
         AbstractMessage $message,
         array $publishOptions = [],
-    ): ?string {
-        if ($publisher->start()) {
-            return (string) $publisher->publish($message, $publishOptions);
+    ): bool {
+        if (!$publisher->start()) {
+            $this->logError(__FUNCTION__ . ': publisher failed to start');
+
+            return false;
         }
 
-        return null;
+        $result = $publisher->publish($message, ...$publishOptions);
+
+        if ($result instanceof Throwable) {
+            $this->logError(
+                __FUNCTION__ . ': republish failed: ' . $result::class . ': ' . $result->getMessage()
+            );
+
+            return false;
+        }
+
+        return true;
     }
 }

@@ -11,8 +11,10 @@ use Aws\Result;
 use Aws\Sqs\SqsClient;
 use BackQ\Adapter\DynamoSQS;
 use BackQ\Tests\Support\TestDynamoSQS;
+use Error;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use Throwable;
 use function crc32;
 use function json_decode;
 use function json_encode;
@@ -34,7 +36,7 @@ class DynamoSQSAdapterTest extends TestCase
         $adapter = $this->makeAdapter($dynamo, new MockHandler([]));
 
         $before = time();
-        $this->assertTrue($adapter->putTask('job-body', [DynamoSQS::PARAM_MESSAGE_ID => 42]));
+        $this->assertNull($adapter->putTask('job-body', messageId: 42));
 
         $body = json_decode((string) $dynamo->getLastRequest()->getBody(), true);
 
@@ -53,7 +55,7 @@ class DynamoSQSAdapterTest extends TestCase
         $dynamo  = new MockHandler([new Result([])]);
         $adapter = $this->makeAdapter($dynamo, new MockHandler([]));
 
-        $this->assertTrue($adapter->putTask('job-body'));
+        $this->assertNull($adapter->putTask('job-body'));
 
         $body = json_decode((string) $dynamo->getLastRequest()->getBody(), true);
         $this->assertMatchesRegularExpression('/^[0-9]+\.[a-f0-9]{13}$/', $body['Item']['id']['S']);
@@ -68,16 +70,15 @@ class DynamoSQSAdapterTest extends TestCase
         );
         $dynamo    = new MockHandler([$exception]);
         $adapter   = $this->makeAdapter($dynamo, new MockHandler([]));
-        $adapter->setTriggerErrorOnError(false);
 
-        $this->assertFalse($adapter->putTask('job-body'));
+        $this->assertInstanceOf(Throwable::class, $adapter->putTask('job-body'));
     }
 
     public function testPutTaskFailsWhenNotConnected(): void
     {
         $adapter = new TestDynamoSQS(self::ACCOUNT_ID, 'key', 'secret', self::REGION);
 
-        $this->assertFalse($adapter->putTask('job-body'));
+        $this->assertInstanceOf(Throwable::class, $adapter->putTask('job-body'));
     }
 
     public function testPutTaskReadywaitBelowEstimatedDelayIsUsedDirectly(): void
@@ -86,7 +87,7 @@ class DynamoSQSAdapterTest extends TestCase
         $adapter = $this->makeAdapter($dynamo, new MockHandler([]));
 
         $before = time();
-        $this->assertTrue($adapter->putTask('x', [DynamoSQS::PARAM_READYWAIT => 100]));
+        $this->assertNull($adapter->putTask('x', readyWait: 100));
 
         $timeReady = (int) json_decode((string) $dynamo->getLastRequest()->getBody(), true)['Item']['time_ready']['N'];
         $this->assertGreaterThanOrEqual($before + 100, $timeReady);
@@ -99,7 +100,7 @@ class DynamoSQSAdapterTest extends TestCase
         $adapter = $this->makeAdapter($dynamo, new MockHandler([]));
 
         $before = time();
-        $this->assertTrue($adapter->putTask('x', [DynamoSQS::PARAM_READYWAIT => 1000]));
+        $this->assertNull($adapter->putTask('x', 1000));
 
         $timeReady = (int) json_decode((string) $dynamo->getLastRequest()->getBody(), true)['Item']['time_ready']['N'];
         $this->assertGreaterThanOrEqual($before + 280, $timeReady);
@@ -112,7 +113,17 @@ class DynamoSQSAdapterTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
 
-        $adapter->putTask('x', [DynamoSQS::PARAM_READYWAIT => -200000000]);
+        $adapter->putTask('x', readyWait: -200000000);
+    }
+
+    public function testPutTaskRejectsRetiredKeyName(): void
+    {
+        $adapter = $this->makeAdapter(new MockHandler([]), new MockHandler([]));
+
+        $this->expectException(Error::class);
+        $this->expectExceptionMessage('Unknown named parameter $readywait');
+
+        $adapter->putTask('x', readywait: 100);
     }
 
     public function testPickTaskReturnsPayloadAndAcknowledges(): void
@@ -158,7 +169,6 @@ class DynamoSQSAdapterTest extends TestCase
                 'ReceiptHandle' => 'rh-2'],
         ]])]);
         $adapter = $this->makeAdapter(new MockHandler([]), $sqs);
-        $adapter->setTriggerErrorOnError(false);
 
         $this->assertSame(['rh-2', null], $adapter->pickTask());
     }
@@ -170,7 +180,6 @@ class DynamoSQSAdapterTest extends TestCase
                 'ReceiptHandle' => 'rh-3'],
         ]])]);
         $adapter = $this->makeAdapter(new MockHandler([]), $sqs);
-        $adapter->setTriggerErrorOnError(false);
 
         $this->assertSame(['rh-3', null], $adapter->pickTask());
     }
@@ -188,7 +197,6 @@ class DynamoSQSAdapterTest extends TestCase
         $exception = new AwsException('queue down', new Command('ReceiveMessage'));
         $sqs       = new MockHandler([$exception]);
         $adapter   = $this->makeAdapter(new MockHandler([]), $sqs);
-        $adapter->setTriggerErrorOnError(false);
 
         $this->expectException(AwsException::class);
         $this->expectExceptionMessage('queue down');
@@ -252,7 +260,6 @@ class DynamoSQSAdapterTest extends TestCase
         $exception = new AwsException('queue gone', new Command('DeleteMessage'));
         $sqs       = new MockHandler([$exception]);
         $adapter   = $this->makeAdapter(new MockHandler([]), $sqs);
-        $adapter->setTriggerErrorOnError(false);
 
         $this->assertFalse($adapter->afterWorkSuccess('rh-9'));
     }

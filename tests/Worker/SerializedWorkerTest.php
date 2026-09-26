@@ -14,6 +14,7 @@ use BackQ\Worker\Serialized as SerializedWorker;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use ReflectionProperty;
+use RuntimeException;
 use function array_column;
 use function array_key_last;
 use function implode;
@@ -27,20 +28,19 @@ class SerializedWorkerTest extends TestCase
 
     public function testRepublishesOriginalMessage(): void
     {
-        $publishAdapter           = new TestAdapter();
+        $publishAdapter              = new TestAdapter();
         $publishAdapter->putTaskResult = 'republished-id';
-        $publisher                = new TestPublisher($publishAdapter);
+        $publisher                   = new TestPublisher($publishAdapter);
         $publisher->setQueueName('serialized');
         TestPublisher::bindShared($publishAdapter);
 
         try {
-            $serialized = new Serialized(new NoopMessage(), $publisher, ['jobttr' => 9]);
+            $serialized = new Serialized(new NoopMessage(), $publisher, ['jobTtr' => 9, 'readyWait' => 2]);
             $this->adapter->pickTaskResult = [3, serialize($serialized)];
 
             $worker = new SerializedWorker($this->adapter);
             $worker->setQueueName('serialized');
             $worker->setLogger(new NullLogger());
-            $worker->setTriggerErrorOnError(false);
             $worker->setRestartThreshold(1);
 
             $worker->run();
@@ -51,8 +51,39 @@ class SerializedWorkerTest extends TestCase
         $this->assertContains('connect', $publishAdapter->calls);
         $putCall = $publishAdapter->calls[array_key_last($publishAdapter->calls)];
         $this->assertSame('putTask', $putCall[0]);
-        $this->assertSame(['jobttr' => 9], $putCall[2]);
+        // Named arguments carry no order, so each replayed option is asserted by name
+        $this->assertCount(2, $putCall[2]);
+        $this->assertSame(2, $putCall[2]['readyWait']);
+        $this->assertSame(9, $putCall[2]['jobTtr']);
         $this->assertContains(['afterWorkSuccess', 3], $this->adapter->calls);
+    }
+
+    public function testRepublishFailureIsNotAcknowledgedAsProcessed(): void
+    {
+        $publishAdapter              = new TestAdapter();
+        $publishAdapter->putTaskResult = new RuntimeException('rep publish failed');
+        $publisher                   = new TestPublisher($publishAdapter);
+        $publisher->setQueueName('serialized');
+        TestPublisher::bindShared($publishAdapter);
+
+        $logger = new RecordingLogger();
+
+        try {
+            $serialized = new Serialized(new NoopMessage(), $publisher, ['jobTtr' => 9]);
+            $this->adapter->pickTaskResult = [3, serialize($serialized)];
+
+            $worker = new SerializedWorker($this->adapter);
+            $worker->setQueueName('serialized');
+            $worker->setLogger($logger);
+            $worker->setRestartThreshold(1);
+
+            $worker->run();
+        } finally {
+            TestPublisher::bindShared(null);
+        }
+
+        $this->assertNotContains(['afterWorkSuccess', 3], $this->adapter->calls);
+        $this->assertStringContainsString('rep publish failed', implode("\n", array_column($logger->records, 1)));
     }
 
     public function testRejectsUnsupportedPayloadAsSuccess(): void
@@ -286,7 +317,6 @@ class SerializedWorkerTest extends TestCase
         $worker = new SerializedWorker($this->adapter);
         $worker->setQueueName('serialized');
         $worker->setLogger($logger);
-        $worker->setTriggerErrorOnError(false);
         $worker->setRestartThreshold(1);
 
         return $worker;

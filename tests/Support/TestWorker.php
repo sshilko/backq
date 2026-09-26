@@ -16,7 +16,7 @@ class TestWorker extends AbstractWorker
 
     public array $yields   = [];
 
-    protected $queueName = 'testqueue';
+    protected string $queueName = 'testqueue';
 
     protected int $index = 0;
 

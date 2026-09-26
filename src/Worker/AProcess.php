@@ -32,7 +32,7 @@ final class AProcess extends AbstractWorker
 
     public ?int $workTimeout = 5;
 
-    protected $queueName = 'process';
+    protected string $queueName = 'process';
 
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh

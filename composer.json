@@ -76,6 +76,9 @@
         "slevomat/coding-standard": "*",
         "squizlabs/php_codesniffer": "*"
     },
+    "suggest": {
+        "ext-mysqli": "Needed by the MySQL table adapter, BackQ\\Adapter\\MySql"
+    },
     "autoload": {
         "psr-4": {
             "BackQ\\": "src/"

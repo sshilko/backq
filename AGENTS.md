@@ -18,7 +18,9 @@ and runs OS processes via `symfony/process`.
     `Connector`, `Queue`), `Amazon/DynamoDb/QueueTableRow`, and `IO/` (`StreamIO`,
     `AbstractIO`)
   - `src/Worker/` — job workers. Extend `AbstractWorker`, implement `run(): void`
-  - `src/Publisher/` — job publishers. Extend `AbstractPublisher`, implement `setupAdapter()`
+  - `src/Publisher/` — job publishers. Extend `AbstractPublisher`, pass the adapter
+    to the constructor. A publisher that is embedded in a serialized message must
+    rebuild its adapter in `__wakeup()` (the `$adapter` property is protected)
   - `src/Message/` — job payloads implementing `ConsumeInterface`
 - `example/` — runnable publisher/worker examples (`adapter/`, `http/`, `publishers/`,
   `workers/`; not shipped)
@@ -28,7 +30,40 @@ and runs OS processes via `symfony/process`.
   `php.ini`, `Dockerfile.php83`, `docker-compose.yaml`
 - `plans/` — analysis-based implementation plans. `plan-1-protocol-tcp-frame-handling.md`,
   `plan-2-network-ssl-disconnects.md`, `plan-3-connection-liveness-resilience.md`, and
-  `plan-4-minor-notes-behavior.md` have all been implemented (plan 4 was merged via PR #11)
+  `plan-4-minor-notes-behavior.md` have all been implemented (plan 4 was merged via PR #11).
+  `plan-5-put-task-contract.md` is **implemented** (uncommitted, no branch or PR yet): it reduced
+  `AbstractAdapter::putTask()` to `putTask(string|Stringable $body): null|string|Throwable`
+  — one parameter, no options array. Each adapter **widens** it by appending its own
+  optional parameters (`$readyWait`, `$jobTtr`, `$priority`, `$messageId`, `$jobId`,
+  `$putAsDone`, `$noSleep`); PHP rejects a required extra parameter, a narrowed
+  parameter, and `false` in the return union, so those mistakes are load-time fatals.
+  A transport or storage failure is **returned** as a `Throwable` (not `false`); an
+  invalid argument still **throws**. `AbstractPublisher::publish()` is variadic and
+  forwards named arguments (`publish($message, readyWait: 5)`), and
+  `Message\Serialized::$publishOptions` is a named-argument map replayed with a splat.
+  The `PARAM_*` array keys and `MySql\PutTaskParam` are gone with no shim — a wrong
+  name raises `Error: Unknown named parameter`.
+  `plan-6-error-log-deprecation.md` is proposed only: it routes the 9 `@error_log()` calls in
+  `AProcess` and the three SNS endpoint workers to the PSR-3 `AbstractWorker::logError()`
+  (widened with a `$context` array), converts the 12 tests that read the PHP error log to
+  `RecordingLogger` assertions, and forbids the `error_log` function in the phpcs ruleset.
+  `plans/plan-7-agent-container-exec-bridge.md`,
+  `plans/plan-8-agent-runtime-in-container.md`, and
+  `plans/plan-9-container-shell-via-mcp.md` are three **mutually exclusive proposals**, all
+  proposed only; exactly one is to be implemented. They answer the same problem — the Windows 11
+  host cannot build or test this project, so every agent command must run in a container with
+  the repo mounted whole — and differ only in how the agent reaches that container: (7) the agent
+  stays on the host and reaches it with `docker exec backq-agent …` through checked-in
+  `build/agent/qa` scripts, enforced by an `opencode.jsonc` shell allowlist; (8) the agent
+  runtime itself runs inside the container, so its tools have no host authority at all;
+  (9) the built-in shell tool is denied and the container shell is exposed as an MCP tool
+  (`run` / `read_file` / `list_dir`), which is the only variant that binds clients other than
+  OpenCode. All three record the same measured host hazards (PowerShell argument splitting,
+  CRLF on a piped here-string's last line, `bash` resolving to WSL, host PHP 8.5, host git
+  2.35 with `core.autocrlf=true`, pre-commit's `language: system` hooks silently using host PHP,
+  a 9p bind mount ~125x slower than container-local disk) and all three replace the
+  here-string and `bash -c` recipes in "Code quality inside the container", which are broken on
+  a PowerShell host
 - `.github/workflows/` — `ci.yml` (dockerized test + quality suite) and `opencode.yml`
   (comment-triggered OpenCode runs)
 

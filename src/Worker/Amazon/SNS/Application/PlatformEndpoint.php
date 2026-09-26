@@ -26,7 +26,7 @@ abstract class PlatformEndpoint extends Application
      */
     public const int RETRY_MAX = 3;
 
-    protected $queueName = 'aws_sns_endpoints_';
+    protected string $queueName = 'aws_sns_endpoints_';
 
     public function __construct(AbstractAdapter $adapter)
     {

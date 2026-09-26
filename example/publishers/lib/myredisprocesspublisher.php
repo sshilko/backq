@@ -8,7 +8,6 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
-use BackQ\Adapter\AbstractAdapter;
 use BackQ\Adapter\Redis;
 use BackQ\Publisher\Process;
 use Symfony\Component\Console\Logger\ConsoleLogger;
@@ -22,15 +21,21 @@ use Symfony\Component\Console\Output\ConsoleOutput;
  */
 final class MyRedisProcessPublisher extends Process
 {
-    public const PARAM_READYWAIT = Redis::PARAM_READYWAIT;
+    protected string $queueName = 'process';
 
-    protected $queueName = 'process';
+    /**
+     * This publisher is embedded into a `Message\Serialized` payload, an adapter
+     * is not serializable so it has to be rebuilt when the worker restores it
+     */
+    public function __wakeup(): void
+    {
+        $this->adapter = self::createAdapter();
+    }
 
-    protected function setupAdapter(): AbstractAdapter
+    public static function createAdapter(): Redis
     {
         $output  = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
         $logger  = new ConsoleLogger($output);
-
         $adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
         $adapter->setLogger($logger);
 

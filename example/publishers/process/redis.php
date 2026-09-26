@@ -19,7 +19,7 @@
 require_once __DIR__ . '/../../../vendor/autoload.php';
 require_once __DIR__ . '/../lib/myredisprocesspublisher.php';
 
-$publisher = MyRedisProcessPublisher::getInstance();
+$publisher = new MyRedisProcessPublisher(MyRedisProcessPublisher::createAdapter());
 if (!$publisher->start()) {
     echo 'Failed to start publisher, is redis at BACKQ_REDIS_HOST:BACKQ_REDIS_PORT (default 127.0.0.1:6379) reachable?' . "\n";
     exit(1);
@@ -27,17 +27,16 @@ if (!$publisher->start()) {
 
 $message = new \BackQ\Message\Process('echo $( date +%s ) >> /tmp/test');
 try {
-    $result = $publisher->publish($message, [MyRedisProcessPublisher::PARAM_READYWAIT => random_int(0, 2)]);
+    $jobId = $publisher->publish($message, readyWait: random_int(0, 2));
 } catch (Throwable $e) {
     echo 'Failed to publish process message via redis adapter: ' . $e->getMessage() . "\n";
     exit(1);
 }
-if ($result) {
-    /**
-     * Success
-     */
-    echo 'Published process message via redis adapter as ID=' . $result . "\n";
-} else {
-    echo 'Failed to publish process message via redis adapter' . "\n";
+if ($jobId instanceof Throwable) {
+    echo 'Failed to publish process message via redis adapter: ' . $jobId->getMessage() . "\n";
     exit(1);
 }
+/**
+ * Success
+ */
+echo 'Published process message via redis adapter as ID=' . $jobId . "\n";

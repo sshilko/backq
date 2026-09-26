@@ -8,7 +8,6 @@
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
-use BackQ\Adapter\AbstractAdapter;
 use BackQ\Adapter\Beanstalk;
 use BackQ\Publisher\Process;
 use Symfony\Component\Console\Logger\ConsoleLogger;
@@ -16,12 +15,18 @@ use Symfony\Component\Console\Output\ConsoleOutput;
 
 final class MyProcessPublisher extends Process
 {
-    public const PARAM_JOBTTR    = Beanstalk::PARAM_JOBTTR;
-    public const PARAM_READYWAIT = Beanstalk::PARAM_READYWAIT;
+    protected string $queueName = 'process';
 
-    protected $queueName = 'process';
+    /**
+     * This publisher is embedded into a `Message\Serialized` payload, an adapter
+     * is not serializable so it has to be rebuilt when the worker restores it
+     */
+    public function __wakeup(): void
+    {
+        $this->adapter = self::createAdapter();
+    }
 
-    protected function setupAdapter(): AbstractAdapter
+    public static function createAdapter(): Beanstalk
     {
         $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
         $adapter = new Beanstalk();
