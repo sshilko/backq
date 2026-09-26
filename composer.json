@@ -54,6 +54,8 @@
     "require": {
         "php": ">=8.3",
         "ext-redis": "*",
+        "ext-xml": "*",
+        "ext-dom": "*",
         "aws/aws-sdk-php": "^3",
         "davidpersson/beanstalk": "^2",
         "guzzlehttp/psr7": "^2",
