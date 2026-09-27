@@ -224,13 +224,13 @@ abstract class MySql extends AbstractAdapter
     }
 
     #[Override]
-    public function afterWorkSuccess(int|string|null $workId): bool
+    public function afterWorkSuccess(?string $workId): bool
     {
         return $this->updateState(JobState::Done, $workId);
     }
 
     #[Override]
-    public function afterWorkFailed(int|string|null $workId): bool
+    public function afterWorkFailed(?string $workId): bool
     {
         return $this->updateState(JobState::Hold, $workId);
     }
@@ -295,7 +295,7 @@ abstract class MySql extends AbstractAdapter
     /**
      * Move a job into the given state
      */
-    private function updateState(JobState $state, int|string|null $workId): bool
+    private function updateState(JobState $state, ?string $workId): bool
     {
         if (null === $workId) {
             $this?->logger->error(__FUNCTION__ . ' Missing job id');

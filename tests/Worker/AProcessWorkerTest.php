@@ -35,7 +35,7 @@ class AProcessWorkerTest extends TestCase
         $this->runWorker($adapter, 1, $logger);
 
         $this->assertLogged($logger, 'Worker does not support payload of');
-        $this->assertContains(['afterWorkSuccess', 13], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '13'], $adapter->calls);
         $this->assertContains('disconnect', $adapter->calls);
     }
 
@@ -73,7 +73,7 @@ class AProcessWorkerTest extends TestCase
 
         $worker->run();
 
-        $this->assertContains(['afterWorkSuccess', 12], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '12'], $adapter->calls);
     }
 
     public function testProcessesArrayCommandline(): void
@@ -83,7 +83,7 @@ class AProcessWorkerTest extends TestCase
 
         $logger = $this->runWorker($adapter, 1, new RecordingLogger());
 
-        $this->assertContains(['afterWorkSuccess', 20], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '20'], $adapter->calls);
         $this->assertContains('disconnect', $adapter->calls);
 
         $wholeLog = implode("\n", array_column($logger->records, 1));
@@ -97,7 +97,7 @@ class AProcessWorkerTest extends TestCase
 
         $this->runWorker($adapter);
 
-        $this->assertContains(['afterWorkSuccess', 21], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '21'], $adapter->calls);
     }
 
     public function testSkipsTaskBeyondDeadline(): void
@@ -110,7 +110,7 @@ class AProcessWorkerTest extends TestCase
 
         $this->runWorker($adapter);
 
-        $this->assertContains(['afterWorkSuccess', 22], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '22'], $adapter->calls);
     }
 
     public function testDefersNotReadyMessage(): void
@@ -121,7 +121,7 @@ class AProcessWorkerTest extends TestCase
 
         $this->runWorker($adapter);
 
-        $this->assertContains(['afterWorkFailed', 23], $adapter->calls);
+        $this->assertContains(['afterWorkFailed', '23'], $adapter->calls);
     }
 
     public function testDiscardsExpiredMessageAsSuccess(): void
@@ -132,8 +132,8 @@ class AProcessWorkerTest extends TestCase
 
         $this->runWorker($adapter);
 
-        $this->assertContains(['afterWorkSuccess', 24], $adapter->calls);
-        $this->assertNotContains(['afterWorkFailed', 24], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '24'], $adapter->calls);
+        $this->assertNotContains(['afterWorkFailed', '24'], $adapter->calls);
     }
 
     public function testTriggersWarningOnNonZeroExitCode(): void
@@ -156,7 +156,7 @@ class AProcessWorkerTest extends TestCase
 
         $this->assertIsString($warning);
         $this->assertStringContainsString('existed with error code 3', $warning);
-        $this->assertContains(['afterWorkSuccess', 25], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '25'], $adapter->calls);
     }
 
     public function testManagesRunningForkAndCleansUp(): void
@@ -225,7 +225,7 @@ class AProcessWorkerTest extends TestCase
 
         $this->assertIsString($warning);
         $this->assertStringContainsString('existed with error code 137', $warning);
-        $this->assertContains(['afterWorkSuccess', 29], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '29'], $adapter->calls);
     }
 
     public function testAckFailureTriggersOuterCatch(): void
@@ -252,7 +252,7 @@ class AProcessWorkerTest extends TestCase
         $this->runWorker($adapter, 1, $logger);
 
         $this->assertLogged($logger, 'Process worker failed to run');
-        $this->assertContains(['afterWorkSuccess', 31], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '31'], $adapter->calls);
         $this->assertContains('disconnect', $adapter->calls);
     }
 

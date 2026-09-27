@@ -304,12 +304,14 @@ class Beanstalk extends AbstractAdapter
      *
      */
     #[Override]
-    public function afterWorkFailed(int|string|null $workId): bool
+    public function afterWorkFailed(?string $workId): bool
     {
         if ($this->connected) {
             try {
                 /**
                  * Release task back to queue with default priority and 1 second ready-delay
+                 * The client documents an integer id, the acknowledge contract a string,
+                 * so the id changes hand on the way out
                  */
                 if ($this->client->release((int) $workId, self::PRIORITY_DEFAULT, 1)) {
                     return true;
@@ -327,7 +329,7 @@ class Beanstalk extends AbstractAdapter
      *
      */
     #[Override]
-    public function afterWorkSuccess(int|string|null $workId): bool
+    public function afterWorkSuccess(?string $workId): bool
     {
         if ($this->connected) {
             try {

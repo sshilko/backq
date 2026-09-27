@@ -42,12 +42,14 @@ if ($beanstalkdsub->bindRead($queue)) {
         $job = $beanstalkdsub->pickTask();
         if ($job && $job[0]) {
             $logger->info('Got task: ' . json_encode($job));
+            // the id is acknowledged as a string, beanstalkd reports one as an int
+            $workId = (string) $job[0];
             if (1 === rand(1, 2)) {
                 $logger->info('Reporting success');
-                $beanstalkdsub->afterWorkSuccess($job[0]);
+                $beanstalkdsub->afterWorkSuccess($workId);
             } else {
                 $logger->info('Reporting failure');
-                $beanstalkdsub->afterWorkFailed($job[0]);
+                $beanstalkdsub->afterWorkFailed($workId);
             }
         } else {
             $logger->info('No job received within work timeout');

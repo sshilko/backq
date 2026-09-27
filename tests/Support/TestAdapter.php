@@ -130,7 +130,7 @@ class TestAdapter extends AbstractAdapter
     }
 
     #[Override]
-    public function afterWorkSuccess(int|string|null $workId): bool
+    public function afterWorkSuccess(?string $workId): bool
     {
         $this->calls[] = ['afterWorkSuccess', $workId];
 
@@ -138,7 +138,7 @@ class TestAdapter extends AbstractAdapter
     }
 
     #[Override]
-    public function afterWorkFailed(int|string|null $workId): bool
+    public function afterWorkFailed(?string $workId): bool
     {
         $this->calls[] = ['afterWorkFailed', $workId];
 

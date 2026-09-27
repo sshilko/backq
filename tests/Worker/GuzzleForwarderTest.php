@@ -74,7 +74,7 @@ class GuzzleForwarderTest extends TestCase
         $worker = $this->worker($adapter);
         $worker->run();
 
-        $this->assertContains(['afterWorkSuccess', 21], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '21'], $adapter->calls);
     }
 
     public function testANonStringPayloadIsAcknowledged(): void
@@ -85,7 +85,7 @@ class GuzzleForwarderTest extends TestCase
         $worker = $this->worker($adapter);
         $worker->run();
 
-        $this->assertContains(['afterWorkSuccess', 22], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '22'], $adapter->calls);
     }
 
     public function testAMessageThatIsNotReadyYetIsRescheduled(): void
@@ -98,7 +98,7 @@ class GuzzleForwarderTest extends TestCase
         $worker = $this->worker($adapter);
         $worker->run();
 
-        $this->assertContains(['afterWorkFailed', 23], $adapter->calls);
+        $this->assertContains(['afterWorkFailed', '23'], $adapter->calls);
         $this->assertNotContainsSuccessfulAck($adapter);
     }
 
@@ -112,8 +112,8 @@ class GuzzleForwarderTest extends TestCase
         $worker = $this->worker($adapter);
         $worker->run();
 
-        $this->assertContains(['afterWorkSuccess', 24], $adapter->calls);
-        $this->assertNotContains(['afterWorkFailed', 24], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '24'], $adapter->calls);
+        $this->assertNotContains(['afterWorkFailed', '24'], $adapter->calls);
     }
 
     public function testTheRequestIsForwardedAndTheCallbackSeesTheResponse(): void
@@ -156,8 +156,8 @@ class GuzzleForwarderTest extends TestCase
         unlink($report);
 
         $this->assertStringContainsString('Request sent, got response 201', $this->log($logger));
-        $this->assertContains(['afterWorkSuccess', 25], $adapter->calls);
-        $this->assertNotContains(['afterWorkFailed', 25], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '25'], $adapter->calls);
+        $this->assertNotContains(['afterWorkFailed', '25'], $adapter->calls);
     }
 
     public function testAServerErrorIsLogged(): void
@@ -181,7 +181,7 @@ class GuzzleForwarderTest extends TestCase
         }
 
         $this->assertStringContainsString('Request sent, FAILED with', $this->log($logger));
-        $this->assertContains(['afterWorkSuccess', 26], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '26'], $adapter->calls);
     }
 
     public function testARefusedConnectionIsLoggedAsAFailedRequest(): void
@@ -201,8 +201,8 @@ class GuzzleForwarderTest extends TestCase
          * The job is reported as processed even though the request never left:
          * the worker has no way to tell a failed request from a delivered one
          */
-        $this->assertContains(['afterWorkSuccess', 27], $adapter->calls);
-        $this->assertNotContains(['afterWorkFailed', 27], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '27'], $adapter->calls);
+        $this->assertNotContains(['afterWorkFailed', '27'], $adapter->calls);
     }
 
     public function testAnUnreadableRequestIsReportedAsAPhpWarning(): void
@@ -231,7 +231,7 @@ class GuzzleForwarderTest extends TestCase
         }
 
         $this->assertStringContainsString('GuzzleForwarder worker exception', implode("\n", $warnings));
-        $this->assertContains(['afterWorkSuccess', 29], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '29'], $adapter->calls);
     }
 
     public function testAFailedAckStopsTheWorker(): void

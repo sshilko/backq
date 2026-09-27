@@ -149,8 +149,9 @@
     `hasWorkers(string $queue)`
   - `pickTask(?int $timeout = null)`
   - `putTask(string|Stringable $body)` — see the `putTask()` contract below
-  - `afterWorkSuccess(int|string|null $workId)`,
-    `afterWorkFailed(int|string|null $workId)`
+  - `afterWorkSuccess(?string $workId)`, `afterWorkFailed(?string $workId)` —
+    typed `int|string|null` in the first pass and narrowed afterwards, see "The
+    job id is acknowledged as a string" below
   - `ping(bool $reconnect = true)`
   Subclasses overriding these methods and callers must match the new argument
   types.
@@ -242,6 +243,22 @@
 - `BackQ\Publisher\AbstractPublisher::ready()` is narrowed to `bool` (was
   untyped; it returned `null` before `start()`). The bound path is unchanged;
   callers and subclasses overriding `ready()` must use a `bool` return type.
+- **The job id is acknowledged as a string.**
+  `BackQ\Adapter\AbstractAdapter::afterWorkSuccess()` and
+  `::afterWorkFailed()` take `?string $workId` (was `int|string|null`), and so do
+  the three shipped adapters. The id a backend reports is its own: beanstalkd
+  returns an `int` from `reserve()`, a `mysqli` row comes back as an `int` under
+  `MYSQLI_OPT_INT_AND_FLOAT_NATIVE`, and a hand-written Redis payload may carry a
+  number in its `id`. `pickTask()` is therefore left alone and keeps returning the
+  backend's own type — `AbstractWorker` casts to a string where it invokes the two
+  methods, so an adapter always receives a string.
+
+  A subclass that overrides either method with `int|string|null` — or with any
+  other type — **no longer loads**: PHP rejects a parameter type that is not
+  `?string` exactly, in both directions. Match it and cast inside, where the
+  implementation needs another form. Inside `Redis`, the id read out of a reserved
+  payload is now a string before it reaches the `===` comparison against
+  `$workId`, so a numeric `id` in a payload is acknowledged instead of rejected.
 - `BackQ\Worker\AbstractWorker::$workTimeout` is now typed `?int` (was untyped).
   Child classes that assign an `int` must declare `?int $workTimeout`.
 - **The work timeout is a worker constructor argument and defaults to 60 seconds.**

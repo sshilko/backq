@@ -45,6 +45,11 @@ abstract class AbstractAdapter
     /**
      * Get job to process
      *
+     * The id is the backend's own: an adapter whose backend reports one as an int may
+     * leave it that way, because the two acknowledge methods take a string and their
+     * caller casts before invoking them. A payload is a string, an adapter that carries
+     * more per job appends it.
+     *
      * @param int|null $timeout seconds
      *
      * @return bool|array [id, payload]
@@ -72,16 +77,16 @@ abstract class AbstractAdapter
     /**
      * Acknowledge server: callback after successfully processing job
      *
-     * @param int|string|null $workId
+     * @param string|null $workId the id pickTask() reported, as a string
      */
-    abstract public function afterWorkSuccess(int|string|null $workId): bool;
+    abstract public function afterWorkSuccess(?string $workId): bool;
 
     /**
      * Acknowledge server: callback after failing to process job
      *
-     * @param int|string|null $workId
+     * @param string|null $workId the id pickTask() reported, as a string
      */
-    abstract public function afterWorkFailed(int|string|null $workId): bool;
+    abstract public function afterWorkFailed(?string $workId): bool;
 
     /**
      * Ping if still has alive connection to server

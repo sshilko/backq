@@ -312,7 +312,7 @@ class Redis extends AbstractAdapter
      *
      */
     #[Override]
-    public function afterWorkFailed(int|string|null $workId): bool
+    public function afterWorkFailed(?string $workId): bool
     {
         $this?->logger->debug(__FUNCTION__);
 
@@ -350,7 +350,7 @@ class Redis extends AbstractAdapter
      *
      */
     #[Override]
-    public function afterWorkSuccess(int|string|null $workId): bool
+    public function afterWorkSuccess(?string $workId): bool
     {
         $this?->logger->debug(__FUNCTION__);
 
@@ -463,12 +463,23 @@ class Redis extends AbstractAdapter
 
             /** @var RedisJob $redisJob */
             if ($redisJob) {
-                $jobId = $redisJob->getJobId();
-                if (null === $jobId) {
+                $rawJobId = $redisJob->getJobId();
+                if (null === $rawJobId) {
                     $redisJob->release();
 
                     throw new RuntimeException('Reserved job without an id');
                 }
+
+                /**
+                 * getJobId() is declared to return a string, but hands back whatever the
+                 * decoded payload carries, and a hand-written one may carry a number. The
+                 * acknowledge methods compare it with === against a string, so it is a
+                 * string from here on. The null case is handled above: a cast would turn
+                 * it into an empty string instead.
+                 *
+                 * @psalm-suppress RedundantCastGivenDocblockType
+                 */
+                $jobId = (string) $rawJobId;
                 $this?->logger->debug(__FUNCTION__ . ' reserved a job ' . $jobId);
 
                 if (isset($this->reservedJobs[$jobId])) {

@@ -55,7 +55,7 @@ class SerializedWorkerTest extends TestCase
         $this->assertCount(2, $putCall[2]);
         $this->assertSame(2, $putCall[2]['readyWait']);
         $this->assertSame(9, $putCall[2]['jobTtr']);
-        $this->assertContains(['afterWorkSuccess', 3], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '3'], $this->adapter->calls);
     }
 
     public function testRepublishFailureIsNotAcknowledgedAsProcessed(): void
@@ -82,7 +82,7 @@ class SerializedWorkerTest extends TestCase
             TestPublisher::bindShared(null);
         }
 
-        $this->assertNotContains(['afterWorkSuccess', 3], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkSuccess', '3'], $this->adapter->calls);
         $this->assertStringContainsString('rep publish failed', implode("\n", array_column($logger->records, 1)));
     }
 
@@ -92,7 +92,7 @@ class SerializedWorkerTest extends TestCase
 
         $this->runWorker(4)->run();
 
-        $this->assertContains(['afterWorkSuccess', 4], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '4'], $this->adapter->calls);
     }
 
     public function testEmptyPayloadIsSkipped(): void
@@ -123,7 +123,7 @@ class SerializedWorkerTest extends TestCase
 
         $wholeLog = implode("\n", array_column($logger->records, 1));
         $this->assertStringContainsString('Worker does not support payload of: integer', $wholeLog);
-        $this->assertContains(['afterWorkSuccess', 6], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '6'], $this->adapter->calls);
     }
 
     public function testDefersNotReadyMessage(): void
@@ -143,8 +143,8 @@ class SerializedWorkerTest extends TestCase
             TestPublisher::bindShared(null);
         }
 
-        $this->assertContains(['afterWorkFailed', 7], $this->adapter->calls);
-        $this->assertNotContains(['afterWorkSuccess', 7], $this->adapter->calls);
+        $this->assertContains(['afterWorkFailed', '7'], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkSuccess', '7'], $this->adapter->calls);
     }
 
     public function testDiscardsExpiredMessageAsSuccess(): void
@@ -164,8 +164,8 @@ class SerializedWorkerTest extends TestCase
             TestPublisher::bindShared(null);
         }
 
-        $this->assertContains(['afterWorkSuccess', 8], $this->adapter->calls);
-        $this->assertNotContains(['afterWorkFailed', 8], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '8'], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkFailed', '8'], $this->adapter->calls);
     }
 
     public function testReportsMissingOriginalMessage(): void
@@ -192,7 +192,7 @@ class SerializedWorkerTest extends TestCase
             TestPublisher::bindShared(null);
         }
 
-        $this->assertContains(['afterWorkSuccess', 9], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '9'], $this->adapter->calls);
     }
 
     public function testReportsMissingOriginalPublisher(): void
@@ -219,7 +219,7 @@ class SerializedWorkerTest extends TestCase
             TestPublisher::bindShared(null);
         }
 
-        $this->assertContains(['afterWorkSuccess', 10], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '10'], $this->adapter->calls);
     }
 
     public function testReportsDoNotPublishWhenPublisherStartFails(): void
@@ -243,7 +243,7 @@ class SerializedWorkerTest extends TestCase
         foreach ($publishAdapter->calls as $call) {
             $this->assertNotSame('putTask', is_array($call) ? $call[0] : $call);
         }
-        $this->assertContains(['afterWorkFailed', 11], $this->adapter->calls);
+        $this->assertContains(['afterWorkFailed', '11'], $this->adapter->calls);
     }
 
     public function testReportsDispatchFailure(): void
@@ -263,7 +263,7 @@ class SerializedWorkerTest extends TestCase
 
             $wholeLog = implode("\n", array_column($logger->records, 1));
             $this->assertStringContainsString('putTask exploded', $wholeLog);
-            $this->assertContains(['afterWorkFailed', 12], $this->adapter->calls);
+            $this->assertContains(['afterWorkFailed', '12'], $this->adapter->calls);
         } finally {
             TestPublisher::bindShared(null);
         }

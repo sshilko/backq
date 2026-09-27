@@ -42,12 +42,14 @@ if ($redissub->bindRead($queue)) {
         $job = $redissub->pickTask();
         if ($job && $job[0]) {
             $logger->info('Got task: ' . json_encode($job));
+            // the id is acknowledged as a string
+            $workId = (string) $job[0];
             if (1 === rand(1, 2)) {
                 $logger->info('Reporting success');
-                $redissub->afterWorkSuccess($job[0]);
+                $redissub->afterWorkSuccess($workId);
             } else {
                 $logger->info('Reporting failure');
-                $redissub->afterWorkFailed($job[0]);
+                $redissub->afterWorkFailed($workId);
             }
         } else {
             $logger->info('No job received within work timeout');

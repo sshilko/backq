@@ -46,7 +46,7 @@ class GuzzleWorkerTest extends TestCase
 
         $worker->run();
 
-        $this->assertContains(['afterWorkSuccess', 11], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '11'], $adapter->calls);
         $this->assertContains('disconnect', $adapter->calls);
     }
 
@@ -84,7 +84,7 @@ class GuzzleWorkerTest extends TestCase
 
         $worker->run();
 
-        $this->assertContains(['afterWorkSuccess', 12], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '12'], $adapter->calls);
     }
 
     public function testDefersNotReadyMessage(): void
@@ -101,7 +101,7 @@ class GuzzleWorkerTest extends TestCase
 
         $worker->run();
 
-        $this->assertContains(['afterWorkFailed', 13], $adapter->calls);
+        $this->assertContains(['afterWorkFailed', '13'], $adapter->calls);
         $this->assertNotContainsSuccessfulAck($adapter);
     }
 
@@ -117,8 +117,8 @@ class GuzzleWorkerTest extends TestCase
 
         $worker->run();
 
-        $this->assertContains(['afterWorkSuccess', 14], $adapter->calls);
-        $this->assertNotContains(['afterWorkFailed', 14], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '14'], $adapter->calls);
+        $this->assertNotContains(['afterWorkFailed', '14'], $adapter->calls);
     }
 
     public function testSendsAsyncRequestToLocalServer(): void
@@ -168,7 +168,7 @@ class GuzzleWorkerTest extends TestCase
 
         $this->assertStringContainsString('got response 200 ', $wholeLog);
         $this->assertNotLogged($logger, 'Error while sending FCM');
-        $this->assertContains(['afterWorkSuccess', 15], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '15'], $adapter->calls);
     }
 
     public function testLogsServerErrorRejection(): void
@@ -219,7 +219,7 @@ class GuzzleWorkerTest extends TestCase
 
         $wholeLog = implode("\n", array_column($logger->records, 1));
         $this->assertStringContainsString('Request sent, FAILED with', $wholeLog);
-        $this->assertContains(['afterWorkSuccess', 18], $adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '18'], $adapter->calls);
     }
 
     public function testLogsConnectRefusedFailure(): void
@@ -246,8 +246,8 @@ class GuzzleWorkerTest extends TestCase
             $errorLevels,
             'A refused connection must be handled by the worker, not reported as an error'
         );
-        $this->assertContains(['afterWorkFailed', 16], $adapter->calls);
-        $this->assertNotContains(['afterWorkSuccess', 16], $adapter->calls);
+        $this->assertContains(['afterWorkFailed', '16'], $adapter->calls);
+        $this->assertNotContains(['afterWorkSuccess', '16'], $adapter->calls);
     }
 
     public function testAckFailureTriggersOuterCatch(): void

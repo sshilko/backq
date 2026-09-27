@@ -126,7 +126,7 @@ class BeanstalkAdapterTest extends TestCase
         [$adapter, $client] = $this->adapterWithConnectedClient();
         $client->expects($this->once())->method('delete')->with(1)->willReturn(true);
 
-        $this->assertTrue($adapter->afterWorkSuccess(1));
+        $this->assertTrue($adapter->afterWorkSuccess('1'));
     }
 
     public function testAfterWorkFailedDelegatesToRelease(): void
@@ -134,7 +134,7 @@ class BeanstalkAdapterTest extends TestCase
         [$adapter, $client] = $this->adapterWithConnectedClient();
         $client->expects($this->once())->method('release')->with(1, 1024, 1)->willReturn(true);
 
-        $this->assertTrue($adapter->afterWorkFailed(1));
+        $this->assertTrue($adapter->afterWorkFailed('1'));
     }
 
     public function testHasWorkersTrueWhenWorkersWatchingQueue(): void
@@ -190,8 +190,8 @@ class BeanstalkAdapterTest extends TestCase
         $adapter = new Beanstalk(new RecordingLogger());
         $this->assertInstanceOf(Throwable::class, $adapter->putTask('body'));
         $this->assertFalse($adapter->pickTask());
-        $this->assertFalse($adapter->afterWorkSuccess(1));
-        $this->assertFalse($adapter->afterWorkFailed(1));
+        $this->assertFalse($adapter->afterWorkSuccess('1'));
+        $this->assertFalse($adapter->afterWorkFailed('1'));
         $this->assertFalse($adapter->bindWrite('tube'));
         $this->assertFalse($adapter->bindRead('tube'));
         $this->assertFalse($adapter->hasWorkers('tube'));
@@ -354,7 +354,7 @@ class BeanstalkAdapterTest extends TestCase
             ->with(1)
             ->willThrowException(new RuntimeException('boom'));
 
-        $this->assertFalse($adapter->afterWorkSuccess(1));
+        $this->assertFalse($adapter->afterWorkSuccess('1'));
     }
 
     public function testAfterWorkFailedExceptionReturnsFalse(): void
@@ -366,7 +366,7 @@ class BeanstalkAdapterTest extends TestCase
             ->with(1, 1024, 1)
             ->willThrowException(new RuntimeException('boom'));
 
-        $this->assertFalse($adapter->afterWorkFailed(1));
+        $this->assertFalse($adapter->afterWorkFailed('1'));
     }
 
     public function testDisconnectExceptionReturnsFalse(): void

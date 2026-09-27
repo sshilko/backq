@@ -308,7 +308,7 @@ class MySqlAdapterTest extends TestCase
         $db      = $this->db();
         $adapter = $this->adapter($db);
 
-        $this->assertTrue($adapter->afterWorkSuccess(7));
+        $this->assertTrue($adapter->afterWorkSuccess('7'));
         $this->assertSame('UPDATE backq_jobs SET sync = "DONE" WHERE id = "7"', $this->statements[0]);
     }
 
@@ -317,11 +317,11 @@ class MySqlAdapterTest extends TestCase
         $db      = $this->db();
         $adapter = $this->adapter($db);
 
-        $this->assertTrue($adapter->afterWorkFailed(7));
+        $this->assertTrue($adapter->afterWorkFailed('7'));
         $this->assertSame('UPDATE backq_jobs SET sync = "HOLD" WHERE id = "7"', $this->statements[0]);
     }
 
-    public function testAnAckAcceptsAStringJobId(): void
+    public function testAnAckAcceptsANonNumericJobId(): void
     {
         $db      = $this->db();
         $adapter = $this->adapter($db);
@@ -347,7 +347,7 @@ class MySqlAdapterTest extends TestCase
         $logger = new RecordingLogger();
         $db     = $this->db([], new mysqli_sql_exception('Lock wait timeout'));
 
-        $this->assertFalse($this->adapter($db, null, $logger)->afterWorkSuccess(7));
+        $this->assertFalse($this->adapter($db, null, $logger)->afterWorkSuccess('7'));
         $this->assertStringContainsString('Lock wait timeout', $this->messages($logger));
     }
 
@@ -361,7 +361,7 @@ class MySqlAdapterTest extends TestCase
         $this->assertSame("SELECT uid, body FROM queue WHERE sync = 'WAIT' LIMIT 1 FOR UPDATE", $this->statements[0]);
         $this->assertMatchesRegularExpression('#^UPDATE queue SET sync = "LOCK"#', $this->statements[1]);
 
-        $this->assertTrue($adapter->afterWorkSuccess(7));
+        $this->assertTrue($adapter->afterWorkSuccess('7'));
         $this->assertSame('UPDATE queue SET sync = "DONE" WHERE uid = "7"', $this->statements[2]);
     }
 
@@ -370,7 +370,7 @@ class MySqlAdapterTest extends TestCase
         $logger = new RecordingLogger();
         $db     = $this->db();
 
-        $this->adapter($db, null, $logger)->afterWorkSuccess(7);
+        $this->adapter($db, null, $logger)->afterWorkSuccess('7');
 
         $this->assertContains('debug', array_column($logger->records, 0));
         $this->assertStringContainsString('UPDATE backq_jobs SET sync = "DONE"', $this->messages($logger));

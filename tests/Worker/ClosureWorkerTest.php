@@ -32,7 +32,7 @@ class ClosureWorkerTest extends TestCase
         $this->makeWorker()->run();
 
         $this->assertSame('executed', Flag::$value);
-        $this->assertContains(['afterWorkSuccess', 7], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '7'], $this->adapter->calls);
         $this->assertContains('disconnect', $this->adapter->calls);
     }
 
@@ -42,7 +42,7 @@ class ClosureWorkerTest extends TestCase
 
         $this->makeWorker()->run();
 
-        $this->assertContains(['afterWorkSuccess', 8], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '8'], $this->adapter->calls);
         $this->assertSame(false, Flag::$value);
     }
 
@@ -71,7 +71,7 @@ class ClosureWorkerTest extends TestCase
 
         $this->makeWorker()->run();
 
-        $this->assertContains(['afterWorkFailed', 9], $this->adapter->calls);
+        $this->assertContains(['afterWorkFailed', '9'], $this->adapter->calls);
         $this->assertSame(false, Flag::$value);
     }
 
@@ -82,8 +82,8 @@ class ClosureWorkerTest extends TestCase
 
         $this->makeWorker()->run();
 
-        $this->assertContains(['afterWorkSuccess', 10], $this->adapter->calls);
-        $this->assertNotContains(['afterWorkFailed', 10], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '10'], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkFailed', '10'], $this->adapter->calls);
     }
 
     public function testReportsRecoverableClosureFailure(): void
@@ -99,7 +99,7 @@ class ClosureWorkerTest extends TestCase
 
         $wholeLog = implode("\n", array_column($logger->records, 1));
         $this->assertStringContainsString('Failed executing closure recoverable boom', $wholeLog);
-        $this->assertContains(['afterWorkFailed', 11], $this->adapter->calls);
+        $this->assertContains(['afterWorkFailed', '11'], $this->adapter->calls);
     }
 
     public function testReportsGenericClosureFailure(): void
@@ -114,7 +114,7 @@ class ClosureWorkerTest extends TestCase
 
         $wholeLog = implode("\n", array_column($logger->records, 1));
         $this->assertStringContainsString('Error executing closure generic boom', $wholeLog);
-        $this->assertContains(['afterWorkSuccess', 12], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '12'], $this->adapter->calls);
     }
 
     public function testAckFailureTriggersOuterCatch(): void

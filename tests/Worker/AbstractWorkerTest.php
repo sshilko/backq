@@ -119,8 +119,8 @@ class AbstractWorkerTest extends TestCase
         $worker->run();
 
         $this->assertContains([42, 'payload'], $worker->yields);
-        $this->assertContains(['afterWorkSuccess', 42], $this->adapter->calls);
-        $this->assertNotContains(['afterWorkFailed', 42], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '42'], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkFailed', '42'], $this->adapter->calls);
         $this->assertContains('disconnect', $this->adapter->calls);
     }
 
@@ -133,8 +133,27 @@ class AbstractWorkerTest extends TestCase
 
         $worker->run();
 
-        $this->assertContains(['afterWorkFailed', 42], $this->adapter->calls);
-        $this->assertNotContains(['afterWorkSuccess', 42], $this->adapter->calls);
+        $this->assertContains(['afterWorkFailed', '42'], $this->adapter->calls);
+        $this->assertNotContains(['afterWorkSuccess', '42'], $this->adapter->calls);
+    }
+
+    public function testTheAcknowledgedJobIdIsAString(): void
+    {
+        $this->adapter->pickTaskResult = [42, 'payload'];
+        $this->adapter->afterWorkSuccessResult = true;
+        $worker = $this->makeWorker();
+        $worker->setRestartThreshold(1);
+
+        $worker->run();
+
+        $acks = [];
+        foreach ($this->adapter->calls as $call) {
+            if ('afterWorkSuccess' === $call[0]) {
+                $acks[] = $call;
+            }
+        }
+
+        $this->assertSame([['afterWorkSuccess', '42']], $acks);
     }
 
     public function testWorkIdlesWhenNoJobAndNoTimeout(): void
@@ -247,7 +266,7 @@ class AbstractWorkerTest extends TestCase
 
         $wholeLog = implode("\n", array_column($logger->records, 1));
         $this->assertStringContainsString('termination requested', $wholeLog);
-        $this->assertContains(['afterWorkSuccess', 42], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '42'], $this->adapter->calls);
         $this->assertContains('disconnect', $this->adapter->calls);
     }
 
@@ -264,7 +283,7 @@ class AbstractWorkerTest extends TestCase
 
         $wholeLog = implode("\n", array_column($logger->records, 1));
         $this->assertStringContainsString('termination requested', $wholeLog);
-        $this->assertContains(['afterWorkSuccess', 43], $this->adapter->calls);
+        $this->assertContains(['afterWorkSuccess', '43'], $this->adapter->calls);
         $this->assertContains('disconnect', $this->adapter->calls);
     }
 

@@ -285,17 +285,24 @@ abstract class AbstractWorker
                  * @see http://php.net/manual/en/generator.send.php
                  */
                 /**
-                 * @var array{0: string|int, 1: string} $job
+                 * @var array{0: string|int|null, 1: string} $job
                  */
                 $response = (yield $job[0] => $job[1]);
                 yield;
 
+                /**
+                 * The acknowledge methods take the job id as a string. A backend that
+                 * reports one as an int (beanstalkd, a mysqli row) keeps doing so, so the
+                 * cast belongs here, where the two are invoked.
+                 */
+                $workId = null === $job[0] ? null : (string) $job[0];
+
                 if (false === $response) {
                     $this->logDebug('Calling afterWorkFailed, worker reported failure');
-                    $ack = $this->adapter->afterWorkFailed($job[0]);
+                    $ack = $this->adapter->afterWorkFailed($workId);
                 } else {
                     $this->logDebug('Calling afterWorkSuccess, worker reported success');
-                    $ack = $this->adapter->afterWorkSuccess($job[0]);
+                    $ack = $this->adapter->afterWorkSuccess($workId);
                 }
 
                 if (!$ack) {
