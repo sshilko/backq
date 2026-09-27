@@ -102,6 +102,13 @@ class Redis extends AbstractAdapter
      */
     private $retryAfter = null;
 
+    /**
+     * The 9 connection settings stay separate parameters, so a caller passes them as
+     * named arguments. The parameter count is deliberate, not a leftover.
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
+     * @psalm-suppress TooManyArguments
+     * @phan-suppress PhanParamTooMany
+     */
     public function __construct(
         protected string $host = '127.0.0.1',
         protected int $port = 6379,
