@@ -3,11 +3,12 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+
 use BackQ\Adapter\Redis;
 use BackQ\Worker\Guzzle;
 use Symfony\Component\Console\Logger\ConsoleLogger;
@@ -20,13 +21,11 @@ use Symfony\Component\Console\Output\ConsoleOutput;
  */
 require_once __DIR__ . '/../../../vendor/autoload.php';
 
-$adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
-
 /**
- * Optional adapter logger
+ * Optional logger, shared by the adapter and the worker
  */
-$logger = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$adapter->setLogger($logger);
+$logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
+$adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379), logger: $logger);
 
 $worker = new Guzzle($adapter);
 $worker->setLogger($logger);

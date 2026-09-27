@@ -3,11 +3,12 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+
 use BackQ\Adapter\Redis;
 use BackQ\Publisher\Process;
 use Symfony\Component\Console\Logger\ConsoleLogger;
@@ -36,8 +37,7 @@ final class MyRedisProcessPublisher extends Process
     {
         $output  = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
         $logger  = new ConsoleLogger($output);
-        $adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
-        $adapter->setLogger($logger);
+        $adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379), logger: $logger);
 
         return $adapter;
     }

@@ -3,7 +3,7 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
@@ -143,7 +143,7 @@ abstract class AbstractPublisher
             if (is_array($param)) {
                 throw new InvalidArgumentException(
                     static::class . '::publish() takes named arguments, not an options array: '
-                    . 'publish($message, readyWait: 5)'
+                        . 'publish($message, readyWait: 5)'
                 );
             }
         }

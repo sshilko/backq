@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
@@ -15,7 +16,6 @@ use Symfony\Component\Process\Exception\ProcessSignaledException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 use Throwable;
-use function error_log;
 use function gettype;
 use function is_string;
 use function time;
@@ -72,7 +72,7 @@ final class AProcess extends AbstractWorker
                     $this->logDebug('got some payload: ' . $payload);
                     $message = @unserialize($payload);
                     if (!($message instanceof \BackQ\Message\Process)) {
-                        @error_log('Worker does not support payload of: ' . gettype($message));
+                        $this->logError('Worker does not support payload of: ' . gettype($message));
                         $work->send($processed);
 
                         continue;
@@ -178,14 +178,14 @@ final class AProcess extends AbstractWorker
                         /**
                          * Not caching exceptions, just launching processes async
                          */
-                        @error_log('Process worker failed to run: ' . $e->getMessage());
+                        $this->logError('Process worker failed to run: ' . $e->getMessage(), ['exception' => $e]);
                     }
 
                     $this->logDebug('reporting work as processed: ' . var_export($processed, true));
                     $work->send($processed);
                 }
             } catch (Throwable $e) {
-                @error_log('Process worker exception: ' . $e->getMessage());
+                $this->logError('Process worker exception: ' . $e->getMessage(), ['exception' => $e]);
             }
         }
         /**
@@ -215,7 +215,7 @@ final class AProcess extends AbstractWorker
                     }
                 }
             } catch (Throwable $e) {
-                @error_log('Process worker failed to stop forked child: ' . $e->getMessage());
+                $this->logError('Process worker failed to stop forked child: ' . $e->getMessage(), ['exception' => $e]);
             }
         }
         $this->finish();
@@ -256,9 +256,15 @@ final class AProcess extends AbstractWorker
                     }
                 }
             } catch (ProcessTimedOutException $e) {
-                @error_log('Process worker caught ProcessTimedOutException: ' . $e->getMessage());
+                $this->logError(
+                    'Process worker caught ProcessTimedOutException: ' . $e->getMessage(),
+                    ['exception' => $e]
+                );
             } catch (ProcessSignaledException $e) {
-                @error_log('Process worker caught ProcessSignaledException: ' . $e->getMessage());
+                $this->logError(
+                    'Process worker caught ProcessSignaledException: ' . $e->getMessage(),
+                    ['exception' => $e]
+                );
                 /**
                  * Child process has been terminated by an uncaught signal.
                  */

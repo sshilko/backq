@@ -3,16 +3,27 @@
 namespace BackQ\Tests\Adapter;
 
 use BackQ\Adapter\AbstractAdapter;
+use BackQ\Adapter\Beanstalk;
 use BackQ\Tests\Support\TestAdapter;
 use Error;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use ReflectionClass;
 
 class AbstractAdapterTest extends TestCase
 {
-    public function testJobTtrDefaultConstant(): void
+    public function testBaseClassDeclaresNoConfigurationConstant(): void
     {
-        $this->assertSame(60, AbstractAdapter::JOBTTR_DEFAULT);
+        /**
+         * A default is adapter configuration, not part of the contract: Beanstalk puts a TTR
+         * on the job it reserves. The base class only knows the methods.
+         */
+        $this->assertArrayNotHasKey('JOBTTR_DEFAULT', (new ReflectionClass(AbstractAdapter::class))->getConstants());
+    }
+
+    public function testJobTtrDefaultIsDeclaredByTheAdapterThatUsesIt(): void
+    {
+        $this->assertSame(60, Beanstalk::JOBTTR_DEFAULT);
     }
 
     public function testStringBodyIsAcceptedByTheStringableParameter(): void
@@ -30,14 +41,30 @@ class AbstractAdapterTest extends TestCase
         (new TestAdapter())->putTask('body', jobttr: 5);
     }
 
+    public function testLoggerIsInjectedThroughTheConstructor(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with('injected');
+
+        (new TestAdapter($logger))->logError('injected');
+    }
+
+    public function testSetLoggerStillAssignsTheDeprecatedSetter(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with('setter');
+
+        $adapter = new TestAdapter();
+        $adapter->setLogger($logger);
+        $adapter->logError('setter');
+    }
+
     public function testLogInfoForwardsToLogger(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects($this->once())->method('info')->with('hello');
 
-        $adapter = new TestAdapter();
-        $adapter->setLogger($logger);
-        $adapter->logInfo('hello');
+        (new TestAdapter($logger))->logInfo('hello');
     }
 
     public function testLogDebugForwardsToLogger(): void
@@ -45,9 +72,7 @@ class AbstractAdapterTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects($this->once())->method('debug')->with('trace');
 
-        $adapter = new TestAdapter();
-        $adapter->setLogger($logger);
-        $adapter->logDebug('trace');
+        (new TestAdapter($logger))->logDebug('trace');
     }
 
     public function testLogErrorForwardsToLogger(): void
@@ -55,9 +80,7 @@ class AbstractAdapterTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects($this->once())->method('error')->with('failure');
 
-        $adapter = new TestAdapter();
-        $adapter->setLogger($logger);
-        $adapter->logError('failure');
+        (new TestAdapter($logger))->logError('failure');
     }
 
     public function testLogErrorIsSilentWithoutLogger(): void

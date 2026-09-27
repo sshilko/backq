@@ -3,11 +3,12 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+
 use BackQ\Adapter\Beanstalk;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
@@ -24,8 +25,8 @@ $queue = 'hello-world';
 $beanstalkdHost = getenv('BACKQ_BEANSTALKD_HOST') ?: '127.0.0.1';
 $beanstalkdPort = (int) (getenv('BACKQ_BEANSTALKD_PORT') ?: 11300);
 
-$beanstalkdsub = new Beanstalk();
-$beanstalkdsub->setLogger(new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG)));
+$logger        = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
+$beanstalkdsub = new Beanstalk($logger);
 $beanstalkdsub->logInfo('Starting');
 $beanstalkdsub->setWorkTimeout(5);
 if (!$beanstalkdsub->connect($beanstalkdHost, $beanstalkdPort)) {

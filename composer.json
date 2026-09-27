@@ -19,7 +19,7 @@
         },
         "prepend-autoloader": false,
         "optimize-autoloader": true,
-        "classmap-authoritative": true,
+        "classmap-authoritative": false,
         "process-timeout": 360,
         "sort-packages": true,
         "allow-plugins": {
@@ -36,16 +36,11 @@
     "keywords": [
         "queue",
         "worker",
-        "apns",
-        "push",
-        "ios",
-        "fcm",
-        "apple",
         "guzzle",
         "process",
-        "notification",
-        "sqs",
-        "dynamodb",
+        "beanstalk",
+        "redis",
+        "mysql",
         "send",
         "background",
         "async"
@@ -53,13 +48,13 @@
     "homepage": "https://github.com/sshilko/backq",
     "require": {
         "php": ">=8.3",
-        "ext-redis": "*",
-        "ext-xml": "*",
         "ext-dom": "*",
         "ext-mbstring": "*",
         "ext-mysqli": "*",
-        "aws/aws-sdk-php": "^3",
+        "ext-redis": "*",
+        "ext-xml": "*",
         "davidpersson/beanstalk": "^2",
+        "guzzlehttp/guzzle": "^7",
         "guzzlehttp/psr7": "^2",
         "illuminate/queue": "^10",
         "illuminate/redis": "^10",
@@ -96,10 +91,10 @@
     },
     "scripts": {
         "app-up": [
-            "docker compose -f build/docker-compose.yaml up -d --wait --remove-orphans redis nsq app-php83"
+            "docker compose -f build/docker-compose.yaml up -d --wait --remove-orphans redis app-php83"
         ],
         "app-down": [
-            "docker compose -f build/docker-compose.yaml down --remove-orphans redis nsq app-php83"
+            "docker compose -f build/docker-compose.yaml down --remove-orphans redis app-php83"
         ],
         "app-classes": [
             "@putenv XDEBUG_MODE=off",

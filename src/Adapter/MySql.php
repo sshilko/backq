@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
@@ -69,7 +69,7 @@ abstract class MySql extends AbstractAdapter
      */
     public function __construct(protected mysqli $db, protected JobConfig $config, ?LoggerInterface $logger = null)
     {
-        $this->logger = $logger;
+        parent::__construct($logger);
 
         /**
          * Nothing else to set up, the connection and the config are injected

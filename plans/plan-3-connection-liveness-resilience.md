@@ -1,6 +1,8 @@
 # Plan 3 — Connection liveness & worker resilience (findings 3.1 – 3.6)
 
 > Status: **implemented** — completed in the current working tree.
+> Amendment: 5.x removed the `Nsq` adapter, so the `src/Adapter/Nsq.php` notes below describe
+> code that no longer exists. The `Redis` and `Beanstalk` work still stands.
 >
 > **Implementation notes (current checkout):**
 > - Applied items 3.1–3.6 in code.

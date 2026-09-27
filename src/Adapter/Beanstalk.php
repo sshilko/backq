@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
@@ -12,6 +13,7 @@ namespace BackQ\Adapter;
 
 use BackQ\Adapter\Beanstalk\Client;
 use Override;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Stringable;
 use Throwable;
@@ -29,6 +31,8 @@ class Beanstalk extends AbstractAdapter
 
     public const PRIORITY_DEFAULT = 1024;
 
+    public const int JOBTTR_DEFAULT = 60;
+
     private Client $client;
 
     private $connected;
@@ -38,6 +42,14 @@ class Beanstalk extends AbstractAdapter
      *
      */
     private ?int $workTimeout = null;
+
+    /**
+     * @param LoggerInterface|null $logger the logger that receives the adapter messages
+     */
+    public function __construct(?LoggerInterface $logger = null)
+    {
+        parent::__construct($logger);
+    }
 
     /**
      * Connects adapter
@@ -51,11 +63,13 @@ class Beanstalk extends AbstractAdapter
         }
 
         try {
-            $bconfig = ['host' => $host,
+            $bconfig = [
+                'host' => $host,
                 'port' => $port,
                 'timeout' => $timeout,
                 'persistent' => $persistent,
-                'logger'  => ($logger ?: $this)];
+                'logger'  => ($logger ?: $this)
+            ];
 
             //$this->client = new \Beanstalk\Client($bconfig);
             $this->client = new Client($bconfig);

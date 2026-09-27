@@ -38,8 +38,9 @@ const EXIT_BROKEN = 1;
 const EXIT_USAGE = 2;
 
 /**
- * A class declaration is required: procedural helper scripts, such as
- * tests/Support/FakeNsqdServer.php, have no class to load.
+ * A class declaration is required. Every file under src/ and tests/ has one today, so this
+ * guard has no current user; it is kept so that a procedural helper script added later is
+ * skipped with a name instead of reported as a false failure.
  */
 const DECLARATION_PATTERN = '/^\s*(?:final\s+|abstract\s+|readonly\s+)*(?:class|interface|trait|enum)\s/mi';
 

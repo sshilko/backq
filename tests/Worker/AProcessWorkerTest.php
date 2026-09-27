@@ -3,6 +3,7 @@
 namespace BackQ\Tests\Worker;
 
 use BackQ\Message\Process;
+use BackQ\Tests\Support\LogAssertions;
 use BackQ\Tests\Support\ProcessExpiredMessage;
 use BackQ\Tests\Support\ProcessNotReadyMessage;
 use BackQ\Tests\Support\RecordingLogger;
@@ -12,44 +13,28 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use function array_column;
-use function file_exists;
-use function file_get_contents;
 use function implode;
-use function ini_get;
-use function ini_set;
 use function restore_error_handler;
 use function serialize;
 use function set_error_handler;
-use function tempnam;
 use function time;
-use function unlink;
 use const E_USER_WARNING;
 use const PHP_BINARY;
 
 class AProcessWorkerTest extends TestCase
 {
+
+    use LogAssertions;
+
     public function testRejectsUnsupportedPayloadAsSuccess(): void
     {
         $adapter                = new TestAdapter();
         $adapter->pickTaskResult = [13, 'not-a-process-message'];
 
-        $errorLog = tempnam(sys_get_temp_dir(), 'backqerr_');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $errorLog);
+        $logger = new RecordingLogger();
+        $this->runWorker($adapter, 1, $logger);
 
-        try {
-            $worker = new AProcess($adapter);
-            $worker->setLogger(new NullLogger());
-            $worker->setRestartThreshold(1);
-
-            $worker->run();
-        } finally {
-            ini_set('error_log', $previous);
-            if (file_exists($errorLog)) {
-                unlink($errorLog);
-            }
-        }
-
+        $this->assertLogged($logger, 'Worker does not support payload of');
         $this->assertContains(['afterWorkSuccess', 13], $adapter->calls);
         $this->assertContains('disconnect', $adapter->calls);
     }
@@ -179,25 +164,11 @@ class AProcessWorkerTest extends TestCase
         $adapter                = new TestAdapter();
         $adapter->pickTaskResult = [26, serialize(new Process([PHP_BINARY, '-r', 'usleep(400000);']))];
 
-        $errorLog = tempnam(sys_get_temp_dir(), 'backqerr_');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $errorLog);
+        $logger = new RecordingLogger();
+        $this->runWorker($adapter, 2, $logger);
 
-        try {
-            $worker = new AProcess($adapter);
-            $worker->setLogger(new NullLogger());
-            $worker->setRestartThreshold(2);
-
-            $worker->run();
-        } finally {
-            ini_set('error_log', $previous);
-        }
-
-        $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
-        unlink($errorLog);
-
-        $this->assertStringNotContainsString('Process worker exception', $loggedErrors);
-        $this->assertStringNotContainsString('Process worker failed to stop forked child', $loggedErrors);
+        $this->assertNotLogged($logger, 'Process worker exception');
+        $this->assertNotLogged($logger, 'Process worker failed to stop forked child');
         $this->assertContains('disconnect', $adapter->calls);
     }
 
@@ -210,24 +181,10 @@ class AProcessWorkerTest extends TestCase
             'pcntl_signal(SIGINT, function(){}); pcntl_async_signals(true); usleep(5000000);',
         ]))];
 
-        $errorLog = tempnam(sys_get_temp_dir(), 'backqerr_');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $errorLog);
+        $logger = new RecordingLogger();
+        $this->runWorker($adapter, 1, $logger);
 
-        try {
-            $worker = new AProcess($adapter);
-            $worker->setLogger(new NullLogger());
-            $worker->setRestartThreshold(1);
-
-            $worker->run();
-        } finally {
-            ini_set('error_log', $previous);
-        }
-
-        $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
-        unlink($errorLog);
-
-        $this->assertStringNotContainsString('Process worker failed to stop forked child', $loggedErrors);
+        $this->assertNotLogged($logger, 'Process worker failed to stop forked child');
         $this->assertContains('disconnect', $adapter->calls);
     }
 
@@ -238,20 +195,10 @@ class AProcessWorkerTest extends TestCase
             new Process([PHP_BINARY, '-r', 'usleep(500000);'], null, null, null, 0.01)
         )];
 
-        $errorLog = tempnam(sys_get_temp_dir(), 'backqerr_');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $errorLog);
+        $logger = new RecordingLogger();
+        $this->runWorker($adapter, 3, $logger);
 
-        try {
-            $this->runWorker($adapter, 3);
-        } finally {
-            ini_set('error_log', $previous);
-        }
-
-        $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
-        unlink($errorLog);
-
-        $this->assertStringContainsString('Process worker caught ProcessTimedOutException', $loggedErrors);
+        $this->assertLogged($logger, 'Process worker caught ProcessTimedOutException');
     }
 
     public function testWarnsWhenProcessKilledBySignalLeavesExitCode(): void
@@ -287,24 +234,10 @@ class AProcessWorkerTest extends TestCase
         $adapter->pickTaskResult = [30, 'garbage'];
         $adapter->afterWorkSuccessResult = false;
 
-        $errorLog = tempnam(sys_get_temp_dir(), 'backqerr_');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $errorLog);
+        $logger = new RecordingLogger();
+        $this->runWorker($adapter, 1, $logger);
 
-        try {
-            $worker = new AProcess($adapter);
-            $worker->setLogger(new NullLogger());
-            $worker->setRestartThreshold(1);
-
-            $worker->run();
-        } finally {
-            ini_set('error_log', $previous);
-        }
-
-        $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
-        unlink($errorLog);
-
-        $this->assertStringContainsString('Process worker exception', $loggedErrors);
+        $this->assertLogged($logger, 'Process worker exception');
         $this->assertContains('disconnect', $adapter->calls);
     }
 
@@ -315,24 +248,10 @@ class AProcessWorkerTest extends TestCase
             new Process([PHP_BINARY, '-r', 'exit(0);'], '/nonexistent/dir-no-such')
         )];
 
-        $errorLog = tempnam(sys_get_temp_dir(), 'backqerr_');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $errorLog);
+        $logger = new RecordingLogger();
+        $this->runWorker($adapter, 1, $logger);
 
-        try {
-            $worker = new AProcess($adapter);
-            $worker->setLogger(new NullLogger());
-            $worker->setRestartThreshold(1);
-
-            $worker->run();
-        } finally {
-            ini_set('error_log', $previous);
-        }
-
-        $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
-        unlink($errorLog);
-
-        $this->assertStringContainsString('Process worker failed to run', $loggedErrors);
+        $this->assertLogged($logger, 'Process worker failed to run');
         $this->assertContains(['afterWorkSuccess', 31], $adapter->calls);
         $this->assertContains('disconnect', $adapter->calls);
     }
@@ -344,24 +263,10 @@ class AProcessWorkerTest extends TestCase
             new Process([PHP_BINARY, '-r', 'usleep(500000);'], null, null, null, 0.05)
         )];
 
-        $errorLog = tempnam(sys_get_temp_dir(), 'backqerr_');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $errorLog);
+        $logger = new RecordingLogger();
+        $this->runWorker($adapter, 2, $logger);
 
-        try {
-            $worker = new AProcess($adapter);
-            $worker->setLogger(new NullLogger());
-            $worker->setRestartThreshold(2);
-
-            $worker->run();
-        } finally {
-            ini_set('error_log', $previous);
-        }
-
-        $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
-        unlink($errorLog);
-
-        $this->assertStringContainsString('Process worker failed to stop forked child', $loggedErrors);
+        $this->assertLogged($logger, 'Process worker failed to stop forked child');
         $this->assertContains('disconnect', $adapter->calls);
     }
 

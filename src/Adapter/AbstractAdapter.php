@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
@@ -16,9 +17,6 @@ use Throwable;
 
 abstract class AbstractAdapter
 {
-    public const int JOBTTR_DEFAULT = 60;
-
-    protected ?LoggerInterface $logger = null;
 
     /**
      * Connect to server
@@ -106,6 +104,18 @@ abstract class AbstractAdapter
     abstract public function setWorkTimeout(?int $seconds = null): void;
 
     /**
+     * @param LoggerInterface|null $logger the logger that receives the adapter messages
+     */
+    public function __construct(protected ?LoggerInterface $logger = null)
+    {
+    }
+
+    /**
+     * @deprecated inject the logger instead: new Beanstalk(logger: $logger)
+     *
+     * Still functional, so existing code keeps logging. Nothing announces the deprecation at
+     * runtime: this library reports through PSR-3, and a PHP notice is not a channel it uses.
+     *
      * @param LoggerInterface $logger
      */
     public function setLogger(LoggerInterface $logger): void

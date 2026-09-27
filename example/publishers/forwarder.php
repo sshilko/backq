@@ -3,7 +3,7 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
@@ -27,8 +27,7 @@ require_once __DIR__ . '/lib/myguzzlepublisher.php';
 
 
 $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$adapter = new Beanstalk();
-$adapter->setLogger($logger);
+$adapter = new Beanstalk($logger);
 
 $publisher = new MyGuzzlePublisher($adapter);
 if ($publisher->start()) {

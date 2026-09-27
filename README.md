@@ -26,10 +26,8 @@ BackQ separates job **publication** from job **processing**:
 - **Workers** are long-running processes that pull jobs off the queue and execute
   them — as OS processes, asynchronous PSR-7 HTTP requests, or closure payloads.
 
-Two queue backends are production-ready: **Beanstalkd** and **Redis**.
-
-Two more ship as **beta** — NSQ and DynamoDB + SQS (`DynamoSQS`); see
-[Experimental backends](#experimental-backends-beta)
+Two queue backends are production-ready: **Beanstalkd** and **Redis**. A third,
+`MySql`, keeps the queue in a MySQL table instead of a queue server.
 
 ### How a job travels
 
@@ -49,7 +47,7 @@ other end:
                                  ┌─────────▼─────────┐
                                  │   Queue server    │   QUEUE SERVER BACKEND
                                  │ Redis | Beanstalkd│
-                                 │ Nsq | DynamoDB+SQS│
+                                 │ MySql            │
                                  └─────────┬─────────┘
                                            │
                                            ▼
@@ -96,8 +94,8 @@ against Beanstalkd runs unchanged on Redis, and vice versa.
 - **Extendable by design.** Write your own `Worker`, `Publisher` or `Message` and
   reuse the existing adapters out of the box.
 - **Quality gate enforced by CI.** Every pull request is validated inside the
-  dockerized PHP 8.3 app: PHPUnit (199 tests, including live Redis and NSQ
-  integration) plus a six-tool static-analysis stack — PHPStan, Psalm
+  dockerized PHP 8.3 app: PHPUnit (including live Redis integration) plus a
+  six-tool static-analysis stack — PHPStan, Psalm
   (`errorLevel=3`, suppressions disabled), Phan, PHPMD, PDepend and PHP_CodeSniffer
   (PSR-12).
 
@@ -146,25 +144,17 @@ them from a clone of this repository. In your own project, depend on
 |---|---|---|
 | `Beanstalk` | stable | [Beanstalkd](https://github.com/kr/beanstalkd/blob/master/doc/protocol.txt) |
 | `Redis` | stable | [Redis](https://redis.io) |
-| `Nsq` | **beta** | [NSQ](https://nsq.io) |
-| `DynamoSQS` | **beta** | [DynamoDB](https://aws.amazon.com/dynamodb/) + [SQS](https://aws.amazon.com/sqs/) (+ [Lambda](https://aws.amazon.com/lambda/) for scheduled stream processing) |
-
-`Nsq` and `DynamoSQS` are beta: the API is complete and covered by tests, but they
-are not the recommended default for new projects. They are documented separately
-under [Experimental backends (beta)](#experimental-backends-beta).
+| `MySql` | stable | [MySQL](https://www.mysql.com) (needs `ext-mysqli`) |
 
 ## Workers and adapters
 
 ### Worker compatibility
 
-| Adapter / Worker | [Process](http://symfony.com/doc/current/components/process.html) | [Guzzle](https://www.php-fig.org/psr/psr-7/) | Serialized | [AWS SNS](https://aws.amazon.com/sns/) | [Closure](https://github.com/opis/closure) |
-|---|---|---|---|---|---|
-| [Beanstalkd](https://beanstalkd.github.io/) — stable | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [Redis](https://redis.io) — stable | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [NSQ](https://nsq.io/) — beta | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [DynamoSQS](https://aws.amazon.com/) — beta | ✓ | ✓ | ✓ | ? | ✓ |
-
-`?` — the DynamoSQS/SNS combination is not covered by the test suite.
+| Adapter / Worker | [Process](http://symfony.com/doc/current/components/process.html) | [Guzzle](https://www.php-fig.org/psr/psr-7/) | Serialized | [Closure](https://github.com/opis/closure) |
+|---|---|---|---|---|
+| [Beanstalkd](https://beanstalkd.github.io/) — stable | ✓ | ✓ | ✓ | ✓ |
+| [Redis](https://redis.io) — stable | ✓ | ✓ | ✓ | ✓ |
+| [MySQL](https://www.mysql.com) — stable | ✓ | ✓ | ✓ | ✓ |
 
 ### Adapter features
 
@@ -172,16 +162,13 @@ under [Experimental backends (beta)](#experimental-backends-beta).
 |---|---|---|---|
 | [Beanstalkd](https://beanstalkd.github.io/) — stable | ✓ | ✓ | ✓ |
 | [Redis](https://redis.io) — stable | ✓ | * | ✓ |
-| [NSQ](https://nsq.io/) — beta | ✓ | * | * |
-| [DynamoSQS](https://aws.amazon.com/) — beta | * | * | ✓ |
+| [MySQL](https://www.mysql.com) — stable | ✓ | * | * |
 
 `*` — unsupported/partial:
-- `NSQ::ping()` only reflects an already-open connection;
-- `NSQ::setWorkTimeout()` is accepted but not applied by the
-server protocol.
-
-- `DynamoSQS::ping()` always returns `true`.
 - `Redis::hasWorkers()` is a stub,
+- `MySql::hasWorkers()` always returns `true`,
+- `MySql::setWorkTimeout()` is accepted but not applied — idle timeouts are a
+  worker concern, and the MySQL queue is shared through the table.
 
 ### Worker controls
 
@@ -275,7 +262,7 @@ The project ships a PHPUnit suite under `tests/` covering adapters, workers,
 publishers and messages.
 
 ```bash
-# start / stop the dev stack: the app-php83 container plus redis and nsq
+# start / stop the dev stack: the app-php83 container plus redis
 composer app-up
 composer app-down
 
@@ -292,12 +279,12 @@ docker compose -f build/docker-compose.yaml exec -T app-php83 composer app-code-
 ```
 
 `composer app-tests-local` runs the suite against whatever PHP is on the host. It needs
-`mbstring` and a reachable Redis and NSQ; `phpunit.xml` sets `failOnSkipped="true"`, so an
-unreachable service fails the run rather than skipping. Point the tests at the ports
+`mbstring` and a reachable Redis; `phpunit.xml` sets `failOnSkipped="true"`, so an
+unreachable service fails the run rather than skipping. Point the tests at the port
 `build/docker-compose.yaml` publishes on the host:
 
 ```bash
-BACKQ_REDIS_PORT=16379 BACKQ_NSQD_HOST=127.0.0.1 BACKQ_NSQD_PORT=14150 composer app-tests-local
+BACKQ_REDIS_PORT=16379 composer app-tests-local
 ```
 
 The same suite runs on every pull request in
@@ -317,48 +304,9 @@ for usage examples of the stable adapters:
   point at, so they run without any external HTTP service
 
 The Redis examples run against the dockerized service from
-`build/docker-compose.yaml`.
-
-NSQ and AWS (DynamoSQS, SNS) examples are not listed here — see
-[Experimental backends (beta)](#experimental-backends-beta).
-
-## Experimental backends (beta)
-
-Everything on this page is **beta**: supported, tested, and usable, but not the
-recommended default for new projects. It is not covered by the compatibility
-promise v5 gives the stable Beanstalkd and Redis adapters, and the API may still
-change.
-
-### NSQ
-
-- Adapter: `BackQ\Adapter\Nsq` — the TCP protocol is implemented in-repo.
-- Strength: NSQ ships a built-in dashboard showing queue status in real time.
-- Weaknesses: lower throughput than Redis/Beanstalkd, no `setWorkTimeout` support in
-  the protocol, `hasWorkers()` is a stub. Per `UPGRADING` the adapter has not been a
-  focus of maintenance for a long time.
-- Status: beta. Continue using it if it already fits your stack.
-
-### DynamoDB + SQS (`DynamoSQS`)
-
-- Adapter: `BackQ\Adapter\DynamoSQS` — DynamoDB stores the job, SQS delivers it,
-  and [DynamoDB Time-to-Live](https://aws.amazon.com/blogs/aws/new-manage-dynamodb-items-using-time-to-live-ttl/)
-  plus a Lambda stream trigger move due jobs into the SQS queue.
-- Strength: reliable long-delay scheduling — jobs planned far into the future wait
-  as DynamoDB items, without holding a clock, a worker or a connection open. This
-  is what the [`Serialized` worker](#the-serialized-worker-a-proxy-worker) exists
-  for.
-- Weaknesses: the most moving parts of any adapter (DynamoDB, a stream, a Lambda
-  function, SQS), `ping()` always returns `true`, `hasWorkers()` is a stub, and the
-  SNS worker combination is not covered by tests.
-- Status: beta.
-
-### AWS SNS push notifications
-
-- Publishers and workers: `BackQ\Publisher\Amazon\SNS\...` /
-  `BackQ\Worker\Amazon\SNS\...` — dedicated `Publish` / `Register` / `Remove` workers
-  that send platform notifications through SNS endpoint ARNs.
-- Status: beta. An alternative for new projects is the FCM HTTP v1 API or the APNs
-  HTTP/2 provider API directly.
+`build/docker-compose.yaml`. The `MySql` adapter has no example: it needs an
+established `mysqli` link and a job table, so it is exercised by the test suite
+instead — see `UPGRADING` for its constructor.
 
 ## License
 

@@ -1,6 +1,8 @@
 # Plan 4 — Minor notes & API behavior (findings 4.1 – 4.3)
 
 > Status: **implemented** — completed and merged in PR #11.
+> Amendment: 5.x removed the `Nsq` adapter, so any NSQ reference below describes code that no
+> longer exists.
 > Scope: section 4 of the analysis report (minor defects / contract mismatches).
 > Companion plans: `plan-1-protocol-tcp-frame-handling.md`, `plan-2-network-ssl-disconnects.md`,
 > `plan-3-connection-liveness-resilience.md`.

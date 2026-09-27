@@ -3,11 +3,12 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+
 use BackQ\Adapter\Beanstalk;
 use BackQ\Publisher\Process;
 use Symfony\Component\Console\Logger\ConsoleLogger;
@@ -29,8 +30,7 @@ final class MyProcessPublisher extends Process
     public static function createAdapter(): Beanstalk
     {
         $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-        $adapter = new Beanstalk();
-        $adapter->setLogger($logger);
+        $adapter = new Beanstalk($logger);
 
         return $adapter;
     }

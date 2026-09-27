@@ -1,12 +1,27 @@
 # Plan 6 — Deprecate every `error_log()` call in `src/`
 
-> Status: **proposed** — design chosen (route to PSR-3, level `error`). Not implemented yet.
+> Status: **implemented** — items 6.1–6.6 and 6.8 are done; 6.7 (`src/FileLogger.php`) is
+> deferred to a second PR, as the plan itself proposes.
 > Scope: the 9 `@error_log()` call sites in 4 files, the `logError()` helper that replaces them, the
 > 12 tests that capture the PHP error log, the phpcs rule that stops the pattern from coming back,
 > and the `UPGRADING` entry.
 > Companion plans: `plan-1-protocol-tcp-frame-handling.md`, `plan-2-network-ssl-disconnects.md`,
 > `plan-3-connection-liveness-resilience.md`, `plan-4-minor-notes-behavior.md`,
 > `plan-5-put-task-contract.md`.
+>
+> **Amended while implementing:** the inventory below is stale in two places, because the
+> `Amazon\SNS` workers (item 6.3) and the NSQ adapter were removed in the same 5.x series.
+> 3 of the 9 call sites and 3 of the 12 tests went with them, so **6 sites remained, all in
+> `AProcess`**, and **9 tests** (`AProcessWorkerTest` ×7, `GuzzleWorkerTest` ×2). Item 6.6 was
+> already satisfied: `build/php.ini:30` is committed as `;error_log=/dev/null`, commented out,
+> and the container reports `error_log => no value`. Item 6.5 additionally fired on the
+> `@`-silenced calls, as predicted. Item 6.1 landed as written. Two more details in the body
+> are stale: the item 6.4 trait snippet uses an arrow function, which
+> `build/phpcs-ruleset.xml` forbids via `SlevomatCodingStandard.Functions.DisallowArrowFunction`
+> (write it as a `static function` closure), and item 6.4's suggestion to keep the
+> `assertNotLogged($logger, 'Error while sending FCM')` guard was replaced by a stronger
+> assertion — that string exists nowhere in `src/`, so the needle match is vacuous; the test
+> now asserts that a refused connection produces **no** `error`-level record at all.
 
 ## The problem
 

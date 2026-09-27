@@ -3,18 +3,92 @@
 
 1. Backward Incompatible Changes
 2. New Features
+3. Deprecated Functionality
 
 ========================================
 1. Backward Incompatible Changes
 ========================================
 
 - PHP: minimum supported version is now `>= 8.3` (was `>= 8.1`).
+- `BackQ\Adapter\Nsq` is **removed**, and with it the in-repo NSQ TCP protocol
+  implementation. The adapter was deprecated back in 2.0.6 and has shipped as
+  beta without a maintainer since; 5.x drops it rather than carry it untested.
+  Gone from the release: the `BackQ\Adapter\Nsq` class, `example/adapter/nsq/`
+  and every `example/**/nsq.php` pair, the `nsq` service in
+  `build/docker-compose.yaml`, the `BACKQ_NSQD_HOST` / `BACKQ_NSQD_PORT`
+  environment variables, and the NSQ test suite. Workers, publishers and
+  messages written against NSQ need no rewrite beyond the adapter they are
+  handed: `AbstractAdapter` is the contract they program to, so passing a
+  `Beanstalk` or `Redis` instance is the whole migration. To keep using NSQ,
+  stay on the 4.x line.
+- **The whole AWS surface is removed**: the `DynamoSQS` adapter, the
+  `Amazon\SNS` push-notification feature, and the `aws/aws-sdk-php`
+  dependency. Every AWS class is gone —
+
+  | Removed | Was |
+  |---|---|
+  | `BackQ\Adapter\DynamoSQS` | the DynamoDB + SQS queue adapter |
+  | `BackQ\Adapter\Amazon\DynamoDb\QueueTableRow` | its DynamoDB row helper |
+  | `BackQ\Message\Amazon\SNS\Application\PlatformEndpoint\*` | the `Publish` / `Register` / `Remove` messages and their interfaces |
+  | `BackQ\Publisher\Amazon\SNS\Application\PlatformEndpoint\*` | the matching publishers |
+  | `BackQ\Worker\Amazon\SNS\*` | the `SnsClient`, its exceptions, and the `Application` / `PlatformEndpoint` workers |
+
+  Also gone: `example/adapter/dynamosqs/` and `example/workers/amazon/`, their
+  test suites, and the `aws`, `dynamodb`, `sqs`, `apns`, `fcm` and `apple`
+  Packagist keywords. Nothing in the library needs AWS any more, so
+  `aws/aws-sdk-php` is no longer installed for you — a meaningful dependency
+  reduction.
+
+  The SNS workers were **push** workers, not queue consumers: they published to
+  an SNS endpoint ARN and never touched DynamoDB, so they were independent of
+  `DynamoSQS` and were dropped as a separate feature. Replace them with the
+  provider APIs directly (FCM HTTP v1, APNs HTTP/2). To keep any of this, stay
+  on the 4.x line.
+
+  Migration for the `DynamoSQS` adapter: it was the only backend providing
+  reliable long-delay scheduling (jobs waited as DynamoDB items driven by TTL
+  plus a Lambda stream trigger). The [`Serialized`
+  worker](README.md#the-serialized-worker-a-proxy-worker) covers the same need
+  on any surviving adapter.
+- `guzzlehttp/guzzle` is now a **direct** dependency (`^7`), where it was
+  previously pulled in only as a transitive dependency of `aws/aws-sdk-php`.
+  `BackQ\Worker\Guzzle` and `BackQ\Worker\GuzzleForwarder` use
+  `GuzzleHttp\Client`, so dropping the AWS SDK would otherwise have removed a
+  package the library imports directly. No action needed if you already relied
+  on the transitive copy.
 - `BackQ\Adapter\AbstractAdapter::hasWorkers($queue)` is narrowed to `bool`
   (was `bool|int|null`). Concrete adapters return real values where the backend
-  supports the check and `false` elsewhere: `Redis`, `Nsq` and `DynamoSQS`
-  report "no workers" (a documented stub contract), `Beanstalk` implements the
-  check against real tube stats. Subclasses overriding `hasWorkers()` must
-  declare a `bool` return type.
+  supports the check and `false` elsewhere: `Redis`
+  reports "no workers" (a documented stub contract), `Beanstalk` implements the
+  check against real tube stats, and `MySql` reports `true`. Subclasses
+  overriding `hasWorkers()` must declare a `bool` return type.
+- **The process worker no longer writes to the PHP error log.** `BackQ\Worker\AProcess`
+  reports unsupported payloads, child-launch failures, fork-cleanup failures,
+  timeouts, signals and outer-loop failures through the PSR-3 logger set with
+  `setLogger()`, at level `error`, instead of `@error_log()`. Code that watched
+  `php.ini`'s `error_log` destination (journald, a web-server error log, `php-fpm`)
+  for these messages must switch to a PSR-3 handler, or pass a file-writing
+  logger to `setLogger()`.
+
+  `logError()` is a no-op when no logger is set, so `setLogger(null)` now
+  silences these messages completely — where `error_log()` used to keep
+  reporting them. By default they land in the `ConsoleLogger` that
+  `AbstractWorker::__construct()` installs, so under supervisor or
+  `docker logs` they are still visible.
+
+  `AProcess` was the only remaining `error_log()` caller in 5.x: the NSQ and
+  `Amazon\SNS` workers that shared the pattern are removed, and
+  `src/Worker/Guzzle.php` never had one. `build/phpcs-ruleset.xml` now forbids
+  the `error_log` function outright, so it cannot come back.
+- `BackQ\Worker\AbstractWorker::logError()` gained an optional
+  `array $context = []` second parameter, forwarded to
+  `Psr\Log\LoggerInterface::error()`. The former `@error_log()` call sites now
+  pass the caught exception as `['exception' => $e]`, so a PSR-3 handler gets the
+  type, the code and the `previous` chain instead of a concatenated message
+  string. Subclasses overriding `logError(string $message)` are unaffected (the
+  parameter is optional and nothing in the library overrides the method), but a
+  subclass that declared a *narrower* signature must match. `logInfo()` and
+  `logDebug()` are unchanged.
 - `BackQ\Adapter\AbstractAdapter` method parameters are now typed (were untyped):
   - `bindRead(string $queue)`, `bindWrite(string $queue)`,
     `hasWorkers(string $queue)`
@@ -41,8 +115,6 @@
   |---|---|---|
   | `Beanstalk` | `putTask($body, int $readyWait = 0, ?int $jobTtr = null, ?int $priority = null)` | `string\|Throwable` |
   | `Redis` | `putTask($body, int $readyWait = 0)` | `string\|Throwable` |
-  | `Nsq` | `putTask($body, int $readyWait = 0, ?int $jobTtr = null)` | `null\|Throwable` |
-  | `DynamoSQS` | `putTask($body, int $readyWait = 0, int\|string\|null $messageId = null)` | `null\|Throwable` |
   | `MySql` | `putTask($body, int\|string\|null $jobId = null, bool $putAsDone = false, bool $noSleep = false)` | `string\|Throwable` |
 
   Migration:
@@ -66,8 +138,8 @@
   - `false` is no longer a put result anywhere. A transport or storage failure
     comes back as the `Throwable`, so the type, message and previous chain
     survive. An **invalid argument still throws** (an out-of-range `jobTtr`, a
-    `$readyWait` above `max_req_timeout`, an unprocessable DynamoDB TTL, a
-    missing `MySql` job id), because that is a bug in the caller.
+    `$readyWait` above `max_req_timeout`, a missing `MySql` job id), because
+    that is a bug in the caller.
   - **A `Throwable` is truthy.** `if ($publisher->publish($m))` now reads a
     failure as success. Test `instanceof Throwable` instead:
 
@@ -85,34 +157,39 @@
     payload holds the retired `jobttr` / `readywait` keys and the worker logs
     `Error: Unknown named parameter`. Drain or purge the `serialized` queue
     across the upgrade.
+  - `BackQ\Publisher\Serialized`'s default queue name is now `serialized` (was
+    `mydynamodbtablenameandsqsqueuename`, a placeholder from when DynamoDB + SQS
+    was the adapter it was written for). Anyone relying on the old default must
+    pass the queue name explicitly.
   - `MySql::putTask()` `$jobId` is nullable only because PHP forbids appending a
     required parameter to an inherited method; a call without a usable id returns
     an `InvalidArgumentException`. Callers that always hold an id should call the
     new `MySql::putTaskTo(int|string $jobId, string|Stringable $body, bool $putAsDone = false, bool $noSleep = false)`.
   - Constants removed, all replaced by the parameter of the same meaning:
     `AbstractAdapter::PARAM_JOBTTR`, `AbstractAdapter::PARAM_READYWAIT`,
-    `Beanstalk::PARAM_PRIORITY`, `DynamoSQS::PARAM_MESSAGE_ID`.
-    `AbstractAdapter::JOBTTR_DEFAULT` and `Beanstalk::PRIORITY_DEFAULT` stay and
-    now seed the `$jobTtr` / `$priority` defaults.
+    `Beanstalk::PARAM_PRIORITY`. (`DynamoSQS::PARAM_MESSAGE_ID` went with the
+    adapter.)
+  - `AbstractAdapter::JOBTTR_DEFAULT` is removed. A TTR default is adapter
+    configuration, not part of the base contract, so the adapter that has one
+    declares it: `Beanstalk::JOBTTR_DEFAULT`, which seeds the `$jobTtr` default
+    of `putTask()`. It is `60`, and code that read the constant off the base
+    class, `AbstractAdapter::JOBTTR_DEFAULT`, now reads
+    `Beanstalk::JOBTTR_DEFAULT`. `Beanstalk::PRIORITY_DEFAULT` stays and now
+    seeds the `$priority` default.
   - `Redis::putTask()` still accepts no TTR: the adapter applies the timeout on
     pick, because `migrate()` only reaps rotten and delayed jobs on pop/pick.
 - `BackQ\Worker\AbstractWorker::work()` now treats `pickTask() === false` as
   an idle cycle, including when no work timeout is configured. Adapters must
   throw on real connection failures instead of returning `false`; Beanstalk
-  and DynamoSQS transport failures now propagate to the worker.
-- `BackQ\Adapter\Nsq::ping()` now reports a healthy socket as `true` and a
-  broken socket as `false`. Failed NSQ jobs are requeued with a 1-second delay
-  instead of immediately.
+  transport failures now propagate to the worker.
 - `BackQ\Adapter\Redis::ping()` returns `false` when the Redis connection
-  check fails. `BackQ\Adapter\DynamoSQS::afterWorkSuccess()` returns `false`
-  when SQS cannot delete the message, so the worker can restart and retry
-  instead of treating the acknowledgement as successful.
+  check fails.
 - `BackQ\Publisher\AbstractPublisher::ready()` is narrowed to `bool` (was
   untyped; it returned `null` before `start()`). The bound path is unchanged;
   callers and subclasses overriding `ready()` must use a `bool` return type.
 - `BackQ\Worker\AbstractWorker::$workTimeout` is now typed `?int` (was untyped,
-  default `null`). Child classes that assign an `int` (such as the SNS workers'
-  `= 5`) must declare `?int $workTimeout`.
+  default `null`). Child classes that assign an `int` must declare
+  `?int $workTimeout`.
 - `BackQ\Publisher\AbstractPublisher` takes the adapter through the constructor,
   mirroring `AbstractWorker`:
   - `__construct(?AbstractAdapter $adapter = null)` is now
@@ -132,8 +209,6 @@
     in its own `__wakeup()` — see `example/publishers/lib/*processpublisher.php`.
 - Deprecated/dead API removed:
   - `BackQ\Worker\AbstractWorker::debug()` (use `logDebug()`)
-  - NSQ `info()`/`error()` aliases on `BackQ\Adapter\Nsq` (use the PSR-3
-    `logInfo()`/`logError()` methods)
   - `BackQ\Adapter\Beanstalk::pickTasks()` (dead, unused)
   - `BackQ\Adapter\AbstractAdapter::setTriggerErrorOnError()` and
     `BackQ\Worker\AbstractWorker::setTriggerErrorOnError()`, together with the
@@ -167,19 +242,15 @@
     (`READ_EOF_CODE` / `READ_TIME_CODE`) on a short read instead of silently
     returning fewer than the requested number of bytes, and never reads past
     the requested length.
-  - `BackQ\Adapter\Nsq` rejects a frame whose declared size is `< 4` or
-    greater than `MAX_FRAME_SIZE` (16 MiB) with an `Invalid frame size`
-    `RuntimeException`, instead of attempting the read and desynchronising or
-    exhausting memory.
 
 ========================================
 2. New Features
 ========================================
 
 - `BackQ\Adapter\ConnectionState`: backed `int` enum (`Nothing` = 0,
-  `BindWrite` = 1, `BindRead` = 2) used internally by the `Redis` and `Nsq`
-  adapters for the connection state machine. The legacy `STATE_*` integer
-  constants on both adapters are kept for backward compatibility.
+  `BindWrite` = 1, `BindRead` = 2) used internally by the `Redis`
+  adapter for the connection state machine. The legacy `STATE_*` integer
+  constants on the adapter are kept for backward compatibility.
 - `BackQ\Message\Generic::$data` and `getData()` are typed (`mixed`).
 - `BackQ\Adapter\MySql`: new adapter that keeps the queue in a MySQL table
   instead of a queue server. It receives an established `mysqli` link through
@@ -193,8 +264,7 @@
   `pickTask()` catches them, rolls the transaction back and returns `false`,
   while `putTask()` catches them, rolls the transaction back and returns the
   exception. `afterWorkSuccess()` and `afterWorkFailed()` report `false`
-  instead of throwing, so an acknowledgement never breaks the worker loop. The
-  inherited `setLogger()` still works.
+  instead of throwing, so an acknowledgement never breaks the worker loop.
 - `BackQ\Adapter\MySql\JobState` and `BackQ\Adapter\MySql\JobColumn`: backed
   `string` enums for the job states of the `sync` column (`Wait` = `WAIT`,
   `Lock` = `LOCK`, `Done` = `DONE`, `Hold` = `HOLD`) and for the columns the
@@ -209,11 +279,41 @@
   (`new MySqlAdapter($db, new JobConfig(), $logger)`). All defaults are
   unchanged. Subclasses that overrode the sleep properties now pass a
   `JobConfig` with their own values instead.
-- `json_validate()` in place of `@json_decode(...)` + `is_array` checks in
-  `BackQ\Adapter\DynamoSQS` and `BackQ\Adapter\Amazon\DynamoDb\QueueTableRow`.
+- `json_validate()` in place of `@json_decode(...)` + `is_array` checks.
+- `BackQ\Adapter\AbstractAdapter::__construct(?LoggerInterface $logger = null)`
+  takes the PSR-3 logger, so an adapter is fully configured by the caller
+  instead of being mutated after construction. Every adapter forwards it to
+  `parent::__construct()` as its **last** constructor argument, so the new
+  parameter is appended and no existing call site breaks:
+
+  ```php
+  new Beanstalk($logger);
+  new Redis($host, $port, logger: $logger);
+  new MySqlAdapter($db, new JobConfig(), $logger);   // unchanged
+  ```
+
+  A custom adapter that declares its own constructor must call
+  `parent::__construct($logger)`; without it the logger is silently dropped.
+  `Beanstalk` and `PersistentBeanstalk` had no constructor and gained one.
+
+========================================
+3. Deprecated Functionality
+========================================
+
+- `BackQ\Adapter\AbstractAdapter::setLogger()` is `@deprecated`: pass the logger
+  to the constructor instead (`new Beanstalk($logger)`). It
+  keeps working, so upgrading changes no behaviour, and the deprecation is
+  docblock-only — nothing is emitted at runtime, because this library does not
+  call `trigger_error()`. The setter of `BackQ\Worker\AbstractWorker` is not
+  deprecated.
 
 ------------------------------------------------------------------------------
 3.x -> 4.x (PHP 8.1 modernization)
+
+> This section is a historical record of the 4.x release, which was never published.
+> Its `Amazon\SNS` replacement advice is **stale**: 5.x removed the whole AWS surface
+> (see the 4.x → 5.x section above), so those SNS classes no longer exist. Use the APNs
+> HTTP/2 or FCM HTTP v1 provider APIs directly.
 
 1. Backward Incompatible Changes
 2. New Features

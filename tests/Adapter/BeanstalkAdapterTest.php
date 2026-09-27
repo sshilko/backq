@@ -220,9 +220,8 @@ class BeanstalkAdapterTest extends TestCase
         $port = (int) substr((string) $name, (int) strrpos((string) $name, ':') + 1);
         fclose($server);
 
-        $logger = new RecordingLogger();
-        $adapter = new Beanstalk();
-        $adapter->setLogger($logger);
+        $logger  = new RecordingLogger();
+        $adapter = new Beanstalk($logger);
 
         $this->assertFalse($adapter->connect('127.0.0.1', $port));
 

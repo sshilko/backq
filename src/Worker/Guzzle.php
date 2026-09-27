@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
@@ -28,7 +29,7 @@ final class Guzzle extends AbstractWorker
     public ?int $workTimeout = 4;
 
     protected string $queueName = 'guzzle';
-    
+
     /**
      * @phpcs:disable SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
      */
@@ -101,18 +102,17 @@ final class Guzzle extends AbstractWorker
                         $promise = $client->sendAsync($request)->then(
                             static function (ResponseInterface $fulfilledResponse) use ($me): void {
                                 $me->logDebug('Request sent, got response ' . $fulfilledResponse->getStatusCode() .
-                                         ' ' . json_encode(
-                                             (string) $fulfilledResponse->getBody(),
-                                             JSON_THROW_ON_ERROR
-                                         ));
+                                    ' ' . json_encode(
+                                        (string) $fulfilledResponse->getBody(),
+                                        JSON_THROW_ON_ERROR
+                                    ));
                             },
                             static function (Throwable $rejectedResponse) use ($me, &$processed): void {
                                 $me->logDebug('Request sent, FAILED with ' . $rejectedResponse->getMessage());
                                 if (!(
-                                        $rejectedResponse instanceof RequestException
-                                        && null !== $rejectedResponse->getResponse()
-                                    )
-                                ) {
+                                    $rejectedResponse instanceof RequestException
+                                    && null !== $rejectedResponse->getResponse()
+                                )) {
                                     $processed = false;
                                 }
                             }

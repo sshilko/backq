@@ -1,6 +1,9 @@
 # Plan 1 — Protocol / TCP frame handling (findings 1.1 – 1.4)
 
 > Status: **implemented** - completed in the current working tree.
+> Amendment: 5.x removed the `Nsq` adapter, so every NSQ reference below — including the
+> frame-size and handshake work — describes code that no longer exists. Read this plan as a
+> record of what was done to NSQ, not as a description of the current `src/`.
 > Scope: section 1 of the analysis report (protocol / TCP frame errors).
 > Companion plans: `plan-2-network-ssl-disconnects.md`, `plan-3-connection-liveness-resilience.md`,
 > `plan-4-minor-notes-behavior.md`.

@@ -5,6 +5,7 @@ namespace BackQ\Tests\Worker;
 use BackQ\Message\Guzzle as GuzzleMessage;
 use BackQ\Tests\Support\GuzzleExpiredMessage;
 use BackQ\Tests\Support\GuzzleNotReadyMessage;
+use BackQ\Tests\Support\LogAssertions;
 use BackQ\Tests\Support\RecordingLogger;
 use BackQ\Tests\Support\TestAdapter;
 use BackQ\Worker\Guzzle;
@@ -12,14 +13,12 @@ use GuzzleHttp\Psr7\Request;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use function array_column;
+use function array_filter;
+use function array_values;
 use function fclose;
 use function fgets;
-use function file_exists;
-use function file_get_contents;
 use function fwrite;
 use function implode;
-use function ini_get;
-use function ini_set;
 use function is_array;
 use function pcntl_fork;
 use function pcntl_waitpid;
@@ -30,11 +29,12 @@ use function stream_socket_get_name;
 use function stream_socket_server;
 use function strrpos;
 use function substr;
-use function tempnam;
-use function unlink;
 
 class GuzzleWorkerTest extends TestCase
 {
+
+    use LogAssertions;
+
     public function testRejectsUnsupportedPayloadAsSuccess(): void
     {
         $adapter                = new TestAdapter();
@@ -147,10 +147,6 @@ class GuzzleWorkerTest extends TestCase
             exit(0);
         }
 
-        $errorLog = tempnam(sys_get_temp_dir(), 'backqerr_');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $errorLog);
-
         try {
             $adapter                = new TestAdapter();
             $adapter->pickTaskResult = [15, serialize(
@@ -166,15 +162,12 @@ class GuzzleWorkerTest extends TestCase
         } finally {
             pcntl_waitpid($pid, $status);
             fclose($server);
-            ini_set('error_log', $previous);
         }
 
-        $wholeLog      = implode("\n", array_column($logger->records, 1));
-        $loggedErrors  = file_exists($errorLog) ? file_get_contents($errorLog) : '';
-        unlink($errorLog);
+        $wholeLog = implode("\n", array_column($logger->records, 1));
 
         $this->assertStringContainsString('got response 200 ', $wholeLog);
-        $this->assertStringNotContainsString('Error while sending FCM', $loggedErrors);
+        $this->assertNotLogged($logger, 'Error while sending FCM');
         $this->assertContains(['afterWorkSuccess', 15], $adapter->calls);
     }
 
@@ -231,30 +224,27 @@ class GuzzleWorkerTest extends TestCase
 
     public function testLogsConnectRefusedFailure(): void
     {
-        $errorLog = tempnam(sys_get_temp_dir(), 'backqerr_');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $errorLog);
+        $adapter                = new TestAdapter();
+        $adapter->pickTaskResult = [16, serialize(new GuzzleMessage(new Request('GET', 'http://127.0.0.1:9/')))];
 
-        try {
-            $adapter                = new TestAdapter();
-            $adapter->pickTaskResult = [16, serialize(new GuzzleMessage(new Request('GET', 'http://127.0.0.1:9/')))];
+        $logger = new RecordingLogger();
+        $worker = new Guzzle($adapter);
+        $worker->setLogger($logger);
+        $worker->setRestartThreshold(1);
 
-            $worker = new Guzzle($adapter);
-            $worker->setLogger(new NullLogger());
-            $worker->setRestartThreshold(1);
+        $worker->run();
 
-            $worker->run();
-        } finally {
-            ini_set('error_log', $previous);
-        }
-
-        $loggedErrors = file_exists($errorLog) ? file_get_contents($errorLog) : '';
-        unlink($errorLog);
+        $errorLevels = array_values(array_filter(
+            $logger->records,
+            static function (array $record): bool {
+                return 'error' === $record[0];
+            }
+        ));
 
         $this->assertSame(
-            '',
-            $loggedErrors,
-            'A refused connection must be handled by the worker, not reported as a PHP error'
+            [],
+            $errorLevels,
+            'A refused connection must be handled by the worker, not reported as an error'
         );
         $this->assertContains(['afterWorkFailed', 16], $adapter->calls);
         $this->assertNotContains(['afterWorkSuccess', 16], $adapter->calls);

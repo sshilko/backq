@@ -3,11 +3,12 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+
 use BackQ\Adapter\Beanstalk;
 use BackQ\Worker\AProcess;
 use Symfony\Component\Console\Logger\ConsoleLogger;
@@ -25,8 +26,7 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 $output  = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
 $logger  = new ConsoleLogger($output);
 
-$adapter = new Beanstalk();
-$adapter->setLogger($logger);
+$adapter = new Beanstalk($logger);
 echo 'Using ' . get_class($adapter) . ' adapter' . "\n";
 
 $worker = new AProcess($adapter);

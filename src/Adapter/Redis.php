@@ -20,6 +20,7 @@ use Illuminate\Queue\Capsule\Manager;
 use Illuminate\Queue\Jobs\RedisJob;
 use InvalidArgumentException;
 use Override;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Stringable;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
@@ -111,7 +112,10 @@ class Redis extends AbstractAdapter
         private int $read_timeout = 10,
         private int $database_id = 0,
         private ?string $auth_password = null,
+        ?LoggerInterface $logger = null,
     ) {
+        parent::__construct($logger);
+
         $this->app = new Redis\App();
 
         $this->app->bind('exception.handler', static function () {

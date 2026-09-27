@@ -3,11 +3,12 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+
 use BackQ\Adapter\Redis;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
@@ -25,8 +26,8 @@ $queue = 'hello-world';
 $redisHost = getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1';
 $redisPort = (int) (getenv('BACKQ_REDIS_PORT') ?: 6379);
 
-$redispub = new Redis($redisHost, $redisPort);
-$redispub->setLogger(new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG)));
+$logger   = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
+$redispub = new Redis($redisHost, $redisPort, logger: $logger);
 $redispub->setWorkTimeout(5);
 if (!$redispub->connect()) {
     echo 'Failed to connect to redis at ' . $redisHost . ':' . $redisPort . "\n";

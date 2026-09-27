@@ -95,9 +95,9 @@ class DefaultQueueNameTest extends TestCase
             },
             'guzzle' => new class ($adapter) extends Guzzle {
             },
-            'mydynamodbtablenameandsqsqueuename' => new class ($adapter) extends Serialized {
-            },
             'process' => new class ($adapter) extends Process {
+            },
+            'serialized' => new class ($adapter) extends Serialized {
             },
         ];
     }

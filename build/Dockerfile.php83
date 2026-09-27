@@ -42,6 +42,8 @@ RUN apt-get install -y --no-install-recommends \
     locales \
     netcat-traditional \
     git \
+    jq \
+    ripgrep \
     beanstalkd
 
 # Package manager cleanup

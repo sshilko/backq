@@ -3,11 +3,12 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
  */
+
 use BackQ\Adapter\Redis;
 use BackQ\Publisher\Guzzle;
 use GuzzleHttp\Psr7\Request;
@@ -24,13 +25,10 @@ use Throwable;
 
 require_once __DIR__ . '/../../../vendor/autoload.php';
 
-final class MyRedisGuzzlePublisher extends Guzzle
-{
-}
+final class MyRedisGuzzlePublisher extends Guzzle {}
 
 $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
-$adapter->setLogger($logger);
+$adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379), logger: $logger);
 
 /**
  * The Guzzle worker sends the request asynchronously.

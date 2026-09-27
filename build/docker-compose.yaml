@@ -41,8 +41,6 @@ x-app: &app
     COMPOSER_DISABLE_XDEBUG_WARN: "1"
     BACKQ_REDIS_HOST: "redis"
     BACKQ_REDIS_PORT: "6379"
-    BACKQ_NSQD_HOST: "nsq"
-    BACKQ_NSQD_PORT: "4150"
   extra_hosts:
     - "host.docker.internal:host-gateway"
   restart: on-failure:2
@@ -57,8 +55,6 @@ services:
       dockerfile: Dockerfile.php83
     depends_on:
       redis:
-        condition: service_started
-      nsq:
         condition: service_started
     healthcheck:
       test: ["CMD", "php", "-v"]
@@ -79,21 +75,6 @@ services:
       - /data
     ports:
       - "127.0.0.1:16379:6379"
-
-  nsq:
-    image: nsqio/nsq:v1.3.0
-    container_name: backq-nsq
-    command: ["/nsqd", "--broadcast-address=nsq", "--data-path=/data"]
-    platform: linux/amd64
-    logging:
-      options:
-        max-size: "1m"
-        max-file: "2"
-    tmpfs:
-      - /data
-    ports:
-      - "127.0.0.1:14150:4150"
-      - "127.0.0.1:14151:4151"
 
 volumes:
   composer-cache:

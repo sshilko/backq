@@ -256,6 +256,7 @@
         <properties>
             <property name="forbiddenFunctions" type="array" extend="true">
                 <element key="sizeof" value="count"/>
+                <element key="error_log" value=""/>
             </property>
         </properties>
     </rule>

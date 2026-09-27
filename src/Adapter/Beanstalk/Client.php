@@ -3,7 +3,7 @@
 /**
  * Backq: Background tasks with workers & publishers via queues
  *
- * Copyright (c) 2013-2019 Sergei Shilko
+ * Copyright (c) 2013-2026 Sergei Shilko
  *
  * Distributed under the terms of the MIT License.
  * Redistributions of files must retain the above copyright notice.
@@ -377,7 +377,7 @@ class Client extends \Beanstalk\Client
                 $value = ltrim($parts[1] ?? '', ' ');
             }
             if (is_numeric($value)) {
-                $value = (integer) $value == $value ? (integer) $value : (float) $value;
+                $value = (int) $value == $value ? (int) $value : (float) $value;
             }
             $result[$key] = $value;
         }

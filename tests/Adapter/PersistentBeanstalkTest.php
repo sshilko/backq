@@ -119,8 +119,7 @@ class PersistentBeanstalkTest extends TestCase
     public function testConnectLogsThroughTheAdapterWhenNoLoggerIsGiven(): void
     {
         $logger  = new RecordingLogger();
-        $adapter = new PersistentBeanstalk();
-        $adapter->setLogger($logger);
+        $adapter = new PersistentBeanstalk($logger);
 
         $this->assertFalse($adapter->connect('127.0.0.1', $this->unusedPort()));
 
@@ -132,8 +131,7 @@ class PersistentBeanstalkTest extends TestCase
     {
         $ownLogger    = new RecordingLogger();
         $givenLogger  = new RecordingLogger();
-        $adapter      = new PersistentBeanstalk();
-        $adapter->setLogger($ownLogger);
+        $adapter      = new PersistentBeanstalk($ownLogger);
 
         $this->assertFalse($adapter->connect('127.0.0.1', $this->unusedPort(), 1, true, $givenLogger));
 

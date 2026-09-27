@@ -1,6 +1,8 @@
 # Plan 2 — Network & SSL disconnect handling (findings 2.1 – 2.3)
 
 > Status: **implemented** — completed in the current working tree.
+> Amendment: 5.x removed the `Nsq` adapter, so every NSQ reference below describes code that
+> no longer exists. The `StreamIO` and `Guzzle` work this plan did still stands.
 >
 > **Implementation notes (current checkout):**
 > - `src/Worker/Guzzle.php`: rejection handler now catches `Throwable` (not just `RequestException`) and marks transport/connect failures as processed=false (with `error_log` for connect failures); HTTP errors that return a response are logged but not marked as failure. `processed` set to false on catch.

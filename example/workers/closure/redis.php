@@ -20,13 +20,11 @@ use Symfony\Component\Console\Output\ConsoleOutput;
  */
 require_once __DIR__ . '/../../../vendor/autoload.php';
 
-$adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
-
 /**
- * Optional adapter logger
+ * Optional logger, shared by the adapter and the worker
  */
-$logger = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$adapter->setLogger($logger);
+$logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
+$adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379), logger: $logger);
 
 $worker = new Closure($adapter);
 $worker->setLogger($logger);

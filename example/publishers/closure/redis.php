@@ -28,8 +28,7 @@ final class MyRedisClosurePublisher extends Closure
 }
 
 $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
-$adapter->setLogger($logger);
+$adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379), logger: $logger);
 
 $publisher = new MyRedisClosurePublisher($adapter);
 if (!$publisher->start()) {

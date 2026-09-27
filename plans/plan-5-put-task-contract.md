@@ -2,6 +2,12 @@
 
 > Status: **implemented** — uncommitted in the working tree, not yet on a branch or PR.
 > 452 tests / 1083 assertions green in `app-php83`.
+> Later amendment: `JOBTTR_DEFAULT` did **not** stay on `AbstractAdapter`. A TTR default is
+> adapter configuration, so it was moved to `Nsq::JOBTTR_DEFAULT` and
+> `Beanstalk::JOBTTR_DEFAULT`; 5.x then removed the `Nsq` adapter entirely, leaving only
+> `Beanstalk::JOBTTR_DEFAULT`. See the `JOBTTR_DEFAULT` and `Nsq` entries in `UPGRADING`.
+> Every statement below that says the constant "stays", or that describes an Nsq signature,
+> describes this plan only.
 > Scope: `BackQ\Adapter\AbstractAdapter::putTask()` reduced to one parameter, the whole
 > `PARAM_*` array-key vocabulary deleted, `JOBTTR_DEFAULT` kept, `false` replaced by `Throwable`,
 > and every adapter, publisher, worker, message, test and example adapted.
