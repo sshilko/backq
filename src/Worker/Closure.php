@@ -20,8 +20,6 @@ use function unserialize;
 class Closure extends AbstractWorker
 {
 
-    public ?int $workTimeout = 5;
-
     protected string $queueName = 'closure';
 
     /**

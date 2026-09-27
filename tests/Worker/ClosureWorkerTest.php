@@ -54,7 +54,7 @@ class ClosureWorkerTest extends TestCase
 
         $this->assertSame(
             [
-                ['setWorkTimeout', 5],
+                ['setWorkTimeout', 60],
                 'connect',
                 ['bindRead', 'closure'],
                 ['pickTask', null],

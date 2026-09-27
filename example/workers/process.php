@@ -29,9 +29,8 @@ $logger  = new ConsoleLogger($output);
 $adapter = new Beanstalk($logger);
 echo 'Using ' . get_class($adapter) . ' adapter' . "\n";
 
-$worker = new AProcess($adapter);
+$worker = new AProcess($adapter, workTimeout: 5);
 $worker->setLogger($logger);
-$worker->setWorkTimeout(5);
 $worker->setIdleTimeout(12);
 $worker->setQueueName('process');
 $worker->run();

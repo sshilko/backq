@@ -242,9 +242,33 @@
 - `BackQ\Publisher\AbstractPublisher::ready()` is narrowed to `bool` (was
   untyped; it returned `null` before `start()`). The bound path is unchanged;
   callers and subclasses overriding `ready()` must use a `bool` return type.
-- `BackQ\Worker\AbstractWorker::$workTimeout` is now typed `?int` (was untyped,
-  default `null`). Child classes that assign an `int` must declare
-  `?int $workTimeout`.
+- `BackQ\Worker\AbstractWorker::$workTimeout` is now typed `?int` (was untyped).
+  Child classes that assign an `int` must declare `?int $workTimeout`.
+- **The work timeout is a worker constructor argument and defaults to 60 seconds.**
+  `AbstractWorker::__construct(AbstractAdapter $adapter, ?int $workTimeout = 60)`
+  takes it, and `AbstractWorker::setWorkTimeout()` is `@deprecated` — still
+  functional, so an existing worker keeps its pick cycle, and nothing is emitted at
+  runtime: this library reports through PSR-3, and a PHP notice is not a channel it
+  uses.
+
+  | Was | Now |
+  |---|---|
+  | `$worker->setWorkTimeout(5);` | `new Serialized($adapter, workTimeout: 5);` |
+  | `Serialized`, `Closure` and `AProcess` default to 5, `Guzzle` to 4, `GuzzleForwarder` to none | every worker defaults to 60 |
+
+  A subclass that redeclared the property (`public ?int $workTimeout = 5;`) has to
+  drop the declaration: the constructor assigns the value, so a redeclaration is
+  dead code. `null` keeps the old behaviour of polling without blocking.
+
+  Because a worker now always carries a timeout, **the idle-timeout check no longer
+  throws**. `work()` used to raise `Time to pick next task cannot be lower than idle
+  timeout` whenever `setIdleTimeout()` was not above the pick timeout — with a 60
+  second default that would have been *every* `setIdleTimeout()` up to 60, including
+  the ordinary "quit after 30 idle seconds". A work cycle may not outlast the idle
+  deadline (the loop has to reach its idle check while the deadline is still ahead of
+  it), so the timeout is now **lowered to `idleTimeout - 1`** instead, and both the
+  adapter and the work loop use the lowered value — the two cannot disagree. The
+  configured number is not rewritten, and the worker logs what it lowered and to what.
 - `BackQ\Publisher\AbstractPublisher` takes the adapter through the constructor,
   mirroring `AbstractWorker`:
   - `__construct(?AbstractAdapter $adapter = null)` is now
@@ -307,6 +331,10 @@
   adapter for the connection state machine. The legacy `STATE_*` integer
   constants on the adapter are kept for backward compatibility.
 - `BackQ\Message\Generic::$data` and `getData()` are typed (`mixed`).
+- `BackQ\Worker\AbstractWorker::DEFAULT_WORK_TIMEOUT` (typed `int`, 60) names the
+  default work timeout, so a caller can pass it on deliberately
+  (`new Serialized($adapter, workTimeout: AbstractWorker::DEFAULT_WORK_TIMEOUT)`)
+  or assert against it.
 - `BackQ\Adapter\MySql`: new adapter that keeps the queue in a MySQL table
   instead of a queue server. It receives an established `mysqli` link through
   the constructor and never opens or closes it, so the application keeps

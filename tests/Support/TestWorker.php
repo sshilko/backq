@@ -12,17 +12,18 @@ use Override;
 class TestWorker extends AbstractWorker
 {
 
-    public ?int $workTimeout = 5;
-
     public array $yields   = [];
 
     protected string $queueName = 'testqueue';
 
     protected int $index = 0;
 
-    public function __construct(AbstractAdapter $adapter, public array $responses = [true])
-    {
-        parent::__construct($adapter);
+    public function __construct(
+        AbstractAdapter $adapter,
+        ?int $workTimeout = AbstractWorker::DEFAULT_WORK_TIMEOUT,
+        public array $responses = [true],
+    ) {
+        parent::__construct($adapter, $workTimeout);
     }
 
     public function doStart(): bool

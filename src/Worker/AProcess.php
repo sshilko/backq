@@ -30,8 +30,6 @@ use const SIGKILL;
 final class AProcess extends AbstractWorker
 {
 
-    public ?int $workTimeout = 5;
-
     protected string $queueName = 'process';
 
     /**

@@ -104,7 +104,7 @@ class SerializedWorkerTest extends TestCase
 
         $this->assertSame(
             [
-                ['setWorkTimeout', 5],
+                ['setWorkTimeout', 60],
                 'connect',
                 ['bindRead', 'serialized'],
                 ['pickTask', null],

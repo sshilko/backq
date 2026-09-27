@@ -25,10 +25,9 @@ require_once __DIR__ . '/../../publishers/lib/myredisprocesspublisher.php';
 $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
 $adapter = new Redis($logger, getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
 
-$worker = new Serialized($adapter);
+$worker = new Serialized($adapter, workTimeout: 1);
 $worker->setLogger($logger);
 $worker->setQueueName('serialized');
-$worker->setWorkTimeout(1);
 $worker->setRestartThreshold(100);
 $worker->setIdleTimeout(100);
 $worker->run();

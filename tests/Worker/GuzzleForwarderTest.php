@@ -7,6 +7,7 @@ use BackQ\Tests\Support\NotReadyGuzzleForwarderMessage;
 use BackQ\Tests\Support\RecordingLogger;
 use BackQ\Tests\Support\TestAdapter;
 use BackQ\Tests\Support\TestGuzzleForwarderWorker;
+use BackQ\Worker\AbstractWorker;
 use GuzzleHttp\Psr7\Request;
 use Opis\Closure\SerializableClosure;
 use PHPUnit\Framework\TestCase;
@@ -45,8 +46,7 @@ class GuzzleForwarderTest extends TestCase
         $adapter                = new TestAdapter();
         $adapter->pickTaskResult = false;
 
-        $worker = $this->worker($adapter);
-        $worker->setWorkTimeout(4);
+        $worker = $this->worker($adapter, workTimeout: 4);
         $worker->run();
 
         $this->assertContains('disconnect', $adapter->calls);
@@ -59,8 +59,7 @@ class GuzzleForwarderTest extends TestCase
         $adapter->pickTaskResult = false;
 
         $logger = new RecordingLogger();
-        $worker = $this->worker($adapter, $logger);
-        $worker->setWorkTimeout(0);
+        $worker = $this->worker($adapter, $logger, 0);
         $worker->run();
 
         $this->assertStringContainsString('Worker does not support payload of: NULL', $this->log($logger));
@@ -262,9 +261,12 @@ class GuzzleForwarderTest extends TestCase
         $this->assertNotContains('disconnect', $adapter->calls);
     }
 
-    private function worker(TestAdapter $adapter, ?RecordingLogger $logger = null): TestGuzzleForwarderWorker
-    {
-        $worker = new TestGuzzleForwarderWorker($adapter);
+    private function worker(
+        TestAdapter $adapter,
+        ?RecordingLogger $logger = null,
+        ?int $workTimeout = AbstractWorker::DEFAULT_WORK_TIMEOUT,
+    ): TestGuzzleForwarderWorker {
+        $worker = new TestGuzzleForwarderWorker($adapter, $workTimeout);
         $worker->setLogger($logger ?? new NullLogger());
         $worker->setRestartThreshold(1);
 

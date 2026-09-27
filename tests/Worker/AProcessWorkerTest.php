@@ -52,7 +52,7 @@ class AProcessWorkerTest extends TestCase
 
         $this->assertSame(
             [
-                ['setWorkTimeout', 5],
+                ['setWorkTimeout', 60],
                 'connect',
                 ['bindRead', 'process'],
                 ['pickTask', null],

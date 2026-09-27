@@ -63,7 +63,7 @@ class GuzzleWorkerTest extends TestCase
 
         $this->assertSame(
             [
-                ['setWorkTimeout', 4],
+                ['setWorkTimeout', 60],
                 'connect',
                 ['bindRead', 'guzzle'],
                 ['pickTask', null],

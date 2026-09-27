@@ -22,18 +22,22 @@ use function pcntl_async_signals;
 use function pcntl_signal;
 use function pcntl_signal_dispatch;
 use function time;
+use function var_export;
 use const SIGHUP;
 use const SIGINT;
 use const SIGTERM;
 
 abstract class AbstractWorker
 {
+    /**
+     * Seconds a work cycle may take unless the caller says otherwise
+     */
+    public const int DEFAULT_WORK_TIMEOUT = 60;
 
     /**
-     * Work timeout value
-     *
+     * Work timeout value, in seconds. Handed to the adapter on start().
      */
-    public ?int $workTimeout = null;
+    public ?int $workTimeout = self::DEFAULT_WORK_TIMEOUT;
 
     /**
      * Whether syscalls should be delayed
@@ -62,13 +66,24 @@ abstract class AbstractWorker
 
     abstract public function run(): void;
 
-    public function __construct(private AbstractAdapter $adapter)
+    /**
+     * @param int|null $workTimeout seconds a work cycle may take, DEFAULT_WORK_TIMEOUT unless set
+     */
+    public function __construct(private AbstractAdapter $adapter, ?int $workTimeout = self::DEFAULT_WORK_TIMEOUT)
     {
+        $this->workTimeout = $workTimeout;
+
         $output        = new ConsoleOutput(ConsoleOutput::VERBOSITY_NORMAL);
         $this->setLogger(new ConsoleLogger($output));
     }
 
     /**
+     * @deprecated pass the timeout to the constructor: new Serialized($adapter, workTimeout: 5)
+     *
+     * Still functional, so existing workers keep their pick cycle. Nothing announces the
+     * deprecation at runtime: this library reports through PSR-3, and a PHP notice is not
+     * a channel it uses.
+     *
      * @param int|null $timeout
      */
     public function setWorkTimeout(?int $timeout = null): void
@@ -166,7 +181,13 @@ abstract class AbstractWorker
          * Tell adapter about our desire for work cycle duration, if any
          * Some adapters require it before connecting
          */
-        $this->adapter->setWorkTimeout($this->workTimeout);
+        $timeout = $this->effectiveWorkTimeout();
+        if ($timeout !== $this->workTimeout) {
+            $this->logDebug('Work timeout ' . var_export($this->workTimeout, true)
+                . ' lowered to ' . var_export($timeout, true)
+                . ' to end a work cycle before the idle timeout of ' . $this->idleTimeout . 's');
+        }
+        $this->adapter->setWorkTimeout($timeout);
 
         if (true === $this->adapter->connect()) {
             if ($this->adapter->bindRead($this->getQueueName())) {
@@ -235,17 +256,7 @@ abstract class AbstractWorker
             return;
         }
 
-        $timeout = $this->workTimeout;
-
-        /**
-         * Make sure that, if an timeout and idle timeout were set, the timeout is
-         * less than the idle timeout
-         */
-        if ($timeout && $this->idleTimeout > 0) {
-            if ($this->idleTimeout <= $timeout) {
-                throw new Exception('Time to pick next task cannot be lower than idle timeout');
-            }
-        }
+        $timeout = $this->effectiveWorkTimeout();
 
         $jobsdone   = 0;
         $lastActive = time();
@@ -375,5 +386,28 @@ abstract class AbstractWorker
         }
 
         return false;
+    }
+
+    /**
+     * The pick timeout this worker really works with. A work cycle may not outlast the
+     * idle timeout, the loop has to reach its idle check while the deadline is still ahead
+     * of it, so a timeout that reaches the idle timeout is lowered one second below it.
+     * The adapter and the loop both read the result, so they cannot disagree.
+     *
+     * @return int|null null leaves the adapter to poll without blocking
+     */
+    private function effectiveWorkTimeout(): ?int
+    {
+        $timeout = $this->workTimeout;
+
+        if (null === $timeout || $timeout <= 0 || $this->idleTimeout <= 0) {
+            return $timeout;
+        }
+
+        if ($this->idleTimeout <= $timeout) {
+            return $this->idleTimeout - 1;
+        }
+
+        return $timeout;
     }
 }

@@ -9,6 +9,7 @@ use BackQ\Tests\Support\SleepingPickAdapter;
 use BackQ\Tests\Support\TestAdapter;
 use BackQ\Tests\Support\TestWorker;
 use BackQ\Tests\Support\ThrowingPickAdapter;
+use BackQ\Worker\AbstractWorker;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -27,7 +28,46 @@ class AbstractWorkerTest extends TestCase
         $this->assertSame('foo', $worker->getQueueName());
     }
 
-    public function testSetWorkTimeoutAcceptsNull(): void
+    public function testTheWorkTimeoutDefaultsToSixtySeconds(): void
+    {
+        $this->assertSame(60, AbstractWorker::DEFAULT_WORK_TIMEOUT);
+
+        $worker = $this->makeWorker();
+        $worker->doStart();
+
+        $this->assertSame(60, $worker->workTimeout);
+        $this->assertContains(['setWorkTimeout', 60], $this->adapter->calls);
+    }
+
+    public function testTheConstructorTakesTheWorkTimeout(): void
+    {
+        $worker = $this->makeWorker(workTimeout: 7);
+        $worker->doStart();
+
+        $this->assertSame(7, $worker->workTimeout);
+        $this->assertContains(['setWorkTimeout', 7], $this->adapter->calls);
+    }
+
+    public function testTheConstructorTakesNoWorkTimeout(): void
+    {
+        $worker = $this->makeWorker(workTimeout: null);
+        $worker->doStart();
+
+        $this->assertNull($worker->workTimeout);
+        $this->assertContains(['setWorkTimeout', null], $this->adapter->calls);
+    }
+
+    public function testTheDeprecatedSetterIsStillFunctional(): void
+    {
+        $worker = $this->makeWorker();
+        $worker->setWorkTimeout(3);
+        $worker->doStart();
+
+        $this->assertSame(3, $worker->workTimeout);
+        $this->assertContains(['setWorkTimeout', 3], $this->adapter->calls);
+    }
+
+    public function testTheDeprecatedSetterAcceptsNull(): void
     {
         $worker = $this->makeWorker();
         $worker->setWorkTimeout(null);
@@ -37,12 +77,10 @@ class AbstractWorkerTest extends TestCase
 
     public function testStartPropagatesTimeoutAndConnects(): void
     {
-        $worker = $this->makeWorker();
-        $worker->setWorkTimeout(7);
+        $worker = $this->makeWorker(workTimeout: 7);
 
         $this->assertTrue($worker->doStart());
 
-        $this->assertContains(['setWorkTimeout', 7], $this->adapter->calls);
         $this->assertContains('connect', $this->adapter->calls);
         $this->assertContains(['bindRead', 'testqueue'], $this->adapter->calls);
     }
@@ -104,9 +142,8 @@ class AbstractWorkerTest extends TestCase
         $adapter                = new SleepingPickAdapter();
         $adapter->pickTaskResult = false;
         $logger                 = new RecordingLogger();
-        $worker                 = new TestWorker($adapter);
+        $worker                 = new TestWorker($adapter, null);
         $worker->setLogger($logger);
-        $worker->setWorkTimeout(null);
         $worker->setIdleTimeout(1);
 
         $worker->run();
@@ -120,9 +157,8 @@ class AbstractWorkerTest extends TestCase
     {
         $adapter = new SleepingPickAdapter();
         $logger  = new RecordingLogger();
-        $worker  = new ConfigurableWorker($adapter);
+        $worker  = new ConfigurableWorker($adapter, null);
         $worker->setLogger($logger);
-        $worker->setWorkTimeout(null);
         $worker->setIdleTimeout(1);
 
         $worker->run();
@@ -158,17 +194,45 @@ class AbstractWorkerTest extends TestCase
         $this->assertSame([], iterator_to_array($worker->doWork()));
     }
 
-    public function testWorkThrowsWhenIdleTimeoutNotLowerThanPickInterval(): void
+    public function testTheWorkTimeoutIsLoweredBelowTheIdleTimeout(): void
     {
+        $logger = new RecordingLogger();
         $worker = $this->makeWorker();
-        $worker->doStart();
-        $worker->setWorkTimeout(5);
+        $worker->setLogger($logger);
         $worker->setIdleTimeout(5);
 
-        $this->expectException(\Throwable::class);
-        $this->expectExceptionMessage('Time to pick next task cannot be lower than idle timeout');
+        $worker->doStart();
 
-        iterator_to_array($worker->doWork());
+        /**
+         * The adapter and the work loop have to agree, and the configured value is
+         * left alone: only what the worker works with is lowered
+         */
+        $this->assertContains(['setWorkTimeout', 4], $this->adapter->calls);
+        $this->assertSame(60, $worker->workTimeout);
+        $this->assertStringContainsString('Work timeout 60 lowered to 4', $this->wholeLog($logger));
+    }
+
+    public function testTheWorkTimeoutIsNotLoweredWhenItFitsBelowTheIdleTimeout(): void
+    {
+        $logger = new RecordingLogger();
+        $worker = $this->makeWorker(workTimeout: 3);
+        $worker->setLogger($logger);
+        $worker->setIdleTimeout(5);
+
+        $worker->doStart();
+
+        $this->assertContains(['setWorkTimeout', 3], $this->adapter->calls);
+        $this->assertStringNotContainsString('lowered', $this->wholeLog($logger));
+    }
+
+    public function testNoWorkTimeoutIsNotLowered(): void
+    {
+        $worker = $this->makeWorker(workTimeout: null);
+        $worker->setIdleTimeout(5);
+
+        $worker->doStart();
+
+        $this->assertContains(['setWorkTimeout', null], $this->adapter->calls);
     }
 
     public function testTerminationRequestedStopsLoop(): void
@@ -209,11 +273,10 @@ class AbstractWorkerTest extends TestCase
         $adapter           = new SleepingPickAdapter();
         $adapter->pickTaskResult = false;
         $logger            = new RecordingLogger();
-        $worker            = new TestWorker($adapter);
+        $worker            = new TestWorker($adapter, 1);
         $worker->setLogger($logger);
         $worker->setRestartThreshold(0);
         $worker->setIdleTimeout(2);
-        $worker->setWorkTimeout(1);
 
         $worker->run();
 
@@ -228,12 +291,11 @@ class AbstractWorkerTest extends TestCase
         $adapter                = new SleepingPickAdapter();
         $adapter->pickTaskResult = false;
         $logger                 = new RecordingLogger();
-        $worker                 = new ConfigurableWorker($adapter);
+        $worker                 = new ConfigurableWorker($adapter, 1);
         $worker->idleTimeoutResult = false;
         $worker->setLogger($logger);
         $worker->setRestartThreshold(4);
         $worker->setIdleTimeout(2);
-        $worker->setWorkTimeout(1);
 
         $worker->run();
 
@@ -271,11 +333,18 @@ class AbstractWorkerTest extends TestCase
         $this->adapter = new TestAdapter();
     }
 
-    private function makeWorker(array $responses = [true]): TestWorker
-    {
-        $worker = new TestWorker($this->adapter, $responses);
+    private function makeWorker(
+        array $responses = [true],
+        ?int $workTimeout = AbstractWorker::DEFAULT_WORK_TIMEOUT,
+    ): TestWorker {
+        $worker = new TestWorker($this->adapter, $workTimeout, $responses);
         $worker->setLogger(new NullLogger());
 
         return $worker;
+    }
+
+    private function wholeLog(RecordingLogger $logger): string
+    {
+        return implode("\n", array_column($logger->records, 1));
     }
 }

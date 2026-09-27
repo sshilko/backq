@@ -26,9 +26,8 @@ require_once __DIR__ . '/../../../vendor/autoload.php';
 $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
 $adapter = new Redis($logger, getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
 
-$worker = new Closure($adapter);
+$worker = new Closure($adapter, workTimeout: 5);
 $worker->setLogger($logger);
-$worker->setWorkTimeout(5);
 $worker->setIdleTimeout(15);
 $worker->setRestartThreshold(10);
 $worker->run();

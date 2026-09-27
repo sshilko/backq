@@ -172,8 +172,24 @@ them from a clone of this repository. In your own project, depend on
 
 ### Worker controls
 
+Every worker takes the adapter and, optionally, the seconds a work cycle may take:
+
+```php
+$worker = new Serialized($adapter, workTimeout: 30);
+```
+
+- `workTimeout` — constructor argument, 60 seconds by default
+  (`AbstractWorker::DEFAULT_WORK_TIMEOUT`). It is handed to the adapter on start, so
+  a queue with blocking picks waits instead of spinning. `null` polls without
+  blocking. `setWorkTimeout()` still sets the same value and is **deprecated**.
 - `setRestartThreshold` — limit the maximum number of job cycles, then terminate.
 - `setIdleTimeout` — limit maximum idle time, then terminate.
+
+A work cycle may not outlast the idle timeout, the worker has to reach its idle check
+while the deadline is still ahead of it. A `workTimeout` that reaches `setIdleTimeout()`
+is therefore lowered to one second below it, and both the adapter and the work loop use
+the lowered value. The configured number is left alone, and the worker logs what it
+lowered and to what.
 
 ## The `Serialized` worker (a proxy worker)
 

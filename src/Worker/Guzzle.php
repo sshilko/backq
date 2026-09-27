@@ -26,8 +26,6 @@ use const JSON_THROW_ON_ERROR;
 final class Guzzle extends AbstractWorker
 {
 
-    public ?int $workTimeout = 4;
-
     protected string $queueName = 'guzzle';
 
     /**
