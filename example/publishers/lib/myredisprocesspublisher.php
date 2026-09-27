@@ -37,7 +37,7 @@ final class MyRedisProcessPublisher extends Process
     {
         $output  = new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG);
         $logger  = new ConsoleLogger($output);
-        $adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379), logger: $logger);
+        $adapter = new Redis($logger, getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
 
         return $adapter;
     }

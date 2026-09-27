@@ -27,37 +27,37 @@ $beanstalkdPort = (int) (getenv('BACKQ_BEANSTALKD_PORT') ?: 11300);
 
 $logger        = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
 $beanstalkdsub = new Beanstalk($logger);
-$beanstalkdsub->logInfo('Starting');
+$logger->info('Starting');
 $beanstalkdsub->setWorkTimeout(5);
 if (!$beanstalkdsub->connect($beanstalkdHost, $beanstalkdPort)) {
     echo 'Failed to connect to beanstalkd at ' . $beanstalkdHost . ':' . $beanstalkdPort . "\n";
     exit(1);
 }
-$beanstalkdsub->logInfo('Connected');
+$logger->info('Connected');
 if ($beanstalkdsub->bindRead($queue)) {
-    $beanstalkdsub->logInfo('Subscribed');
+    $logger->info('Subscribed');
     $i = 100;
     while ($i > 0) {
-        $beanstalkdsub->logInfo('Picking task');
+        $logger->info('Picking task');
         $job = $beanstalkdsub->pickTask();
         if ($job && $job[0]) {
-            $beanstalkdsub->logInfo('Got task: ' . json_encode($job));
+            $logger->info('Got task: ' . json_encode($job));
             if (1 === rand(1, 2)) {
-                $beanstalkdsub->logInfo('Reporting success');
+                $logger->info('Reporting success');
                 $beanstalkdsub->afterWorkSuccess($job[0]);
             } else {
-                $beanstalkdsub->logInfo('Reporting failure');
+                $logger->info('Reporting failure');
                 $beanstalkdsub->afterWorkFailed($job[0]);
             }
         } else {
-            $beanstalkdsub->logInfo('No job received within work timeout');
+            $logger->info('No job received within work timeout');
         }
         $i--;
     }
 } else {
-    $beanstalkdsub->logError('Failed to bind to read queue ' . $queue);
+    $logger->error('Failed to bind to read queue ' . $queue);
     exit(1);
 }
-$beanstalkdsub->logInfo('All done');
+$logger->info('All done');
 $beanstalkdsub->disconnect();
-$beanstalkdsub->logInfo('Disconnected');
+$logger->info('Disconnected');

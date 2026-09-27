@@ -2,6 +2,7 @@
 
 namespace BackQ\Tests\Adapter;
 
+use ArgumentCountError;
 use BackQ\Adapter\MySql\JobConfig;
 use BackQ\Adapter\MySql\JobState;
 use BackQ\Tests\Support\RecordingLogger;
@@ -11,6 +12,9 @@ use mysqli_result;
 use mysqli_sql_exception;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use ReflectionClass;
+use ReflectionMethod;
 use stdClass;
 use Throwable;
 use TypeError;
@@ -372,12 +376,17 @@ class MySqlAdapterTest extends TestCase
         $this->assertStringContainsString('UPDATE backq_jobs SET sync = "DONE"', $this->messages($logger));
     }
 
-    public function testNothingIsLoggedWithoutALogger(): void
+    public function testTheLoggerIsMandatory(): void
     {
-        $db = $this->db([], new mysqli_sql_exception('boom'));
+        /**
+         * Called through reflection: the helper would supply a NullLogger, and a direct
+         * two-argument call is exactly the mistake this test exists to make impossible
+         */
+        $adapter = (new ReflectionClass(TestMySqlAdapter::class))->newInstanceWithoutConstructor();
 
-        $this->assertFalse($this->adapter($db)->afterWorkSuccess(7));
-        $this->addToAssertionCount(1);
+        $this->expectException(ArgumentCountError::class);
+
+        (new ReflectionMethod(TestMySqlAdapter::class, '__construct'))->invoke($adapter);
     }
 
     /**
@@ -433,7 +442,7 @@ class MySqlAdapterTest extends TestCase
         return new TestMySqlAdapter(
             $db,
             $config ?? $this->config(),
-            $logger
+            $logger ?? new NullLogger()
         );
     }
 

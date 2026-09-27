@@ -187,7 +187,7 @@ class BeanstalkAdapterTest extends TestCase
 
     public function testDisconnectedInstanceGuards(): void
     {
-        $adapter = new Beanstalk();
+        $adapter = new Beanstalk(new RecordingLogger());
         $this->assertInstanceOf(Throwable::class, $adapter->putTask('body'));
         $this->assertFalse($adapter->pickTask());
         $this->assertFalse($adapter->afterWorkSuccess(1));
@@ -207,7 +207,7 @@ class BeanstalkAdapterTest extends TestCase
         $port = (int) substr((string) $name, (int) strrpos((string) $name, ':') + 1);
         fclose($server);
 
-        $adapter = new Beanstalk();
+        $adapter = new Beanstalk(new RecordingLogger());
 
         $this->assertFalse($adapter->connect('127.0.0.1', $port));
     }
@@ -233,7 +233,7 @@ class BeanstalkAdapterTest extends TestCase
     {
         $server = new FakeBeanstalkServer();
         try {
-            $adapter = new Beanstalk();
+            $adapter = new Beanstalk(new RecordingLogger());
 
             $this->assertTrue($adapter->connect('127.0.0.1', $server->getPort()));
             $server->accept();
@@ -382,7 +382,7 @@ class BeanstalkAdapterTest extends TestCase
 
     private function adapterWithConnectedClient(): array
     {
-        $adapter = new Beanstalk();
+        $adapter = new Beanstalk(new RecordingLogger());
         $client  = $this->createMock(Client::class);
 
         $clientProp  = new ReflectionProperty(Beanstalk::class, 'client');

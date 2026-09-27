@@ -26,38 +26,38 @@ $redisHost = getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1';
 $redisPort = (int) (getenv('BACKQ_REDIS_PORT') ?: 6379);
 
 $logger   = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$redissub = new Redis($redisHost, $redisPort, logger: $logger);
-$redissub->logInfo('Starting');
+$redissub = new Redis($logger, $redisHost, $redisPort);
+$logger->info('Starting');
 $redissub->setWorkTimeout(5);
 if (!$redissub->connect()) {
     echo 'Failed to connect to redis at ' . $redisHost . ':' . $redisPort . "\n";
     exit(1);
 }
-$redissub->logInfo('Connected');
+$logger->info('Connected');
 if ($redissub->bindRead($queue)) {
-    $redissub->logInfo('Subscribed');
+    $logger->info('Subscribed');
     $i = 100;
     while ($i > 0) {
-        $redissub->logInfo('Picking task');
+        $logger->info('Picking task');
         $job = $redissub->pickTask();
         if ($job && $job[0]) {
-            $redissub->logInfo('Got task: ' . json_encode($job));
+            $logger->info('Got task: ' . json_encode($job));
             if (1 === rand(1, 2)) {
-                $redissub->logInfo('Reporting success');
+                $logger->info('Reporting success');
                 $redissub->afterWorkSuccess($job[0]);
             } else {
-                $redissub->logInfo('Reporting failure');
+                $logger->info('Reporting failure');
                 $redissub->afterWorkFailed($job[0]);
             }
         } else {
-            $redissub->logInfo('No job received within work timeout');
+            $logger->info('No job received within work timeout');
         }
         $i--;
     }
 } else {
-    $redissub->logError('Failed to bind to read queue ' . $queue);
+    $logger->error('Failed to bind to read queue ' . $queue);
     exit(1);
 }
-$redissub->logInfo('All done');
+$logger->info('All done');
 $redissub->disconnect();
-$redissub->logInfo('Disconnected');
+$logger->info('Disconnected');

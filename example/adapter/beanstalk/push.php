@@ -33,25 +33,25 @@ if (!$beanstalkdpub->connect($beanstalkdHost, $beanstalkdPort)) {
     echo 'Failed to connect to beanstalkd at ' . $beanstalkdHost . ':' . $beanstalkdPort . "\n";
     exit(1);
 }
-$beanstalkdpub->logInfo('Connected');
+$logger->info('Connected');
 if ($beanstalkdpub->bindWrite($queue)) {
-    $beanstalkdpub->logInfo('Ready to publish');
+    $logger->info('Ready to publish');
     $i = 100;
     while ($i > 0) {
         $randomMessage = 'Payload body of message ' . time();
         $jobId         = $beanstalkdpub->putTask($randomMessage);
         if ($jobId instanceof Throwable) {
-            $beanstalkdpub->logError('Failed pushing message: ' . $jobId->getMessage());
+            $logger->error('Failed pushing message: ' . $jobId->getMessage());
         } else {
-            $beanstalkdpub->logInfo('Pushed message ' . $jobId);
+            $logger->info('Pushed message ' . $jobId);
         }
         $i--;
         sleep(1);
     }
 } else {
-    $beanstalkdpub->logError('Failed to bind to write queue ' . $queue);
+    $logger->error('Failed to bind to write queue ' . $queue);
     exit(1);
 }
-$beanstalkdpub->logInfo('All done');
+$logger->info('All done');
 $beanstalkdpub->disconnect();
-$beanstalkdpub->logInfo('Disconnected');
+$logger->info('Disconnected');

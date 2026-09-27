@@ -4,6 +4,8 @@ namespace BackQ\Tests\Support;
 
 use BackQ\Adapter\AbstractAdapter;
 use Override;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Stringable;
 use Throwable;
 use function array_filter;
@@ -44,6 +46,15 @@ class TestAdapter extends AbstractAdapter
     public $afterWorkFailedResult  = true;
 
     public array $calls = [];
+
+    /**
+     * The logger is mandatory on AbstractAdapter, so a test that does not care about the
+     * log does not have to build one: a NullLogger is the logger of last resort.
+     */
+    public function __construct(LoggerInterface $logger = new NullLogger())
+    {
+        parent::__construct($logger);
+    }
 
     #[Override]
     public function connect(): bool

@@ -11,6 +11,7 @@ use Illuminate\Queue\Capsule\Manager as QueueManager;
 use Illuminate\Queue\Jobs\RedisJob;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use ReflectionProperty;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -26,7 +27,7 @@ class RedisAdapterCoreTest extends TestCase
 {
     public function testConstructAppliesConfig(): void
     {
-        $redis = new Redis('redis.example', 6380);
+        $redis = new Redis(new NullLogger(), 'redis.example', 6380);
 
         $this->assertSame('redis.example', (new ReflectionProperty(Redis::class, 'host'))->getValue($redis));
         $this->assertSame(6380, (new ReflectionProperty(Redis::class, 'port'))->getValue($redis));
@@ -34,7 +35,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testNewInstanceStartsDisconnected(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
 
         $this->assertFalse($redis->ping());
         $this->assertFalse($redis->disconnect());
@@ -42,7 +43,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testConnectMarksConnected(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
 
         $this->assertTrue($redis->connect());
         $this->assertTrue((new ReflectionProperty(Redis::class, 'connected'))->getValue($redis));
@@ -50,19 +51,19 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testBindReadRequiresConnectedClient(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->assertFalse($redis->bindRead('queue'));
     }
 
     public function testBindWriteRequiresConnectedClient(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->assertFalse($redis->bindWrite('queue'));
     }
 
     public function testBindReadRejectedWhenAlreadyBound(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
 
         $this->assertFalse($redis->bindRead('queue'));
@@ -70,7 +71,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testBindWriteRejectedWhenAlreadyBound(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindWrite);
 
         $this->assertFalse($redis->bindWrite('queue'));
@@ -78,38 +79,38 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testPutTaskRequiresConnectedClient(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->assertInstanceOf(Throwable::class, $redis->putTask('body'));
     }
 
     public function testPickTaskRequiresConnectedClient(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->assertFalse($redis->pickTask(1));
     }
 
     public function testAfterWorkSuccessRequiresConnectedClient(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->assertFalse($redis->afterWorkSuccess('job-1'));
     }
 
     public function testAfterWorkFailedRequiresConnectedClient(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->assertFalse($redis->afterWorkFailed('job-1'));
     }
 
     public function testHasWorkersReportsNotSupported(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
 
         $this->assertFalse($redis->hasWorkers('queue'));
     }
 
     public function testSetWorkTimeoutStoresSubReadTimeoutValue(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
 
         $redis->setWorkTimeout(5);
 
@@ -118,7 +119,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testSetWorkTimeoutClampsBeyondReadTimeout(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
 
         $redis->setWorkTimeout(15);
 
@@ -127,7 +128,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testSetWorkTimeoutFallsBackToSecondWhenReadTimeoutTooSmall(): void
     {
-        $redis = new Redis('127.0.0.1', 6379, false, null, null, 10, 1);
+        $redis = new Redis(new NullLogger(), '127.0.0.1', 6379, false, null, null, 10, 1);
 
         $redis->setWorkTimeout(15);
 
@@ -136,7 +137,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testRetryJobAfterStoresRetryAfter(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
 
         $redis->retryJobAfter(90);
 
@@ -145,7 +146,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testConnectWhenAlreadyConnectedRebinds(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
 
         $this->assertTrue($redis->connect());
         $this->assertTrue($redis->connect());
@@ -155,7 +156,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testExceptionHandlerResolvesAndReports(): void
     {
-        $redis   = new Redis();
+        $redis   = new Redis(new NullLogger());
         $app     = (new ReflectionProperty(Redis::class, 'app'))->getValue($redis);
         $handler = $app->make('exception.handler');
 
@@ -177,7 +178,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testPingReportsSuccessWhenQueueIsAlive(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
 
         $redisClient = $this->createMock(\Redis::class);
@@ -192,7 +193,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testPingReturnsFalseWhenRedisThrows(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
 
         $redisClient = $this->createMock(\Redis::class);
@@ -207,7 +208,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testDisconnectReleasesReservedJobs(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
 
         $redisManager = $this->createMock(Manager::class);
@@ -227,7 +228,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testDisconnectSurvivesQueueFailure(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
 
         $redisManager = $this->createMock(Manager::class);
@@ -242,7 +243,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testAfterWorkFailedReleasesReservedJob(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
 
         $job = $this->createMock(RedisJob::class);
@@ -255,7 +256,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testAfterWorkFailedThrowsOnJobIdMismatch(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
 
         $job = $this->createMock(RedisJob::class);
@@ -270,7 +271,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testAfterWorkSuccessThrowsOnJobIdMismatch(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
 
         $job = $this->createMock(RedisJob::class);
@@ -285,7 +286,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testPickTaskThrowsWhenReservedJobHasNoId(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
         $this->setQueueName($redis, 'the-queue');
 
@@ -305,7 +306,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testPickTaskThrowsWhenJobAlreadyReserved(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
         $this->setQueueName($redis, 'the-queue');
 
@@ -329,7 +330,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testPickTaskReturnsFalseWhenQueueIsEmpty(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindRead);
         $this->setQueueName($redis, 'the-queue');
 
@@ -342,7 +343,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testPutTaskPushesDelayedJob(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindWrite);
         $this->setQueueName($redis, 'the-queue');
 
@@ -356,7 +357,7 @@ class RedisAdapterCoreTest extends TestCase
 
     public function testPutTaskReturnsThrowableWhenPushFails(): void
     {
-        $redis = new Redis();
+        $redis = new Redis(new NullLogger());
         $this->setState($redis, true, ConnectionState::BindWrite);
         $this->setQueueName($redis, 'the-queue');
 

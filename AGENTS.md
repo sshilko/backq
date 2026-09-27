@@ -200,7 +200,10 @@ Each of these yields a wrong result rather than an error.
 - **Do not re-enable the sniffs excluded in `build/phpcs-ruleset.xml`**:
   `AttributesOrder` needs `orderAlphabetically=true`, and `DisallowTrailingCommaInDeclaration`
   plus `DisallowNonCapturingCatch` conflict with their matching "Require" sniffs and send
-  phpcbf into an infinite loop.
+  phpcbf into an infinite loop. `DisallowNullSafeObjectOperator` is excluded for the
+  adapters' logging: they call `$this?->logger->error(...)` at the call site since
+  `AbstractAdapter` dropped its `logInfo()` / `logDebug()` / `logError()` helpers, and the
+  logger is mandatory there.
 - **Three `opis/closure` deprecations are expected** — `SerializableClosure implements
   Serializable` and the dynamic `ClosureStream::$context`. They print as `D` and do not fail
   the run.

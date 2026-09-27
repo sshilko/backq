@@ -23,6 +23,11 @@ use function is_array;
  * Beanstalk protocol adapter
  * @phpcs:disable
  *
+ * Every message is reported through $this?->logger. Psalm reads the nullsafe operator as
+ * widening $this to `Beanstalk|null` for the rest of the method, which is not what it
+ * means on an injected logger, so the resulting issue is silenced for this class.
+ * @psalm-suppress TypeDoesNotContainNull
+ *
  * @see https://raw.githubusercontent.com/kr/beanstalkd/master/doc/protocol.txt
  */
 class Beanstalk extends AbstractAdapter
@@ -44,9 +49,9 @@ class Beanstalk extends AbstractAdapter
     private ?int $workTimeout = null;
 
     /**
-     * @param LoggerInterface|null $logger the logger that receives the adapter messages
+     * @param LoggerInterface $logger the logger that receives the adapter messages
      */
-    public function __construct(?LoggerInterface $logger = null)
+    public function __construct(LoggerInterface $logger)
     {
         parent::__construct($logger);
     }
@@ -99,7 +104,7 @@ class Beanstalk extends AbstractAdapter
      */
     public function error(string $msg): void
     {
-        $this->logError($msg);
+        $this?->logger->error($msg);
     }
 
     /**
@@ -173,7 +178,7 @@ class Beanstalk extends AbstractAdapter
                 }
             }
         } catch (RuntimeException $e) {
-            $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+            $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
         }
 
         return false;
@@ -192,7 +197,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Throwable $e) {
-                $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
 
@@ -212,7 +217,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Throwable $e) {
-                $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
 
@@ -238,7 +243,7 @@ class Beanstalk extends AbstractAdapter
                     return [$result['id'], $result['body'], []];
                 }
             } catch (Throwable $e) {
-                $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
 
                 throw $e;
             }
@@ -266,7 +271,7 @@ class Beanstalk extends AbstractAdapter
     ): string|Throwable {
         if (!$this->connected) {
             $error = new RuntimeException(self::class . ' adapter ' . __FUNCTION__ . ': not connected');
-            $this->logError($error->getMessage());
+            $this?->logger->error($error->getMessage());
 
             return $error;
         }
@@ -279,14 +284,14 @@ class Beanstalk extends AbstractAdapter
                 (string) $body
             );
         } catch (Throwable $e) {
-            $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+            $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
 
             return $e;
         }
 
         if (false === $result) {
             $error = new RuntimeException(self::class . ' adapter ' . __FUNCTION__ . ': beanstalkd rejected the job');
-            $this->logError($error->getMessage());
+            $this?->logger->error($error->getMessage());
 
             return $error;
         }
@@ -310,7 +315,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Throwable $e) {
-                $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
 
@@ -330,7 +335,7 @@ class Beanstalk extends AbstractAdapter
                     return true;
                 }
             } catch (Throwable $e) {
-                $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
 
@@ -351,7 +356,7 @@ class Beanstalk extends AbstractAdapter
 
                 return true;
             } catch (Throwable $e) {
-                $this->logError(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
             }
         }
 

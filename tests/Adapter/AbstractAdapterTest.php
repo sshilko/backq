@@ -2,13 +2,19 @@
 
 namespace BackQ\Tests\Adapter;
 
+use ArgumentCountError;
 use BackQ\Adapter\AbstractAdapter;
 use BackQ\Adapter\Beanstalk;
+use BackQ\Tests\Support\RecordingLogger;
 use BackQ\Tests\Support\TestAdapter;
 use Error;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
+use ReflectionMethod;
+use ReflectionProperty;
+use TypeError;
+use function method_exists;
 
 class AbstractAdapterTest extends TestCase
 {
@@ -41,52 +47,58 @@ class AbstractAdapterTest extends TestCase
         (new TestAdapter())->putTask('body', jobttr: 5);
     }
 
-    public function testLoggerIsInjectedThroughTheConstructor(): void
+    public function testTheLoggerIsMandatory(): void
     {
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())->method('error')->with('injected');
+        $parameter = (new ReflectionMethod(AbstractAdapter::class, '__construct'))->getParameters()[0];
 
-        (new TestAdapter($logger))->logError('injected');
+        $this->assertSame('logger', $parameter->getName());
+        $this->assertSame(LoggerInterface::class, (string) $parameter->getType());
+        /**
+         * No default, so an adapter cannot be built without a logger
+         */
+        $this->assertFalse($parameter->isDefaultValueAvailable());
     }
 
-    public function testSetLoggerStillAssignsTheDeprecatedSetter(): void
+    public function testTheLoggerIsRequiredAtCallTime(): void
     {
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())->method('error')->with('setter');
+        /**
+         * The base constructor, called directly: the double supplies a NullLogger of its own
+         * accord, so invoking the constructor it inherits would hide the requirement.
+         */
+        $adapter = (new ReflectionClass(TestAdapter::class))->newInstanceWithoutConstructor();
 
+        $this->expectException(ArgumentCountError::class);
+
+        (new ReflectionMethod(AbstractAdapter::class, '__construct'))->invoke($adapter);
+    }
+
+    public function testTheNullLoggerIsRejected(): void
+    {
+        $this->expectException(TypeError::class);
+
+        new TestAdapter(null);
+    }
+
+    public function testTheInjectedLoggerIsTheOneTheAdapterHolds(): void
+    {
+        $logger = new RecordingLogger();
+
+        $this->assertSame(
+            $logger,
+            (new ReflectionProperty(AbstractAdapter::class, 'logger'))->getValue(new TestAdapter($logger))
+        );
+    }
+
+    public function testTheLoggerHelpersAreGone(): void
+    {
+        /**
+         * An adapter logs through the injected PSR-3 logger, it does not wrap it
+         */
         $adapter = new TestAdapter();
-        $adapter->setLogger($logger);
-        $adapter->logError('setter');
-    }
 
-    public function testLogInfoForwardsToLogger(): void
-    {
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())->method('info')->with('hello');
-
-        (new TestAdapter($logger))->logInfo('hello');
-    }
-
-    public function testLogDebugForwardsToLogger(): void
-    {
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())->method('debug')->with('trace');
-
-        (new TestAdapter($logger))->logDebug('trace');
-    }
-
-    public function testLogErrorForwardsToLogger(): void
-    {
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())->method('error')->with('failure');
-
-        (new TestAdapter($logger))->logError('failure');
-    }
-
-    public function testLogErrorIsSilentWithoutLogger(): void
-    {
-        $adapter = new TestAdapter();
-        $adapter->logError('no logger attached');
-        $this->expectNotToPerformAssertions();
+        $this->assertFalse(method_exists($adapter, 'logInfo'));
+        $this->assertFalse(method_exists($adapter, 'logDebug'));
+        $this->assertFalse(method_exists($adapter, 'logError'));
+        $this->assertFalse(method_exists($adapter, 'setLogger'));
     }
 }

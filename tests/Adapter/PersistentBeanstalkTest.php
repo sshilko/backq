@@ -30,7 +30,7 @@ class PersistentBeanstalkTest extends TestCase
     {
         $server = new FakeBeanstalkServer();
         try {
-            $adapter = new PersistentBeanstalk();
+            $adapter = new PersistentBeanstalk(new RecordingLogger());
 
             $this->assertTrue($adapter->connect('127.0.0.1', $server->getPort()));
             $server->accept();
@@ -45,7 +45,7 @@ class PersistentBeanstalkTest extends TestCase
     {
         $server = new FakeBeanstalkServer();
         try {
-            $adapter = new PersistentBeanstalk();
+            $adapter = new PersistentBeanstalk(new RecordingLogger());
 
             $this->assertTrue($adapter->connect('127.0.0.1', $server->getPort(), 1, false));
             $server->accept();
@@ -78,7 +78,7 @@ class PersistentBeanstalkTest extends TestCase
 
     public function testDisconnectWithoutAConnectionReturnsFalse(): void
     {
-        $adapter = new PersistentBeanstalk();
+        $adapter = new PersistentBeanstalk(new RecordingLogger());
 
         $this->assertFalse($adapter->disconnect());
     }
@@ -116,7 +116,7 @@ class PersistentBeanstalkTest extends TestCase
         $this->assertFalse($this->isPersistent($adapter));
     }
 
-    public function testConnectLogsThroughTheAdapterWhenNoLoggerIsGiven(): void
+    public function testConnectLogsThroughTheInjectedLogger(): void
     {
         $logger  = new RecordingLogger();
         $adapter = new PersistentBeanstalk($logger);
@@ -143,7 +143,7 @@ class PersistentBeanstalkTest extends TestCase
     {
         $server = new FakeBeanstalkServer();
         try {
-            $adapter = new PersistentBeanstalk();
+            $adapter = new PersistentBeanstalk(new RecordingLogger());
             $adapter->connect('127.0.0.1', $server->getPort());
             $server->accept();
 
@@ -159,7 +159,7 @@ class PersistentBeanstalkTest extends TestCase
 
     private function connectedAdapter(Client $client, bool $persistent): PersistentBeanstalk
     {
-        $adapter = new PersistentBeanstalk();
+        $adapter = new PersistentBeanstalk(new RecordingLogger());
         (new ReflectionProperty(Beanstalk::class, 'client'))->setValue($adapter, $client);
         (new ReflectionProperty(Beanstalk::class, 'connected'))->setValue($adapter, true);
         (new ReflectionProperty(PersistentBeanstalk::class, 'persistentConnection'))->setValue($adapter, $persistent);

@@ -28,7 +28,7 @@ require_once __DIR__ . '/../../../vendor/autoload.php';
 final class MyRedisGuzzlePublisher extends Guzzle {}
 
 $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$adapter = new Redis(getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379), logger: $logger);
+$adapter = new Redis($logger, getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
 
 /**
  * The Guzzle worker sends the request asynchronously.

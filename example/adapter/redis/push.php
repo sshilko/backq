@@ -27,31 +27,31 @@ $redisHost = getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1';
 $redisPort = (int) (getenv('BACKQ_REDIS_PORT') ?: 6379);
 
 $logger   = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$redispub = new Redis($redisHost, $redisPort, logger: $logger);
+$redispub = new Redis($logger, $redisHost, $redisPort);
 $redispub->setWorkTimeout(5);
 if (!$redispub->connect()) {
     echo 'Failed to connect to redis at ' . $redisHost . ':' . $redisPort . "\n";
     exit(1);
 }
-$redispub->logInfo('Connected');
+$logger->info('Connected');
 if ($redispub->bindWrite($queue)) {
-    $redispub->logInfo('Ready to publish');
+    $logger->info('Ready to publish');
     $i = 100;
     while ($i > 0) {
         $randomMessage = 'Payload body of message ' . time();
         $jobId         = $redispub->putTask($randomMessage);
         if ($jobId instanceof Throwable) {
-            $redispub->logError('Failed pushing message: ' . $jobId->getMessage());
+            $logger->error('Failed pushing message: ' . $jobId->getMessage());
         } else {
-            $redispub->logInfo('Pushed message ' . $jobId);
+            $logger->info('Pushed message ' . $jobId);
         }
         $i--;
         sleep(1);
     }
 } else {
-    $redispub->logError('Failed to bind to write queue ' . $queue);
+    $logger->error('Failed to bind to write queue ' . $queue);
     exit(1);
 }
-$redispub->logInfo('All done');
+$logger->info('All done');
 $redispub->disconnect();
-$redispub->logInfo('Disconnected');
+$logger->info('Disconnected');

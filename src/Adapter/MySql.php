@@ -53,6 +53,12 @@ use const MYSQLI_ASSOC;
  *
  * WAIT->LOCK->[DONE | HOLD]
  *
+ * Every message is reported through $this?->logger. Psalm reads the nullsafe operator as
+ * widening $this to `MySql|null` for the rest of the method, which is not what it means
+ * on an injected logger, so the two resulting issues are silenced for this class.
+ * @psalm-suppress TypeDoesNotContainNull
+ * @psalm-suppress PossiblyNullReference
+ *
  * The adapter talks to a plain mysqli link owned by the caller, the link has to
  * be established before a job is published or picked. Query failures surface as
  * mysqli_sql_exception, the default error mode of the driver since PHP 8.1
@@ -65,9 +71,9 @@ abstract class MySql extends AbstractAdapter
     /**
      * @param mysqli $db an established connection, the adapter never closes it
      * @param JobConfig $config the job table and the sleeps of this adapter
-     * @param LoggerInterface|null $logger the logger that receives the adapter messages
+     * @param LoggerInterface $logger the logger that receives the adapter messages
      */
-    public function __construct(protected mysqli $db, protected JobConfig $config, ?LoggerInterface $logger = null)
+    public function __construct(protected mysqli $db, protected JobConfig $config, LoggerInterface $logger)
     {
         parent::__construct($logger);
 
@@ -90,7 +96,7 @@ abstract class MySql extends AbstractAdapter
                 'WHERE ' . JobColumn::State->value . " = '" . JobState::Wait->value . "' " .
                 'LIMIT 1 ' .
                 'FOR UPDATE';
-            $this->logDebug(__FUNCTION__ . ': ' . $sql);
+            $this?->logger->debug(__FUNCTION__ . ': ' . $sql);
             $data = $this->select($sql);
             \assert(isset($data[0]));
             if (1 === count($data)) {
@@ -99,17 +105,17 @@ abstract class MySql extends AbstractAdapter
                     'SET ' . JobColumn::State->value . ' = "' . JobState::Lock->value . '", ' .
                     JobColumn::Time->value . ' = "' . date('Y-m-d H:i:s') . '" ' .
                     'WHERE ' . $this->config->idColumn . ' = ' . $jobId;
-                $this->logDebug($sql);
+                $this?->logger->debug($sql);
                 $this->write($sql);
                 $result = [$jobId, $data[0][$this->config->dataColumn]];
-                $this->logDebug(__FUNCTION__ . ' result: ' . (string) json_encode($result));
+                $this?->logger->debug(__FUNCTION__ . ' result: ' . (string) json_encode($result));
                 $this->db->commit();
                 usleep($this->config->pickSuccessSleep);
 
                 return $result;
             }
         } catch (\Throwable $e) {
-            $this->logError($e->getMessage());
+            $this?->logger->error($e->getMessage());
             $this->rollback();
         }
         usleep($this->config->pickMissSleep);
@@ -139,7 +145,7 @@ abstract class MySql extends AbstractAdapter
         bool $noSleep = false,
     ): string|Throwable {
         if (null === $jobId || '' === (string) $jobId || 0 === $jobId) {
-            $this->logError(__FUNCTION__ . ' Missing job id parameter');
+            $this?->logger->error(__FUNCTION__ . ' Missing job id parameter');
 
             return new InvalidArgumentException(
                 self::class . '::' . __FUNCTION__ . '() requires a job id, pass $jobId or call putTaskTo()'
@@ -159,7 +165,7 @@ abstract class MySql extends AbstractAdapter
                 'WHERE ' . $this->config->idColumn . " = '" . $this->escape($jobId) . "' " .
                 'FOR UPDATE';
 
-            $this->logDebug(__FUNCTION__ . ': ' . $sql);
+            $this?->logger->debug(__FUNCTION__ . ': ' . $sql);
             $data = $this->select($sql);
             \assert(isset($data[0]));
             if (1 === count($data)) {
@@ -168,7 +174,7 @@ abstract class MySql extends AbstractAdapter
                     JobColumn::Time->value . ' = "' . date('Y-m-d H:i:s') . '", ' .
                     JobColumn::State->value . ' = "' . $state->value . '" ' .
                     'WHERE ' . $this->config->idColumn . ' = "' . $this->escape($jobId) . '"';
-                $this->logDebug($sql);
+                $this?->logger->debug($sql);
                 $this->write($sql);
                 $this->db->commit();
 
@@ -183,13 +189,13 @@ abstract class MySql extends AbstractAdapter
                 '"' . $this->escape((string) $body) . '",' .
                 '"' . date('Y-m-d H:i:s') . '",' .
                 '"' . $state->value . '")';
-            $this->logDebug($sql);
+            $this?->logger->debug($sql);
             $this->write($sql);
             $this->db->commit();
 
             return (string) $jobId;
         } catch (Throwable $e) {
-            $this->logError($e->getMessage());
+            $this?->logger->error($e->getMessage());
             $this->rollback();
 
             return $e;
@@ -292,7 +298,7 @@ abstract class MySql extends AbstractAdapter
     private function updateState(JobState $state, int|string|null $workId): bool
     {
         if (null === $workId) {
-            $this->logError(__FUNCTION__ . ' Missing job id');
+            $this?->logger->error(__FUNCTION__ . ' Missing job id');
 
             return false;
         }
@@ -301,7 +307,7 @@ abstract class MySql extends AbstractAdapter
             'SET ' . JobColumn::State->value . ' = "' . $state->value . '" ' .
             'WHERE ' . $this->config->idColumn . ' = "' . $this->escape($workId) . '"';
 
-        $this->logDebug(__FUNCTION__ . ': ' . $sql);
+        $this?->logger->debug(__FUNCTION__ . ': ' . $sql);
 
         try {
             return 0 <= $this->write($sql);
@@ -309,7 +315,7 @@ abstract class MySql extends AbstractAdapter
             /**
              * An acknowledge must not throw, false tells the worker the job stays open
              */
-            $this->logError($e->getMessage());
+            $this?->logger->error($e->getMessage());
 
             return false;
         }
@@ -364,7 +370,7 @@ abstract class MySql extends AbstractAdapter
         try {
             $this->db->rollback();
         } catch (mysqli_sql_exception) {
-            $this->logError(__FUNCTION__ . ' Transaction could not be rolled back');
+            $this?->logger->error(__FUNCTION__ . ' Transaction could not be rolled back');
         }
     }
 }

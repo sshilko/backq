@@ -104,52 +104,9 @@ abstract class AbstractAdapter
     abstract public function setWorkTimeout(?int $seconds = null): void;
 
     /**
-     * @param LoggerInterface|null $logger the logger that receives the adapter messages
+     * @param LoggerInterface $logger the logger that receives the adapter messages
      */
-    public function __construct(protected ?LoggerInterface $logger = null)
+    public function __construct(protected LoggerInterface $logger)
     {
-    }
-
-    /**
-     * @deprecated inject the logger instead: new Beanstalk(logger: $logger)
-     *
-     * Still functional, so existing code keeps logging. Nothing announces the deprecation at
-     * runtime: this library reports through PSR-3, and a PHP notice is not a channel it uses.
-     *
-     * @param LoggerInterface $logger
-     */
-    public function setLogger(LoggerInterface $logger): void
-    {
-        $this->logger = $logger;
-    }
-
-    /**
-     * @param string $message
-     */
-    public function logInfo(string $message): void
-    {
-        if (isset($this->logger)) {
-            $this->logger->info($message);
-        }
-    }
-
-    /**
-     * @param string $message
-     */
-    public function logDebug(string $message): void
-    {
-        if (isset($this->logger)) {
-            $this->logger->debug($message);
-        }
-    }
-
-    /**
-     * @param string $message
-     */
-    public function logError(string $message): void
-    {
-        if (isset($this->logger)) {
-            $this->logger->error($message);
-        }
     }
 }

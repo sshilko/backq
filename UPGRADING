@@ -3,7 +3,6 @@
 
 1. Backward Incompatible Changes
 2. New Features
-3. Deprecated Functionality
 
 ========================================
 1. Backward Incompatible Changes
@@ -89,6 +88,62 @@
   parameter is optional and nothing in the library overrides the method), but a
   subclass that declared a *narrower* signature must match. `logInfo()` and
   `logDebug()` are unchanged.
+- **The adapter logger is mandatory and the adapter no longer wraps it.**
+  `BackQ\Adapter\AbstractAdapter::__construct(?LoggerInterface $logger = null)`
+  becomes `__construct(LoggerInterface $logger)`: an adapter cannot be built
+  without a logger, and `setLogger()` is **removed** (it was `@deprecated` in the
+  4.x → 5.x cycle below — pass the logger to the constructor instead). The
+  `logInfo()`, `logDebug()` and `logError()` helpers are **removed** with it: an
+  adapter that is handed a PSR-3 logger logs through it directly
+  (`$this?->logger->error($message)`) instead of wrapping it in three
+  pass-throughs, and the `isset()` guard each helper carried is gone with them.
+  `build/phpcs-ruleset.xml` excludes
+  `SlevomatCodingStandard.ControlStructures.DisallowNullSafeObjectOperator` so
+  that form is allowed in the adapters.
+
+  The logger is the **first** constructor argument of every adapter, so a caller
+  that never passed one has nothing to move:
+
+  ```php
+  new Beanstalk($logger);
+  new MySqlAdapter($db, new JobConfig(), $logger);
+
+  // was: new Redis($host, $port, logger: $logger)
+  new Redis($logger, $host, $port);
+  ```
+
+  The `Redis` constructor is the one signature that moves: its nine connection
+  settings used to come first, with the logger appended as the tenth parameter.
+  A required parameter cannot follow optional ones — PHP 8 treats it as
+  deprecated — so the logger moved to the front and the connection settings keep
+  their names and defaults, which is why passing them as named arguments is
+  unaffected.
+
+  Pass `new NullLogger()` (or any PSR-3 logger of your own) where the old
+  `null` default meant "log nothing":
+
+  ```php
+  use Psr\Log\NullLogger;
+
+  $adapter = new Beanstalk(new NullLogger());
+  ```
+
+  Migration:
+
+  | Removed from `AbstractAdapter` | Use instead |
+  |---|---|
+  | `$adapter->logInfo($m)` | `$logger->info($m)` |
+  | `$adapter->logDebug($m)` | `$logger->debug($m)` |
+  | `$adapter->logError($m)` | `$logger->error($m)` |
+  | `$adapter->setLogger($l)` | `new Beanstalk($l)` |
+
+  A custom adapter that declared its own constructor must pass the logger on:
+  `parent::__construct($logger)`. Code that subclassed `AbstractAdapter` and
+  called the inherited `logError()` / `logDebug()` / `logInfo()` helpers must call
+  the injected logger itself. The worker-side
+  `BackQ\Worker\AbstractWorker::setLogger()`, `logInfo()`, `logDebug()` and
+  `logError()` are **not** affected: the worker's logger is still optional and
+  still assigned through the setter.
 - `BackQ\Adapter\AbstractAdapter` method parameters are now typed (were untyped):
   - `bindRead(string $queue)`, `bindWrite(string $queue)`,
     `hasWorkers(string $queue)`
@@ -280,32 +335,6 @@
   unchanged. Subclasses that overrode the sleep properties now pass a
   `JobConfig` with their own values instead.
 - `json_validate()` in place of `@json_decode(...)` + `is_array` checks.
-- `BackQ\Adapter\AbstractAdapter::__construct(?LoggerInterface $logger = null)`
-  takes the PSR-3 logger, so an adapter is fully configured by the caller
-  instead of being mutated after construction. Every adapter forwards it to
-  `parent::__construct()` as its **last** constructor argument, so the new
-  parameter is appended and no existing call site breaks:
-
-  ```php
-  new Beanstalk($logger);
-  new Redis($host, $port, logger: $logger);
-  new MySqlAdapter($db, new JobConfig(), $logger);   // unchanged
-  ```
-
-  A custom adapter that declares its own constructor must call
-  `parent::__construct($logger)`; without it the logger is silently dropped.
-  `Beanstalk` and `PersistentBeanstalk` had no constructor and gained one.
-
-========================================
-3. Deprecated Functionality
-========================================
-
-- `BackQ\Adapter\AbstractAdapter::setLogger()` is `@deprecated`: pass the logger
-  to the constructor instead (`new Beanstalk($logger)`). It
-  keeps working, so upgrading changes no behaviour, and the deprecation is
-  docblock-only — nothing is emitted at runtime, because this library does not
-  call `trigger_error()`. The setter of `BackQ\Worker\AbstractWorker` is not
-  deprecated.
 
 ------------------------------------------------------------------------------
 3.x -> 4.x (PHP 8.1 modernization)

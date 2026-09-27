@@ -72,6 +72,12 @@
             the only form that works.
         -->
         <exclude name="SlevomatCodingStandard.Functions.DisallowNamedArguments" />
+        <!--
+            The adapters log through the injected PSR-3 logger as $this?->logger->error(...):
+            one null check per call site keeps the message and the guard together, where the
+            removed logError() helper had one for all three levels.
+        -->
+        <exclude name="SlevomatCodingStandard.ControlStructures.DisallowNullSafeObjectOperator" />
         <exclude name="SlevomatCodingStandard.PHP.DisallowReference.DisallowedAssigningByReference" />
         <exclude name="SlevomatCodingStandard.Operators.DisallowIncrementAndDecrementOperators.DisallowedPostIncrementOperator" />
         <exclude name="SlevomatCodingStandard.Operators.DisallowIncrementAndDecrementOperators.DisallowedPostDecrementOperator" />
