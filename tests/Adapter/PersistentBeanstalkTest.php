@@ -4,11 +4,11 @@ namespace BackQ\Tests\Adapter;
 
 use BackQ\Adapter\Beanstalk;
 use BackQ\Adapter\Beanstalk\Client;
+use BackQ\Adapter\Beanstalk\Connection;
 use BackQ\Adapter\PersistentBeanstalk;
 use BackQ\Tests\Support\FakeBeanstalkServer;
 use BackQ\Tests\Support\RecordingLogger;
 use PHPUnit\Framework\TestCase;
-use ReflectionMethod;
 use ReflectionProperty;
 use function array_column;
 use function fclose;
@@ -19,20 +19,13 @@ use function substr;
 
 class PersistentBeanstalkTest extends TestCase
 {
-    public function testTheConnectionIsPersistentUnlessAskedOtherwise(): void
-    {
-        $parameters = (new ReflectionMethod(PersistentBeanstalk::class, 'connect'))->getParameters();
-
-        $this->assertTrue($parameters[3]->getDefaultValue());
-    }
-
-    public function testConnectKeepsTheConnectionOpenForTheNextWorker(): void
+    public function testTheConnectionIsPersistentWhateverTheCallerAskedFor(): void
     {
         $server = new FakeBeanstalkServer();
         try {
             $adapter = new PersistentBeanstalk(new RecordingLogger());
 
-            $this->assertTrue($adapter->connect('127.0.0.1', $server->getPort()));
+            $this->assertTrue($adapter->connect(new Connection(port: $server->getPort())));
             $server->accept();
 
             $this->assertTrue($this->isPersistent($adapter));
@@ -41,16 +34,41 @@ class PersistentBeanstalkTest extends TestCase
         }
     }
 
-    public function testConnectCanAskForANonPersistentConnection(): void
+    public function testTheSocketItselfIsPersistent(): void
     {
         $server = new FakeBeanstalkServer();
         try {
             $adapter = new PersistentBeanstalk(new RecordingLogger());
 
-            $this->assertTrue($adapter->connect('127.0.0.1', $server->getPort(), 1, false));
+            $this->assertTrue($adapter->connect(new Connection(port: $server->getPort())));
             $server->accept();
 
-            $this->assertFalse($this->isPersistent($adapter));
+            $client = (new ReflectionProperty(Beanstalk::class, 'client'))->getValue($adapter);
+            $config = (new ReflectionProperty(Client::class, '_config'))->getValue($client);
+
+            $this->assertTrue($config['persistent']);
+        } finally {
+            $server->close();
+        }
+    }
+
+    /**
+     * The plain adapter is the one that closes, so the difference between the two is the
+     * class and not a flag passed to connect()
+     */
+    public function testAPlainAdapterIsNeverPersistent(): void
+    {
+        $server = new FakeBeanstalkServer();
+        try {
+            $adapter = new Beanstalk(new RecordingLogger());
+
+            $this->assertTrue($adapter->connect(new Connection(port: $server->getPort())));
+            $server->accept();
+
+            $client = (new ReflectionProperty(Beanstalk::class, 'client'))->getValue($adapter);
+            $config = (new ReflectionProperty(Client::class, '_config'))->getValue($client);
+
+            $this->assertFalse($config['persistent']);
         } finally {
             $server->close();
         }
@@ -101,7 +119,7 @@ class PersistentBeanstalkTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
-    public function testConnectRemembersTheAskedForModeEvenWhenAlreadyConnected(): void
+    public function testConnectKeepsTheModeOfTheLiveConnection(): void
     {
         $client = $this->createMock(Client::class);
         $client->expects($this->never())->method('connect');
@@ -109,11 +127,11 @@ class PersistentBeanstalkTest extends TestCase
         $adapter = $this->connectedAdapter($client, true);
 
         /**
-         * The live connection stays open, but the adapter now believes it has to
-         * close it once the worker is done
+         * connect() answers for a socket that is already open, so it does not go through
+         * the hook that would decide the mode again
          */
-        $this->assertTrue($adapter->connect('127.0.0.1', $this->unusedPort(), 1, false));
-        $this->assertFalse($this->isPersistent($adapter));
+        $this->assertTrue($adapter->connect(new Connection(port: $this->unusedPort())));
+        $this->assertTrue($this->isPersistent($adapter));
     }
 
     public function testConnectLogsThroughTheInjectedLogger(): void
@@ -121,22 +139,28 @@ class PersistentBeanstalkTest extends TestCase
         $logger  = new RecordingLogger();
         $adapter = new PersistentBeanstalk($logger);
 
-        $this->assertFalse($adapter->connect('127.0.0.1', $this->unusedPort()));
+        $this->assertFalse($adapter->connect(new Connection(port: $this->unusedPort())));
 
         $this->assertNotEmpty($logger->records);
         $this->assertContains('error', array_column($logger->records, 0));
     }
 
-    public function testConnectPrefersTheGivenLogger(): void
+    public function testTheInjectedLoggerIsAlsoTheClientsLogger(): void
     {
-        $ownLogger    = new RecordingLogger();
-        $givenLogger  = new RecordingLogger();
-        $adapter      = new PersistentBeanstalk($ownLogger);
+        /**
+         * The vendored client reports through whatever answers error(string), so the
+         * adapter hands it the logger it was given. There is no second logger to
+         * prefer: connect() no longer takes one.
+         */
+        $logger  = new RecordingLogger();
+        $adapter = new PersistentBeanstalk($logger);
 
-        $this->assertFalse($adapter->connect('127.0.0.1', $this->unusedPort(), 1, true, $givenLogger));
+        $this->assertFalse($adapter->connect(new Connection(port: $this->unusedPort())));
 
-        $this->assertNotEmpty($givenLogger->records);
-        $this->assertSame([], $ownLogger->records);
+        $client = (new ReflectionProperty(Beanstalk::class, 'client'))->getValue($adapter);
+        $config = (new ReflectionProperty(Client::class, '_config'))->getValue($client);
+
+        $this->assertSame($logger, $config['logger']);
     }
 
     public function testAWorkerRunOverAPersistentConnectionKeepsItOpen(): void
@@ -144,7 +168,7 @@ class PersistentBeanstalkTest extends TestCase
         $server = new FakeBeanstalkServer();
         try {
             $adapter = new PersistentBeanstalk(new RecordingLogger());
-            $adapter->connect('127.0.0.1', $server->getPort());
+            $adapter->connect(new Connection(port: $server->getPort()));
             $server->accept();
 
             /**

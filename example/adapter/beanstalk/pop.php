@@ -10,6 +10,7 @@
  */
 
 use BackQ\Adapter\Beanstalk;
+use BackQ\Adapter\Beanstalk\Connection;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
@@ -29,7 +30,7 @@ $logger        = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DE
 $beanstalkdsub = new Beanstalk($logger);
 $logger->info('Starting');
 $beanstalkdsub->setWorkTimeout(5);
-if (!$beanstalkdsub->connect($beanstalkdHost, $beanstalkdPort)) {
+if (!$beanstalkdsub->connect(new Connection(host: $beanstalkdHost, port: $beanstalkdPort))) {
     echo 'Failed to connect to beanstalkd at ' . $beanstalkdHost . ':' . $beanstalkdPort . "\n";
     exit(1);
 }

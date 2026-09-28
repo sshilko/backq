@@ -13,6 +13,8 @@ namespace BackQ\Adapter;
 
 use BackQ\Adapter\Redis\Connector;
 use BackQ\Adapter\Redis\Queue;
+use BackQ\Adapter\Redis\RedisConfig;
+use Closure;
 use DateInterval;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Debug\ExceptionHandler;
@@ -28,9 +30,7 @@ use Throwable;
 use function assert;
 use function count;
 use function in_array;
-use function trigger_error;
 use function var_export;
-use const E_USER_WARNING;
 
 /**
  * @package BackQ\Adapter
@@ -45,8 +45,19 @@ use const E_USER_WARNING;
  */
 class Redis extends AbstractAdapter
 {
+    /**
+     * @deprecated use ConnectionState, which is the whole state and not a spelling of part of it
+     */
     public const int STATE_BINDWRITE = 1;
+
+    /**
+     * @deprecated use ConnectionState, which is the whole state and not a spelling of part of it
+     */
     public const int STATE_BINDREAD  = 2;
+
+    /**
+     * @deprecated use ConnectionState, which is the whole state and not a spelling of part of it
+     */
     public const int STATE_NOTHING   = 0;
 
     /**
@@ -59,11 +70,16 @@ class Redis extends AbstractAdapter
     private const string REDIS_DRIVER     = 'phpredis';
     private const string REDIS_DRIVER_OWN = 'redis-backq';
 
-    private $connected = false;
-
     private Container $app;
 
-    private Manager $queue;
+    /**
+     * The queue connection, built once by ensureConnected()
+     *
+     * Null until that build, which is a state no operation can reach: the ones that need the
+     * connection are gated on isReady(), and taking a role is what builds it. It is nullable so
+     * the "already built" question has an answer that is not an uninitialised-property read.
+     */
+    private ?Manager $queue = null;
 
     private string $queueName;
 
@@ -73,8 +89,6 @@ class Redis extends AbstractAdapter
     private array $reservedJobs = [];
 
     private ConnectionState $state = ConnectionState::Nothing;
-
-    private array $stateData = [];
 
     /**
      * Since Laravel 5.8 safe
@@ -107,64 +121,76 @@ class Redis extends AbstractAdapter
      *
      * This should be queue property and should be set per-queue
      */
-    private $retryAfter = null;
+    private ?int $retryAfter = null;
 
     /**
-     * The 9 connection settings stay separate parameters, so a caller passes them as
-     * named arguments. The parameter count is deliberate, not a leftover.
+     * The connection settings live in a value object, so a caller names the settings it
+     * means and a wrong one is rejected where the caller can see it.
      *
-     * The logger comes first, because PHP forbids a required parameter after an optional
+     * The logger stays first, because PHP forbids a required parameter after an optional
      * one and a PHP 8 deprecation is not a price worth paying.
-     *
-     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
-     * @psalm-suppress TooManyArguments
-     * @phan-suppress PhanParamTooMany
      */
-    public function __construct(
-        LoggerInterface $logger,
-        protected string $host = '127.0.0.1',
-        protected int $port = 6379,
-        private bool $persistent = false,
-        private ?int $persistent_id = null,
-        private ?string $prefix = null,
-        private int $timeout = 10,
-        private int $read_timeout = 10,
-        private int $database_id = 0,
-        private ?string $auth_password = null,
-    ) {
+    public function __construct(LoggerInterface $logger, private readonly RedisConfig $config = new RedisConfig())
+    {
         parent::__construct($logger);
+
+        /**
+         * connect() builds the connection before anything bound a queue, so it needs a
+         * name to build it with. bindRead() and bindWrite() still say which queue they
+         * mean, and the name the config carries is the default until they do.
+         */
+        $this->queueName = $config->queueName;
 
         $this->app = new Redis\App();
 
-        $this->app->bind('exception.handler', static function () {
-            return new class implements ExceptionHandler
-            {
-                #[Override]
-                public function report(Throwable $e): void
-                {
-                    trigger_error($e->getMessage(), E_USER_WARNING);
-                }
+        /**
+         * illuminate reports through the container's exception handler. PSR-3 is the
+         * channel, so the handler logs and raises nothing: a warning here would be
+         * turned into a throwable by a set_error_handler in user code, at a point far
+         * from the queue operation that failed.
+         */
+        $reportable = static function (Throwable $e) use ($logger): void {
+            $logger->error($e->getMessage(), ['exception' => $e]);
+        };
 
-                /** @phan-suppress-next-line PhanUndeclaredTypeReturnType */
-                #[Override]
-                public function render($request, Throwable $e): HttpFoundationResponse
-                {
-                    return new HttpFoundationResponse();
-                }
+        $this->app->bind(
+            'exception.handler',
+            static function () use ($reportable): ExceptionHandler {
+                return new class ($reportable) implements ExceptionHandler {
+                    /**
+                     * @param Closure(Throwable): void $reporter
+                     */
+                    public function __construct(private readonly Closure $reporter)
+                    {
+                    }
 
-                #[Override]
-                public function renderForConsole($output, Throwable $e): void
-                {
-                    return;
-                }
+                    #[Override]
+                    public function report(Throwable $e): void
+                    {
+                        ($this->reporter)($e);
+                    }
 
-                #[Override]
-                public function shouldReport(Throwable $e)
-                {
-                    return true;
-                }
-            };
-        });
+                    /** @phan-suppress-next-line PhanUndeclaredTypeReturnType */
+                    #[Override]
+                    public function render($request, Throwable $e): HttpFoundationResponse
+                    {
+                        return new HttpFoundationResponse();
+                    }
+
+                    #[Override]
+                    public function renderForConsole($output, Throwable $e): void
+                    {
+                        return;
+                    }
+
+                    #[Override]
+                    public function shouldReport(Throwable $e)
+                    {
+                        return true;
+                    }
+                };
+            }
+        );
     }
 
     /**
@@ -193,15 +219,15 @@ class Redis extends AbstractAdapter
          */
         if (null !== $seconds
             && (
-                $seconds >= $this->timeout
-                || $seconds >= $this->read_timeout
+                $seconds >= $this->config->timeout
+                || $seconds >= $this->config->readTimeout
             )
             && 0 === self::BLOCKFOR_EMULATE
         ) {
             /**
              * Cannot redis.blpop for > read_timeout seconds, wrong settings
              */
-            $newWorkTimeout = $this->read_timeout - 1;
+            $newWorkTimeout = $this->config->readTimeout - 1;
             if ($newWorkTimeout > 0) {
                 $this?->logger->debug(
                     'workTimeout ' . $seconds . ' > read_timeout, using workTimeout = ' . $newWorkTimeout
@@ -217,19 +243,26 @@ class Redis extends AbstractAdapter
 
     /**
      * Disconnects from queue
+     *
+     * The gate here is "there is a connection", not "there is a connection and a queue is
+     * bound": an adapter that connected and was never bound still has a socket to close,
+     * and refusing to close it would leave it claiming to be connected. Releasing the
+     * reserved jobs is best effort and a job lost on the way out does not make the close
+     * itself fail, so the answer is whether this adapter is unbound and quiet now, not
+     * whether every release landed.
      */
     #[Override]
     public function disconnect(): bool
     {
         $this?->logger->debug('Disconnecting');
-        if (true === $this->connected) {
+        if (ConnectionState::Nothing !== $this->state) {
             $this?->logger->debug('Disconnecting, previously connected');
 
             try {
-                if (ConnectionState::BindRead === $this->state || ConnectionState::BindWrite === $this->state) {
+                if ($this->state->isBound()) {
                     $this?->logger->debug('Disconnecting, state detected');
 
-                    $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
+                    $redisQueue = $this->queue()->getConnection(self::CONNECTION_NAME);
                     \assert($redisQueue instanceof Queue);
                     if ($redisQueue) {
                         $manager = $redisQueue->getRedis();
@@ -260,13 +293,10 @@ class Redis extends AbstractAdapter
                     }
                 }
             } catch (Throwable $ex) {
-                $errmsg = self::class . ' ' . __FUNCTION__ . ': ' . $ex->getMessage();
-                $this?->logger->error($errmsg);
+                $this->log(__FUNCTION__, $ex);
             }
 
-            $this->state     = ConnectionState::Nothing;
-            $this->stateData = [];
-            $this->connected = false;
+            $this->state = ConnectionState::Nothing;
             $this?->logger->debug('Disconnecting, successful');
 
             return true;
@@ -285,26 +315,9 @@ class Redis extends AbstractAdapter
     #[Override]
     public function ping(bool $reconnect = true): bool
     {
-        if ($this->connected) {
-            try {
-                $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
-                assert($redisQueue instanceof Queue);
-                $redis = $redisQueue->getRedis();
-                assert($redis instanceof \Redis);
-                $pong  = $redis->ping();
-
-                if (in_array($pong, [true, '+PONG'], true)) {
-                    $this?->logger->debug(__FUNCTION__ . ' successful');
-
-                    return true;
-                }
-            } catch (Throwable $ex) {
-                $this?->logger->error(self::class . ' ' . __FUNCTION__ . ' exception: ' . $ex->getMessage());
-            }
-        }
-        $this?->logger->debug(__FUNCTION__ . ' failed');
-
-        return false;
+        return $this->attempt(__FUNCTION__, function (): bool {
+            return $this->pingServer();
+        });
     }
 
     /**
@@ -314,35 +327,9 @@ class Redis extends AbstractAdapter
     #[Override]
     public function afterWorkFailed(?string $workId): bool
     {
-        $this?->logger->debug(__FUNCTION__);
-
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
-                ConnectionState::BindWrite === $this->state)
-        ) {
-            $this?->logger->debug(__FUNCTION__ . ' currently ' . count($this->reservedJobs) . ' reserved job(s)');
-
-            /** @var RedisJob $redisJob */
-            if (null !== $workId && isset($this->reservedJobs[$workId]) && $redisJob = $this->reservedJobs[$workId]) {
-                /**
-                 * Delete reserved job from queue
-                 */
-                $jobId = $redisJob->getJobId();
-                if (null !== $jobId && $jobId === $workId) {
-                    $this?->logger->debug(
-                        __FUNCTION__ . ' releasing back to queue / failed to process ' . $workId . ' job'
-                    );
-
-                    $redisJob->release();
-                    unset($this->reservedJobs[$jobId]);
-                } else {
-                    throw new InvalidArgumentException('Reserved job doesnt match failed job, nothing to release');
-                }
-            }
-
-            return true;
-        }
-
-        return false;
+        return $this->acknowledge($workId, static function (RedisJob $job): void {
+            $job->release();
+        });
     }
 
     /**
@@ -352,33 +339,9 @@ class Redis extends AbstractAdapter
     #[Override]
     public function afterWorkSuccess(?string $workId): bool
     {
-        $this?->logger->debug(__FUNCTION__);
-
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
-                ConnectionState::BindWrite === $this->state)
-        ) {
-            $this?->logger->debug(__FUNCTION__ . ' currently ' . count($this->reservedJobs) . ' reserved job(s)');
-
-            /** @var RedisJob $redisJob */
-            if (null !== $workId && isset($this->reservedJobs[$workId]) && $redisJob = $this->reservedJobs[$workId]) {
-                /**
-                 * Delete reserved job from queue
-                 */
-                $jobId = $redisJob->getJobId();
-                if (null !== $jobId && $jobId === $workId) {
-                    $this?->logger->debug(__FUNCTION__ . ' releasing completed ' . $workId . ' job');
-
-                    $redisJob->delete();
-                    unset($this->reservedJobs[$jobId]);
-                } else {
-                    throw new InvalidArgumentException('Reserved job doesnt match successful job');
-                }
-            }
-
-            return true;
-        }
-
-        return false;
+        return $this->acknowledge($workId, static function (RedisJob $job): void {
+            $job->delete();
+        });
     }
 
     /**
@@ -388,15 +351,7 @@ class Redis extends AbstractAdapter
     #[Override]
     public function bindWrite(string $queue): bool
     {
-        if ($this->connected && ConnectionState::Nothing === $this->state) {
-            $this->state = ConnectionState::BindWrite;
-            $this->queueName = $queue;
-            $this->_connect();
-
-            return true;
-        }
-
-        return false;
+        return $this->bind($queue, ConnectionState::BindWrite);
     }
 
     /**
@@ -406,15 +361,7 @@ class Redis extends AbstractAdapter
     #[Override]
     public function bindRead(string $queue): bool
     {
-        if ($this->connected && ConnectionState::Nothing === $this->state) {
-            $this->state = ConnectionState::BindRead;
-            $this->queueName = $queue;
-            $this->_connect();
-
-            return true;
-        }
-
-        return false;
+        return $this->bind($queue, ConnectionState::BindRead);
     }
 
     /**
@@ -426,7 +373,7 @@ class Redis extends AbstractAdapter
     #[Override]
     public function hasWorkers(string $queue): bool
     {
-        $this?->logger->info(self::class . '.' . __FUNCTION__ . ' not supported, reporting no workers');
+        $this?->logger->debug(self::class . '.' . __FUNCTION__ . ' not supported, reporting no workers');
 
         return false;
     }
@@ -449,16 +396,18 @@ class Redis extends AbstractAdapter
             $this->blockFor = $timeout;
         }
 
-        if ($this->connected && (ConnectionState::BindRead === $this->state ||
-                ConnectionState::BindWrite === $this->state)
-        ) {
-            $redisQueue = $this->queue->getConnection(self::CONNECTION_NAME);
+        $operation = __FUNCTION__;
+
+        $result = $this->attemptRethrowing($operation, function () use ($operation): bool|array {
+            $redisQueue = $this->queue()->getConnection(self::CONNECTION_NAME);
             assert($redisQueue instanceof Queue);
             if ($this->blockFor) {
                 $redisQueue->setBlockFor($this->blockFor);
             }
 
-            $this?->logger->debug(__FUNCTION__ . ' blocking for ' . (int) $this->blockFor . ' seconds until get a job');
+            $this?->logger->debug(
+                $operation . ' blocking for ' . (int) $this->blockFor . ' seconds until get a job'
+            );
             $redisJob = $redisQueue->pop($this->queueName);
 
             /** @var RedisJob $redisJob */
@@ -480,7 +429,7 @@ class Redis extends AbstractAdapter
                  * @psalm-suppress RedundantCastGivenDocblockType
                  */
                 $jobId = (string) $rawJobId;
-                $this?->logger->debug(__FUNCTION__ . ' reserved a job ' . $jobId);
+                $this?->logger->debug($operation . ' reserved a job ' . $jobId);
 
                 if (isset($this->reservedJobs[$jobId])) {
                     $redisJob->release();
@@ -514,10 +463,13 @@ class Redis extends AbstractAdapter
                 return [$jobId, $jobPayload['data']];
             }
 
-            $this?->logger->debug(__FUNCTION__ . ' not reserved a job, nothing in queue');
-        }
+            $this?->logger->debug($operation . ' not reserved a job, nothing in queue');
 
-        return false;
+            return false;
+        });
+        \assert(\is_bool($result) || \is_array($result));
+
+        return $result;
     }
 
     /**
@@ -536,82 +488,216 @@ class Redis extends AbstractAdapter
     {
         $this?->logger->debug(__FUNCTION__);
 
-        if (!$this->connected || (ConnectionState::BindRead !== $this->state
-                && ConnectionState::BindWrite !== $this->state)
-        ) {
-            $error = new RuntimeException(
-                self::class . ' adapter ' . __FUNCTION__ . ': not connected to a bound queue'
-            );
-            $this?->logger->error($error->getMessage());
+        $operation = __FUNCTION__;
 
-            return $error;
-        }
-
-        $this?->logger->debug(
-            __FUNCTION__ . ' is connected and ready to: ' . (ConnectionState::BindRead === $this->state ? 'read' : 'write')
-        );
-        $instance = $this->queue->getConnection(self::CONNECTION_NAME);
-        assert($instance instanceof Queue);
-        $jobName  = $this->queueName;
-        $body     = (string) $body;
-
-        try {
-            if ($readyWait > 0) {
-                $delay  = new DateInterval('PT' . $readyWait . 'S');
-                $taskId = $instance->later($delay, $jobName, $body, $this->queueName);
-
+        return $this->attemptReturning(
+            $operation,
+            function () use ($body, $readyWait, $operation): string {
                 $this?->logger->debug(
-                    __FUNCTION__ . ' ' . ($taskId ? 'pushed' : 'failed push') . ' delayed job (' . $readyWait . ' seconds) ' . $taskId
+                    $operation . ' is connected and ready to: '
+                    . (ConnectionState::BindRead === $this->state ? 'read' : 'write')
                 );
-            } else {
-                $taskId = $instance->push($jobName, $body, $this->queueName);
-                $this?->logger->debug(
-                    __FUNCTION__ . ' ' . ($taskId ? 'pushed' : 'failed push') . ' task without delay ' . $taskId
-                );
+                $instance = $this->queue()->getConnection(self::CONNECTION_NAME);
+                assert($instance instanceof Queue);
+                $jobName  = $this->queueName;
+                $body     = (string) $body;
+
+                if ($readyWait > 0) {
+                    $delay  = new DateInterval('PT' . $readyWait . 'S');
+                    $taskId = $instance->later($delay, $jobName, $body, $this->queueName);
+
+                    $this?->logger->debug(
+                        $operation . ' ' . ($taskId ? 'pushed' : 'failed push')
+                        . ' delayed job (' . $readyWait . ' seconds) ' . $taskId
+                    );
+                } else {
+                    $taskId = $instance->push($jobName, $body, $this->queueName);
+                    $this?->logger->debug(
+                        $operation . ' ' . ($taskId ? 'pushed' : 'failed push') . ' task without delay ' . $taskId
+                    );
+                }
+
+                if (null === $taskId) {
+                    throw new RuntimeException('push failed');
+                }
+
+                $this?->logger->debug($operation . ' return ' . var_export($taskId, true));
+
+                return (string) $taskId;
             }
-        } catch (Throwable $e) {
-            $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
-
-            return $e;
-        }
-
-        if (null === $taskId) {
-            $error = new RuntimeException(self::class . ' adapter ' . __FUNCTION__ . ': push failed');
-            $this?->logger->error($error->getMessage());
-
-            return $error;
-        }
-
-        $this?->logger->debug(__FUNCTION__ . ' return ' . var_export($taskId, true));
-
-        return (string) $taskId;
+        );
     }
 
     /**
-     * connect and negotiate protocol
+     * Connect and negotiate protocol
+     *
+     * `true` means the server answered, so the caller learns about an unreachable server
+     * here and not from the bind that follows. A second connect() answers for the live
+     * connection rather than replacing it: the jobs this adapter is still holding belong
+     * to it, and dropping them is not something a caller asked for.
      */
     #[Override]
     public function connect(): bool
     {
         $this?->logger->debug(__FUNCTION__);
 
-        if ($this->connected) {
-            $this->disconnect();
-        }
-        $this->connected = true;
+        return $this->attemptConnect(__FUNCTION__, function (): bool {
+            if (ConnectionState::Nothing !== $this->state) {
+                $this?->logger->debug(__FUNCTION__ . ' already connected, keeping the live connection');
 
-        return $this->connected;
+                return true;
+            }
+
+            $this->ensureConnected();
+
+            if (!$this->pingServer()) {
+                $this?->logger->error(__FUNCTION__ . ': the redis server did not answer');
+
+                return false;
+            }
+
+            $this->state = ConnectionState::Connected;
+
+            return true;
+        });
     }
 
-    private function _connect(): void
+    /**
+     * A connected and bound adapter is the only state a queue operation can run in
+     */
+    #[Override]
+    protected function isReady(): bool
+    {
+        return $this->state->isBound();
+    }
+
+    /**
+     * Take the role this adapter plays, and the queue it plays it on
+     *
+     * A role can only be taken on a connection the server confirmed and that is not
+     * playing one already, so a caller that never connected learns that here. The build
+     * is the one connect() uses too, and it happens once.
+     *
+     * @param ConnectionState $role BindRead or BindWrite, the state being taken
+     */
+    private function bind(string $queue, ConnectionState $role): bool
+    {
+        if (ConnectionState::Connected !== $this->state) {
+            $this->preconditionFailed(__FUNCTION__);
+
+            return false;
+        }
+
+        $this->queueName = $queue;
+        $this->ensureConnected();
+        $this->state = $role;
+
+        return true;
+    }
+
+    /**
+     * Does the server answer right now
+     *
+     * Not gated on being bound: connect() has to be able to ask this before a role is
+     * taken, and a bound adapter is a subset of a connected one.
+     */
+    private function pingServer(): bool
+    {
+        $redisQueue = $this->queue()->getConnection(self::CONNECTION_NAME);
+        assert($redisQueue instanceof Queue);
+        $redis = $redisQueue->getRedis();
+        assert($redis instanceof \Redis);
+        $pong  = $redis->ping();
+
+        if (in_array($pong, [true, '+PONG'], true)) {
+            $this?->logger->debug('ping successful');
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * One acknowledge, whichever of the two it is
+     *
+     * The gate and the three outcomes are shared; the two bodies only differ in what
+     * they tell the queue. Written this way because a body flag would put the policy
+     * back at the call site, which is the thing this class no longer spells out.
+     *
+     * @param Closure(RedisJob): void $tell_the_queue what the queue is told about the job
+     */
+    private function acknowledge(?string $workId, Closure $tell_the_queue): bool
     {
         $this?->logger->debug(__FUNCTION__);
 
-        //$this->app->singleton('encrypter', function () {
-        //    return new \Illuminate\Encryption\Encrypter('383baa56ab');
-        //});
+        if (!$this->isReady()) {
+            $this->preconditionFailed(__FUNCTION__);
 
-        $persistentId = $this->persistent && $this->persistent_id ? getmypid() : 0;
+            return false;
+        }
+
+        $reserved = $this->reservedJob($workId);
+        if (null === $reserved) {
+            return false;
+        }
+
+        [$redisJob, $key] = $reserved;
+
+        $tell_the_queue($redisJob);
+        unset($this->reservedJobs[$key]);
+
+        return true;
+    }
+
+    /**
+     * The job this id was reserved under, and the key it is held under
+     *
+     * An id nothing was reserved under is a lost id: the queue was not told, so the
+     * acknowledge fails and the job stays in the reserved set until retry_after reaps
+     * it. It is a debug record and not a throw, because a failed acknowledge only
+     * re-opens the job where a throw would kill the worker over a bookkeeping miss.
+     *
+     * An id that is reserved under a different job is a caller bug and is raised: the
+     * worker holds the id pickTask() reported, so the two can only differ because
+     * something between them mixed them up.
+     *
+     * @return array{0: RedisJob, 1: string}|null the job and the key it is held under
+     */
+    private function reservedJob(?string $workId): ?array
+    {
+        $this?->logger->debug('acknowledge currently ' . count($this->reservedJobs) . ' reserved job(s)');
+
+        if (null === $workId || !isset($this->reservedJobs[$workId])) {
+            $this?->logger->debug('acknowledge: nothing reserved under id ' . var_export($workId, true));
+
+            return null;
+        }
+
+        $redisJob = $this->reservedJobs[$workId];
+        $jobId    = $redisJob->getJobId();
+        if (null === $jobId || $jobId !== $workId) {
+            throw new InvalidArgumentException('Reserved job doesnt match the acknowledged job');
+        }
+
+        return [$redisJob, $workId];
+    }
+
+    /**
+     * Build the queue connection, once
+     *
+     * The one construction site: connect() needs it before a role is taken, and taking a
+     * role needs it to exist, so both come through here and the second one is a no-op.
+     */
+    private function ensureConnected(): void
+    {
+        if (null !== $this->queue) {
+            return;
+        }
+
+        $this?->logger->debug(__FUNCTION__);
+
+        $persistentId = $this->config->persistent && $this->config->persistentId ? getmypid() : 0;
 
         $this->app->bind('redis', function () use ($persistentId) {
             return new Redis\Manager(
@@ -622,15 +708,15 @@ class Redis extends AbstractAdapter
                  * @see \Illuminate\Redis\Connectors\PhpRedisConnector
                  */
                 ['default' => [
-                    'host'          => $this->host,
-                    'password'      => $this->auth_password,
-                    'prefix'        => $this->prefix,
-                    'timeout'       => $this->timeout,
-                    'read_timeout'  => $this->read_timeout,
+                    'host'          => $this->config->host,
+                    'password'      => $this->config->authPassword,
+                    'prefix'        => $this->config->prefix,
+                    'timeout'       => $this->config->timeout,
+                    'read_timeout'  => $this->config->readTimeout,
                     'persistent_id' => $persistentId,
-                    'port'       => $this->port,
-                    'persistent' => $this->persistent,
-                    'database'   => $this->database_id,
+                    'port'       => $this->config->port,
+                    'persistent' => $this->config->persistent,
+                    'database'   => $this->config->databaseId,
                 ]]
             );
         });
@@ -655,5 +741,23 @@ class Redis extends AbstractAdapter
             self::CONNECTION_NAME
         );
         $this->queue = $queue;
+    }
+
+    /**
+     * The queue connection, which every operation that touches the queue is bound to
+     *
+     * It is built by ensureConnected() before any operation that can reach here, so the null
+     * is an invariant break rather than a case to handle. It is raised, not returned, because
+     * a caller cannot make this true by retrying: it is raised inside the attempt*() helper of
+     * the operation that found it, so it is logged and answered as that operation's failure.
+     */
+    private function queue(): Manager
+    {
+        $queue = $this->queue;
+        if (null === $queue) {
+            throw new RuntimeException(self::class . ' ' . __FUNCTION__ . ': the queue connection is not built');
+        }
+
+        return $queue;
     }
 }

@@ -109,15 +109,17 @@
   new MySqlAdapter($db, new JobConfig(), $logger);
 
   // was: new Redis($host, $port, logger: $logger)
-  new Redis($logger, $host, $port);
+  // now: new Redis($logger, new RedisConfig(host: $host, port: $port))
+  new Redis($logger, new RedisConfig(host: $host, port: $port));
   ```
 
-  The `Redis` constructor is the one signature that moves: its nine connection
-  settings used to come first, with the logger appended as the tenth parameter.
-  A required parameter cannot follow optional ones — PHP 8 treats it as
-  deprecated — so the logger moved to the front and the connection settings keep
-  their names and defaults, which is why passing them as named arguments is
-  unaffected.
+  The `Redis` constructor is the one signature that moves twice: its nine connection
+  settings used to come first, with the logger appended as the tenth parameter, and
+  a required parameter cannot follow optional ones — PHP 8 treats that as deprecated.
+  So the logger moved to the front, and then the nine settings moved into
+  `RedisConfig`, which keeps every name and default. Passing them as named arguments
+  therefore still works, spelled as a `RedisConfig` argument — see the second
+  `Redis::__construct()` entry further down for the full before/after table.
 
   Pass `new NullLogger()` (or any PSR-3 logger of your own) where the old
   `null` default meant "log nothing":
@@ -339,6 +341,176 @@
     returning fewer than the requested number of bytes, and never reads past
     the requested length.
 
+- **Acknowledging a job the queue no longer holds now reports `false`.** This is
+  the one change here that turns a silent success into a visible error, and it
+  is the reason to read this entry before anything else.
+
+  | Adapter | Was | Now |
+  |---|---|---|
+  | `MySql` | `afterWorkSuccess()` / `afterWorkFailed()` ran an `UPDATE` and returned `0 <= $this->write($sql)`, and `write()` returns the affected-row count — so an id that matched no row, an already-acknowledged job, or one another worker held, all read as `true` | `false`, plus a `debug` line naming the method |
+  | `Redis` | looked the id up in the in-process reserved set and, not finding it, fell through to `return true` — the queue was never told, and the caller was told it was | `false`, plus a `debug` line |
+
+  `AbstractWorker` does inspect the answer, and it treats `false` as fatal: it
+  throws `Exception('Worker failed to acknowledge job result')`, which the
+  concrete worker's catch-all reports through PSR-3 at `error` and the cycle
+  aborts. Until now a job lost to an expiry, a competing consumer or a restart
+  was acknowledged as if it had been handled, and the worker's result was
+  discarded silently. The `debug` line on the adapter is new output too, and a
+  `debug`-level handler is unaffected by it. If your consumer is at-least-once by
+  design and the duplicate work is cheaper than an aborted cycle, that is a real
+  behavioural choice to make now — there is no per-adapter switch.
+
+  `ping()`/`connect()` and `putTask()` are unchanged in this respect: a
+  transport or storage failure is still **returned** as a `Throwable` rather
+  than `false`, and an invalid argument still throws. `false` from an
+  acknowledgement means "the backend did not confirm it", not "the call failed".
+- **`BackQ\Adapter\Redis::__construct()` takes a value object instead of nine
+  scalar parameters.** The signature was `__construct(LoggerInterface $logger,
+  string $host, int $port, bool $persistent, ?int $persistent_id, ?string
+  $prefix, int $timeout, int $read_timeout, int $database_id, ?string
+  $auth_password)`; it is now `__construct(LoggerInterface $logger,
+  RedisConfig $config = new RedisConfig())`. `BackQ\Adapter\Redis\RedisConfig` is
+  a `final readonly` class carrying the same nine settings plus the queue name:
+
+  | Was | Now | Default unchanged |
+  |---|---|---|
+  | `$host` | `RedisConfig::$host` | `127.0.0.1` |
+  | `$port` | `RedisConfig::$port` | `6379` |
+  | `$persistent` | `RedisConfig::$persistent` | `false` |
+  | `$persistent_id` | `RedisConfig::$persistentId` | `null` |
+  | `$prefix` | `RedisConfig::$prefix` | `null` |
+  | `$timeout` | `RedisConfig::$timeout` | `10` |
+  | `$read_timeout` | `RedisConfig::$readTimeout` | `10` |
+  | `$database_id` | `RedisConfig::$databaseId` | `0` |
+  | `$auth_password` | `RedisConfig::$authPassword` | `null` |
+  | *(none — see below)* | `RedisConfig::$queueName` | `default` |
+
+  ```php
+  // 4.x
+  $adapter = new Redis($logger, '127.0.0.1', 6379, false, null, 'app:', 10, 10, 0, null);
+  // 5.x
+  $adapter = new Redis($logger, new RedisConfig(prefix: 'app:'));
+  ```
+
+  The new object validates what it holds and names the offending field:
+  `port` must be 1–65535, `timeout` and `readTimeout` at least 1, and
+  `databaseId` at least 0 — each an `InvalidArgumentException` at construction,
+  where the old scalar signature accepted a bad value and failed later against
+  the server.
+
+  `queueName` is new rather than moved: in 4.x it was an untyped-default
+  `private string $queueName` that only `bindRead()` / `bindWrite()` ever
+  assigned, so it was uninitialized until one of them ran and the constructor
+  could not name a queue at all. It is now a constructor setting defaulting to
+  `default`, which is what an uninitialized read would have produced nothing for
+  before. `bindRead()` / `bindWrite()` still overwrite it per call, so a
+  per-role queue name behaves as it did.
+- **`BackQ\Adapter\Beanstalk::connect()` takes a value object, and its fifth
+  `$logger` parameter is gone.** The signature was `connect(string $host =
+  '127.0.0.1', int $port = 11300, int $timeout = 1, bool $persistent = false,
+  $logger = null)`; it is now `connect(Connection $connection = new Connection())`.
+  `BackQ\Adapter\Beanstalk\Connection` is a `final readonly` class with `$host`,
+  `$port` (validated 1–65535), `$timeout`, `$persistent` and a new `mixed
+  $context`, plus `asPersistent()`:
+
+  ```php
+  // 4.x
+  $adapter->connect('beanstalkd', 11300, 5, true);
+  // 5.x
+  $adapter->connect(new Connection(host: 'beanstalkd', timeout: 5, persistent: true));
+  ```
+
+  The dropped `$logger` existed only to be handed to `Beanstalk::error()`, which
+  is itself **removed** — see below. Pass the logger to
+  `AbstractAdapter::__construct()` as before; the adapter reports through it.
+  The stream context is new and is what makes a TLS beanstalkd reachable:
+  `new Connection(context: stream_context_create(['ssl' => ['cafile' => $ca]]))`.
+- **`BackQ\Adapter\Beanstalk::error()` is removed.** It was a public
+  `error(string $msg): void` bridge so the vendored `davidpersson/beanstalk`
+  client, which is configured with `'logger' => $adapter`, could report through
+  the adapter's PSR-3 logger. The client no longer receives the adapter: it
+  logs through `$this?->logger->error(...)` like every other adapter, so there
+  is nothing to bridge. The client still receives a `'logger'` key in its
+  config array and it is still `null` by default.
+- **`PersistentBeanstalk` makes the connection persistent whatever the argument
+  says.** `connect()` runs the `Connection` through a new
+  `protected connection(Connection $connection): Connection` hook, and the
+  subclass answers `$connection->asPersistent()` from it, so
+  `new PersistentBeanstalk()->connect(new Connection(persistent: false))` is still
+  a persistent connection — the class name is the intent, as it always was.
+  Previously the flag on the argument decided it, which let a caller accidentally
+  turn a persistent adapter into a non-persistent one. A subclass of
+  `PersistentBeanstalk` that overrode `connect()` to alter the connection must
+  override `connection()` instead, and the class is **not** `final`: subclassing it
+  is still supported.
+- **`BackQ\Adapter\MySql` is instantiable.** It was `abstract` with no abstract
+  method of its own, so the only way to use it was a trivial subclass, and every
+  third-party adapter in the wild exists for that reason. `new MySql($db, new
+  JobConfig(), $logger)` is now the supported construction. The test double
+  `BackQ\Tests\Support\TestMySqlAdapter` is deleted.
+- **`BackQ\Adapter\MySql::hasWorkers()` returns `false`, not `true`.** It
+  always reported `true` without checking anything; the query it would need is
+  the same query that already knows the answer, so it reports "no workers" the
+  way `Redis` does, at `debug` level, and the `README.md` feature table now says
+  so. `MySql::setWorkTimeout()` keeps its empty body and the same `debug` line.
+- **The MySQL queue's timestamps come from the database.** `pickTask()`,
+  `putTask()` and the state update wrote `date('Y-m-d H:i:s')` interpolated into
+  the SQL, so the job clock was the web server's clock and a second host could
+  write a `time_sync` in the past. All three now write `NOW()`, which is the
+  server's own clock. Code that set the PHP timezone to influence job ordering
+  has no effect any more; set the session or server time zone instead.
+- **A dead MySQL link is no longer the caller's problem by default.**
+  `MySql::ping()` asks `mysqli::ping()` and reports `false`; it does **not**
+  reconnect, because the driver cannot. `JobConfig` gained a seventh argument,
+  `?\Closure $connectionProvider`, a factory returning a `mysqli`:
+
+  ```php
+  $config = new JobConfig(
+      table: 'backq_jobs',
+      connectionProvider: static fn (): mysqli => new mysqli('127.0.0.1', 'backq', 'secret', 'backq_jobs'),
+  );
+  ```
+
+  `ping()` calls it **only** when `mysqli::ping()` reported the link dead, and
+  **before** closing the dead link — a provider that throws leaves the caller the
+  link it already has, so a failed reconnect is never worse than no reconnect.
+  The dead link is then closed best-effort (a close failure is a `debug` line,
+  not an error) and the new one takes its place. With no provider configured the
+  behaviour is exactly as in 4.x: `ping()` reports `false`, logs why, and the
+  adapter never closes a link it did not open. `ping(false)` never replaces the
+  link whatever the provider does.
+- **`trigger_error()` is gone from the Redis adapter.** Its illuminate
+  `ExceptionHandler` bridge raised an `E_USER_WARNING` for every connection
+  error, so a Redis outage produced one PHP warning per failed operation *and*
+  a PSR-3 record. It now only `report()`s, and every other adapter already
+  reported the same way. Code that watched the PHP error log for these messages
+  must watch the PSR-3 logger — the same change 5.x already made for
+  `AProcess`. The `trigger_error()` calls in
+  `BackQ\Publisher\AbstractPublisher::getInstance()` and in
+  `BackQ\Worker\AProcess` / `BackQ\Worker\GuzzleForwarder` are **unchanged**;
+  they are a different concern and are not part of this release.
+- **One failure policy, written once.** `AbstractAdapter` gained the
+  `attempt()` / `attemptConnect()` / `attemptReturning()` / `attemptRethrowing()`
+  family, so the "log it, return false, do not throw" decision an adapter used to
+  repeat at each call site is now one method. It is protected: a subclass adapter
+  that needs it calls `parent::`-style helpers rather than copying the try/catch.
+  Behaviour is unchanged — a `Throwable` from a transport is returned, never
+  thrown, and an `InvalidArgumentException` from your own validation still
+  propagates. The log line is one PSR-3 record with `['exception' => $e]` in the
+  context, where the `Beanstalk` adapter used to prefix its own text and the
+  `Redis` one used to warn; a handler that matched on the message prefix has to
+  match on the `exception` key instead.
+- `BackQ\Adapter\Redis::STATE_NOTHING`, `STATE_BINDWRITE` and `STATE_BINDREAD`
+  are `@deprecated`: `BackQ\Adapter\ConnectionState` is the supported way to name
+  a connection state, and it gains a fourth case `Connected = 3` (the server
+  answered, but no role has been picked yet) and an `isBound()` method. The
+  three constants are kept and still hold `0`, `1` and `2`, so an existing
+  integer comparison keeps working; they emit no runtime notice. The
+  `AbstractWorker` / `AbstractPublisher` constructor parameter narrowing
+  (`AbstractAdapter` → `QueueConsumer` / `QueueProducer`) is likewise
+  **deferred to 6.0** and is not in this release — see the New Features entry
+  for the two role interfaces.
+
 ========================================
 2. New Features
 ========================================
@@ -379,6 +551,51 @@
   (`new MySqlAdapter($db, new JobConfig(), $logger)`). All defaults are
   unchanged. Subclasses that overrode the sleep properties now pass a
   `JobConfig` with their own values instead.
+- `BackQ\Adapter\QueueConsumer` and `BackQ\Adapter\QueueProducer`: two small
+  role interfaces. `QueueConsumer` is the four methods a worker needs (`ping`,
+  `pickTask`, `afterWorkSuccess`, `afterWorkFailed`); `QueueProducer` is the
+  four a publisher needs (`ping`, `putTask`, and the two it shares with the
+  consumer). `AbstractAdapter` implements both, so every shipped adapter and
+  every existing subclass is both roles with no change — but a consumer-only or
+  producer-only component can now be typed against the role instead of the whole
+  adapter, and a test double can implement four methods rather than eleven. The
+  11 methods of `AbstractAdapter` are unchanged in name, signature and order, so
+  `AbstractWorker` and `AbstractPublisher` still accept anything that extends it.
+
+  ```php
+  // A component that only publishes
+  final class Mailer
+  {
+      public function __construct(private readonly QueueProducer $queue) {}
+  }
+
+  // A class that is not an AbstractAdapter at all
+  final class InMemoryQueue implements QueueConsumer, QueueProducer { /* ... */ }
+  ```
+
+  Both roles are **deprecating** `AbstractAdapter` as the type to program to.
+  6.0 is where `AbstractWorker::__construct()` and
+  `AbstractPublisher::__construct()` narrow their parameter from
+  `AbstractAdapter` to the matching role; a subclass of `AbstractAdapter` is
+  unaffected by that, and a hand-rolled adapter that does not extend the abstract
+  class will want `QueueConsumer` / `QueueProducer` instead.
+- `BackQ\Adapter\Redis\RedisConfig`: the `final readonly` value object described
+  in the Backward Incompatible Changes section above.
+- `BackQ\Adapter\Beanstalk\Connection`: the `final readonly` value object
+  described above, with the stream context that makes TLS reachable and
+  `asPersistent()`.
+- `BackQ\Adapter\MySql\JobConfig::$connectionProvider`: a `\Closure(): \mysqli`
+  factory the adapter calls when — and only when — `mysqli::ping()` has already
+  reported the link dead. See above.
+- `BackQ\Adapter\Beanstalk\Client` documents its delta from
+  `davidpersson/beanstalk` in the class docblock: a nine-row table, one row per
+  overridden method, saying what the vendored version does and what this one does
+  instead. `BackQ\Tests\Adapter\Beanstalk\ClientTest` asserts the table against
+  the code, so an override added or removed on either side fails the suite — a
+  `composer update` of the fork is now a diff against a list rather than a
+  mystery. That table is the only reason this class still carries
+  `@phpcs:disable`; the other three adapter files that carried it
+  (`Beanstalk.php`, `PersistentBeanstalk.php`, `IO/StreamIO.php`) are linted.
 - `json_validate()` in place of `@json_decode(...)` + `is_array` checks.
 
 ------------------------------------------------------------------------------

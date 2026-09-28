@@ -4,7 +4,9 @@ namespace BackQ\Tests\Adapter;
 
 use BackQ\Adapter\Beanstalk;
 use BackQ\Adapter\Beanstalk\Client;
+use BackQ\Adapter\Beanstalk\Connection;
 use BackQ\Tests\Support\FakeBeanstalkServer;
+use BackQ\Tests\Support\LogAssertions;
 use BackQ\Tests\Support\RecordingLogger;
 use Error;
 use PHPUnit\Framework\TestCase;
@@ -20,13 +22,16 @@ use function substr;
 
 class BeanstalkAdapterTest extends TestCase
 {
+
+    use LogAssertions;
+
     public function testConnectWhenAlreadyConnectedReturnsTrue(): void
     {
         [$adapter, $client] = $this->adapterWithConnectedClient();
 
         $client->expects($this->never())->method('connect');
 
-        $this->assertTrue($adapter->connect('127.0.0.1', 11300));
+        $this->assertTrue($adapter->connect());
     }
 
     public function testBindReadDelegatesToWatch(): void
@@ -196,7 +201,7 @@ class BeanstalkAdapterTest extends TestCase
         $this->assertFalse($adapter->bindRead('tube'));
         $this->assertFalse($adapter->hasWorkers('tube'));
         $this->assertFalse($adapter->disconnect());
-        $this->assertFalse($adapter->connect('127.0.0.1', 1));
+        $this->assertFalse($adapter->connect(new Connection(port: 1)));
     }
 
     public function testConnectFailureReturnsFalseWhenPeerIsDown(): void
@@ -209,7 +214,7 @@ class BeanstalkAdapterTest extends TestCase
 
         $adapter = new Beanstalk(new RecordingLogger());
 
-        $this->assertFalse($adapter->connect('127.0.0.1', $port));
+        $this->assertFalse($adapter->connect(new Connection(port: $port)));
     }
 
     public function testConnectLogsExceptionWhenPeerIsDown(): void
@@ -223,7 +228,7 @@ class BeanstalkAdapterTest extends TestCase
         $logger  = new RecordingLogger();
         $adapter = new Beanstalk($logger);
 
-        $this->assertFalse($adapter->connect('127.0.0.1', $port));
+        $this->assertFalse($adapter->connect(new Connection(port: $port)));
 
         $this->assertNotEmpty($logger->records);
         $this->assertContains('error', array_column($logger->records, 0));
@@ -235,11 +240,28 @@ class BeanstalkAdapterTest extends TestCase
         try {
             $adapter = new Beanstalk(new RecordingLogger());
 
-            $this->assertTrue($adapter->connect('127.0.0.1', $server->getPort()));
+            $this->assertTrue($adapter->connect(new Connection(port: $server->getPort())));
             $server->accept();
         } finally {
             $server->close();
         }
+    }
+
+    public function testTheConnectionReachesTheClientConfigIncludingTheStreamContext(): void
+    {
+        $context = stream_context_create(['ssl' => ['verify_peer' => true]]);
+        $adapter = new Beanstalk(new RecordingLogger());
+
+        $this->assertFalse($adapter->connect(new Connection('127.0.0.1', 1, 3, true, $context)));
+
+        $client = (new ReflectionProperty(Beanstalk::class, 'client'))->getValue($adapter);
+        $config = (new ReflectionProperty(Client::class, '_config'))->getValue($client);
+
+        $this->assertSame('127.0.0.1', $config['host']);
+        $this->assertSame(1, $config['port']);
+        $this->assertSame(3, $config['timeout']);
+        $this->assertTrue($config['persistent']);
+        $this->assertSame($context, $config['context']);
     }
 
     public function testErrorPathLogsAndReturnsFalse(): void
@@ -378,6 +400,20 @@ class BeanstalkAdapterTest extends TestCase
             ->willThrowException(new RuntimeException('boom'));
 
         $this->assertFalse($adapter->disconnect());
+    }
+
+    public function testTheFailureIsReportedWithTheExceptionInTheContext(): void
+    {
+        $logger  = new RecordingLogger();
+        $adapter = new Beanstalk($logger);
+        $client  = $this->createMock(Client::class);
+
+        (new ReflectionProperty(Beanstalk::class, 'client'))->setValue($adapter, $client);
+        (new ReflectionProperty(Beanstalk::class, 'connected'))->setValue($adapter, true);
+        $client->method('delete')->willThrowException(new RuntimeException('boom'));
+
+        $this->assertFalse($adapter->afterWorkSuccess('1'));
+        $this->assertLoggedException($logger, RuntimeException::class);
     }
 
     private function adapterWithConnectedClient(): array

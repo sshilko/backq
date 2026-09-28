@@ -11,6 +11,8 @@
 
 namespace BackQ\Adapter\MySql;
 
+use Closure;
+
 /**
  * Where the adapter keeps the jobs and how hard it pushes the database
  *
@@ -26,6 +28,11 @@ final readonly class JobConfig
      * @param int $pickMissSleep microseconds slept after a pick found no job
      * @param int $pickSuccessSleep microseconds slept after a pick took a job
      * @param int $putTaskSleep microseconds slept before a put, to avoid DB CPU usage
+     * @param \Closure():\mysqli|null $connectionProvider builds the link that replaces a dead
+     *        one. The mysqli driver cannot reconnect, so a worker whose link drops is dead
+     *        until somebody builds a new link; this is that somebody. It is called only after
+     *        ping() reported the link dead, and the link it returns takes the dead one's place.
+     *        Left null, the link is the caller's to replace and the adapter never closes it.
      */
     public function __construct(
         public string $idColumn = 'id',
@@ -34,6 +41,7 @@ final readonly class JobConfig
         public int $pickMissSleep = 5000000,
         public int $pickSuccessSleep = 1000000,
         public int $putTaskSleep = 50000,
+        public ?Closure $connectionProvider = null,
     ) {
     }
 }

@@ -5,11 +5,17 @@ namespace BackQ\Tests\Adapter\Beanstalk;
 use BackQ\Adapter\Beanstalk\Client;
 use BackQ\Adapter\IO\Exception\RuntimeException;
 use BackQ\Tests\Support\FakeBeanstalkServer;
+use Beanstalk\Client as BaseClient;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use ReflectionMethod;
 use ReflectionProperty;
+use function array_unique;
+use function array_values;
+use function preg_match_all;
 use function restore_error_handler;
 use function set_error_handler;
+use function sort;
 use function strlen;
 use function uniqid;
 
@@ -489,6 +495,25 @@ class ClientTest extends TestCase
         $this->assertSame(1.12, $result['version']);
     }
 
+    /**
+     * The class docblock is a table of the overrides, and a `composer update` of
+     * davidpersson/beanstalk is a diff against it. A row that stops matching the code
+     * means the fork changed and the table has not, so the two are compared here.
+     */
+    public function testTheOverrideInventoryInTheDocblockMatchesTheCode(): void
+    {
+        $documented = $this->documentedOverrides();
+        $actual     = $this->overriddenMethods();
+
+        $this->assertNotEmpty($actual, 'the fork has to override something for the table to mean anything');
+        $this->assertNotEmpty($documented, 'the table in the class docblock has to name its overrides');
+
+        sort($documented);
+        sort($actual);
+
+        $this->assertSame($actual, $documented);
+    }
+
     protected function setUp(): void
     {
         $this->server = new FakeBeanstalkServer();
@@ -497,6 +522,65 @@ class ClientTest extends TestCase
     protected function tearDown(): void
     {
         $this->server->close();
+    }
+
+    /**
+     * The names this class declares again, because the vendored client declares them too
+     *
+     * getDeclaringClass() is no help here: on an override it names the child, so every
+     * method would look like a first declaration. The parent's own method list is the
+     * only thing that can tell an override from a new method.
+     *
+     * @return list<string>
+     */
+    private function overriddenMethods(): array
+    {
+        $inherited = [];
+        foreach ((new ReflectionClass(BaseClient::class))->getMethods() as $method) {
+            $inherited[$method->getName()] = true;
+        }
+
+        $overridden = [];
+        $own        = (new ReflectionClass(Client::class))->getMethods(
+            ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED
+        );
+
+        foreach ($own as $method) {
+            /**
+             * getMethods() hands back the inherited ones too, so a name the client never
+             * declares itself is not an override. A private method is not one either, even
+             * under a name the parent has, which is why the visibility is filtered above.
+             */
+            if (Client::class === $method->getDeclaringClass()->getName()
+                && isset($inherited[$method->getName()])) {
+                $overridden[] = $method->getName();
+            }
+        }
+
+        return $overridden;
+    }
+
+    /**
+     * The first column of the table in the class docblock
+     *
+     * A row of a docblock table is " * | `name` | ...", and the header row carries no
+     * backticks, so the backtick pair is what tells a method row from the header and
+     * from the separator rule.
+     *
+     * @return list<string>
+     */
+    private function documentedOverrides(): array
+    {
+        $docblock = (new ReflectionClass(Client::class))->getDocComment();
+        $this->assertIsString($docblock);
+
+        preg_match_all('/^\s*\*\s*\|\s*`(\w+)`\s*\|/m', $docblock, $found);
+
+        /**
+         * $found[1] cannot be assumed: a regex that stops matching returns nothing, and
+         * then the comparison in the caller would pass on two empty lists.
+         */
+        return array_values(array_unique($found[1] ?? []));
     }
 
     private function connectClient(): Client

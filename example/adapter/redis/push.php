@@ -10,6 +10,7 @@
  */
 
 use BackQ\Adapter\Redis;
+use BackQ\Adapter\Redis\RedisConfig;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
 use Throwable;
@@ -27,7 +28,7 @@ $redisHost = getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1';
 $redisPort = (int) (getenv('BACKQ_REDIS_PORT') ?: 6379);
 
 $logger   = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$redispub = new Redis($logger, $redisHost, $redisPort);
+$redispub = new Redis($logger, new RedisConfig(host: $redisHost, port: $redisPort));
 $redispub->setWorkTimeout(5);
 if (!$redispub->connect()) {
     echo 'Failed to connect to redis at ' . $redisHost . ':' . $redisPort . "\n";

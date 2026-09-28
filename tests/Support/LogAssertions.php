@@ -2,6 +2,7 @@
 
 namespace BackQ\Tests\Support;
 
+use Throwable;
 use function array_filter;
 use function sprintf;
 use function str_contains;
@@ -31,6 +32,29 @@ trait LogAssertions
     protected function assertNotLogged(RecordingLogger $logger, string $needle, string $level = 'error'): void
     {
         $this->assertMatchesLog($logger, $needle, $level, false);
+    }
+
+    /**
+     * Assert that a record carries the throwable itself and not only its message
+     *
+     * The message a failure is logged with is what a human reads first, so it is the
+     * part most likely to survive while the exception in the context is quietly
+     * dropped. That is what this guards: a class, a stack and a previous chain.
+     *
+     * @param RecordingLogger $logger the logger the adapter was given
+     * @param string          $class  the throwable the record must carry
+     */
+    protected function assertLoggedException(RecordingLogger $logger, string $class): void
+    {
+        $carried = [];
+        foreach ($logger->records as [, , $context]) {
+            if ($context['exception'] ?? null instanceof Throwable) {
+                $carried[] = $context['exception'];
+            }
+        }
+
+        self::assertNotEmpty($carried, 'no record carried an exception in its context');
+        self::assertInstanceOf($class, $carried[0]);
     }
 
     private function assertMatchesLog(RecordingLogger $logger, string $needle, string $level, bool $expected): void

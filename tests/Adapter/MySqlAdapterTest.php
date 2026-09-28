@@ -3,10 +3,12 @@
 namespace BackQ\Tests\Adapter;
 
 use ArgumentCountError;
+use BackQ\Adapter\MySql;
 use BackQ\Adapter\MySql\JobConfig;
 use BackQ\Adapter\MySql\JobState;
+use BackQ\Tests\Support\LogAssertions;
 use BackQ\Tests\Support\RecordingLogger;
-use BackQ\Tests\Support\TestMySqlAdapter;
+use Closure;
 use mysqli;
 use mysqli_result;
 use mysqli_sql_exception;
@@ -15,6 +17,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use ReflectionClass;
 use ReflectionMethod;
+use RuntimeException;
 use stdClass;
 use Throwable;
 use TypeError;
@@ -29,6 +32,8 @@ use function var_export;
 
 class MySqlAdapterTest extends TestCase
 {
+
+    use LogAssertions;
 
     /**
      * The statements the adapter sent, in order
@@ -78,6 +83,134 @@ class MySqlAdapterTest extends TestCase
         $this->assertTrue($this->adapter($db)->disconnect());
     }
 
+    /**
+     * The adapter answers all eleven methods, so an `abstract` on the class is decoration
+     * that makes every caller write a one-line subclass to get an instance
+     */
+    public function testTheAdapterItselfIsInstantiable(): void
+    {
+        $this->assertFalse((new ReflectionClass(MySql::class))->isAbstract());
+        $this->assertInstanceOf(MySql::class, $this->adapter($this->db()));
+    }
+
+    public function testADeadLinkIsReplacedByTheLinkTheProviderBuilds(): void
+    {
+        $dead = $this->db();
+        $dead->method('ping')->willReturn(false);
+        $dead->expects($this->once())->method('close');
+
+        $fresh = $this->db();
+        $fresh->method('ping')->willReturn(true);
+
+        $asked = 0;
+        $config = $this->config(static function () use ($fresh, &$asked): mysqli {
+            $asked++;
+
+            return $fresh;
+        });
+
+        $adapter = $this->adapter($dead, $config);
+
+        $this->assertTrue($adapter->connect());
+        $this->assertSame(1, $asked);
+
+        $this->assertTrue($adapter->afterWorkSuccess('7'));
+        $this->assertSame(
+            ['UPDATE backq_jobs SET sync = "DONE" WHERE id = "7"'],
+            $this->statements,
+            'the statements must go to the link the provider built'
+        );
+    }
+
+    public function testTheProviderIsNotAskedWhileTheLinkIsAlive(): void
+    {
+        $db = $this->db();
+        $db->method('ping')->willReturn(true);
+        $db->expects($this->never())->method('close');
+
+        $asked = 0;
+        $config = $this->config(static function () use ($db, &$asked): mysqli {
+            $asked++;
+
+            return $db;
+        });
+
+        $this->assertTrue($this->adapter($db, $config)->connect());
+        $this->assertSame(0, $asked);
+    }
+
+    public function testPingWithoutReconnectLeavesTheDeadLinkAlone(): void
+    {
+        $db = $this->db();
+        $db->method('ping')->willReturn(false);
+        $db->expects($this->never())->method('close');
+
+        $asked = 0;
+        $config = $this->config(static function () use ($db, &$asked): mysqli {
+            $asked++;
+
+            return $db;
+        });
+
+        $this->assertFalse($this->adapter($db, $config)->ping(reconnect: false));
+        $this->assertSame(0, $asked);
+    }
+
+    public function testADeadLinkIsLeftOpenWhenNoProviderIsConfigured(): void
+    {
+        $logger = new RecordingLogger();
+        $db     = $this->db();
+        $db->method('ping')->willReturn(false);
+        $db->expects($this->never())->method('close');
+
+        $this->assertFalse($this->adapter($db, null, $logger)->connect());
+        $this->assertStringContainsString('connectionProvider', $this->messages($logger));
+    }
+
+    public function testAFailingProviderIsLoggedAndLeavesTheCallerItsLink(): void
+    {
+        $logger = new RecordingLogger();
+        $db     = $this->db();
+        $db->method('ping')->willReturn(false);
+        $db->expects($this->never())->method('close');
+
+        $config = $this->config(static function (): mysqli {
+            throw new RuntimeException('no server today');
+        });
+
+        $this->assertFalse($this->adapter($db, $config, $logger)->connect());
+        $this->assertStringContainsString('no server today', $this->messages($logger));
+    }
+
+    /**
+     * Closing first would hand the caller a dead link and then fail to replace it, so the
+     * dead one is closed only once there is a live one to take its place
+     */
+    public function testTheDeadLinkIsClosedOnlyAfterTheReplacementExists(): void
+    {
+        $closed = false;
+
+        $db = $this->db();
+        $db->method('ping')->willReturn(false);
+        $db->method('close')->willReturnCallback(static function () use (&$closed): bool {
+            $closed = true;
+
+            return true;
+        });
+
+        $fresh = $this->db();
+        $fresh->method('ping')->willReturn(true);
+
+        $config = $this->config(function () use (&$closed, $fresh): mysqli {
+            $this->assertFalse($closed, 'the caller still owns its link while the provider runs');
+
+            return $fresh;
+        });
+
+        $this->assertTrue($this->adapter($db, $config)->connect());
+        $this->assertTrue($closed);
+    }
+
     public function testTheQueueNameIsIrrelevantTheTableIsTheQueue(): void
     {
         $db = $this->db();
@@ -86,16 +219,31 @@ class MySqlAdapterTest extends TestCase
 
         $this->assertTrue($adapter->bindRead('whatever'));
         $this->assertTrue($adapter->bindWrite('whatever'));
-        $this->assertTrue($adapter->hasWorkers('whatever'));
+    }
+
+    /**
+     * A table queue has no heartbeat column, so there is no cheap way to know whether a
+     * worker is idle on it. Answering "yes" reaches the user through
+     * AbstractPublisher::hasWorkers(), so the honest answer is no.
+     */
+    public function testHasWorkersReportsNoWorkersRatherThanClaimingSome(): void
+    {
+        $logger  = new RecordingLogger();
+        $db      = $this->db();
+        $adapter = $this->adapter($db, null, $logger);
+
+        $this->assertFalse($adapter->hasWorkers('whatever'));
+        $this->assertLogged($logger, 'hasWorkers', 'debug');
     }
 
     public function testSetWorkTimeoutIsIgnored(): void
     {
-        $db = $this->db();
+        $logger = new RecordingLogger();
+        $db     = $this->db();
         $db->expects($this->never())->method('query');
 
-        $this->adapter($db)->setWorkTimeout(5);
-        $this->addToAssertionCount(1);
+        $this->adapter($db, null, $logger)->setWorkTimeout(5);
+        $this->assertLogged($logger, 'setWorkTimeout', 'debug');
     }
 
     public function testPickTaskLocksTheJobItTook(): void
@@ -114,10 +262,19 @@ class MySqlAdapterTest extends TestCase
             $this->statements[0]
         );
         $this->assertMatchesRegularExpression(
-            '#^UPDATE backq_jobs SET sync = "LOCK", time_sync = "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}" '
-            . 'WHERE id = 7$#',
+            '#^UPDATE backq_jobs SET sync = "LOCK", time_sync = NOW\(\), '
+            . 'WHERE id = "7"$#',
             $this->statements[1]
         );
+    }
+
+    public function testPickTaskQuotesTheJobIdItLocks(): void
+    {
+        $db      = $this->db([['id' => "1' OR '1'='1", 'payload' => 'serialized']]);
+        $adapter = $this->adapter($db);
+
+        $this->assertSame(["1' OR '1'='1", 'serialized'], $adapter->pickTask());
+        $this->assertStringEndsWith('WHERE id = "1\\\' OR \\\'1\\\'=\\\'1"', $this->statements[1]);
     }
 
     public function testPickTaskReturnsFalseWhenNoJobIsWaiting(): void
@@ -225,7 +382,7 @@ class MySqlAdapterTest extends TestCase
         $this->assertSame("SELECT id FROM backq_jobs WHERE id = 'a-1' FOR UPDATE", $this->statements[0]);
         $this->assertMatchesRegularExpression(
             '#^INSERT INTO backq_jobs \(id,payload,time_sync,sync\) VALUES '
-            . '\("a-1","serialized","\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}","WAIT"\)$#',
+            . '\("a-1","serialized",NOW\(\),"WAIT"\)$#',
             $this->statements[1]
         );
     }
@@ -241,7 +398,7 @@ class MySqlAdapterTest extends TestCase
         $this->assertSame('a-1', $adapter->putTask('serialized', 'a-1'));
         $this->assertMatchesRegularExpression(
             '#^UPDATE backq_jobs SET payload = "serialized", '
-            . 'time_sync = "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", sync = "WAIT" WHERE id = "a-1"$#',
+            . 'time_sync = NOW\(\), sync = "WAIT" WHERE id = "a-1"$#',
             $this->statements[1]
         );
     }
@@ -351,6 +508,29 @@ class MySqlAdapterTest extends TestCase
         $this->assertStringContainsString('Lock wait timeout', $this->messages($logger));
     }
 
+    public function testAnAckSucceedsWhenTheStatementMatchesNoRow(): void
+    {
+        // The link double answers every statement with a result set, so the adapter reads
+        // 0 affected rows. The honest reading of that cell is "the statement executed",
+        // not "a row changed", because an UPDATE that writes the value a row already holds
+        // also reports 0. The id is logged so the case is not silent.
+        $logger  = new RecordingLogger();
+        $db      = $this->db();
+        $adapter = $this->adapter($db, null, $logger);
+
+        $this->assertTrue($adapter->afterWorkSuccess('7'));
+        $this->assertLogged($logger, 'no row matched 7', 'debug');
+    }
+
+    public function testTheFailureIsReportedWithTheExceptionInTheContext(): void
+    {
+        $logger = new RecordingLogger();
+        $db     = $this->db([], new mysqli_sql_exception('Lock wait timeout'));
+
+        $this->assertFalse($this->adapter($db, null, $logger)->afterWorkSuccess('7'));
+        $this->assertLoggedException($logger, mysqli_sql_exception::class);
+    }
+
     public function testTheConfiguredTableAndColumnsAreUsed(): void
     {
         $db      = $this->db([['uid' => 7, 'body' => 'serialized']]);
@@ -382,11 +562,11 @@ class MySqlAdapterTest extends TestCase
          * Called through reflection: the helper would supply a NullLogger, and a direct
          * two-argument call is exactly the mistake this test exists to make impossible
          */
-        $adapter = (new ReflectionClass(TestMySqlAdapter::class))->newInstanceWithoutConstructor();
+        $adapter = (new ReflectionClass(MySql::class))->newInstanceWithoutConstructor();
 
         $this->expectException(ArgumentCountError::class);
 
-        (new ReflectionMethod(TestMySqlAdapter::class, '__construct'))->invoke($adapter);
+        (new ReflectionMethod(MySql::class, '__construct'))->invoke($adapter);
     }
 
     /**
@@ -437,9 +617,9 @@ class MySqlAdapterTest extends TestCase
         return $db;
     }
 
-    private function adapter(mysqli $db, ?JobConfig $config = null, ?LoggerInterface $logger = null): TestMySqlAdapter
+    private function adapter(mysqli $db, ?JobConfig $config = null, ?LoggerInterface $logger = null): MySql
     {
-        return new TestMySqlAdapter(
+        return new MySql(
             $db,
             $config ?? $this->config(),
             $logger ?? new NullLogger()
@@ -448,10 +628,12 @@ class MySqlAdapterTest extends TestCase
 
     /**
      * The documented table without the sleeps that would slow the suite down
+     *
+     * @param Closure():mysqli|null $provider builds the link that replaces a dead one
      */
-    private function config(): JobConfig
+    private function config(?Closure $provider = null): JobConfig
     {
-        return new JobConfig('id', 'payload', 'backq_jobs', 0, 0, 0);
+        return new JobConfig('id', 'payload', 'backq_jobs', 0, 0, 0, $provider);
     }
 
     private function messages(RecordingLogger $logger): string

@@ -3,6 +3,7 @@
 namespace BackQ\Tests\Adapter;
 
 use BackQ\Adapter\Redis;
+use BackQ\Adapter\Redis\RedisConfig;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use function extension_loaded;
@@ -43,14 +44,14 @@ class RedisAdapterTest extends TestCase
         $queue = 'backq.test.' . uniqid();
         $body  = 'hello-from-tests-' . uniqid();
 
-        $publisher = new Redis(new NullLogger(), $host, $port);
+        $publisher = new Redis(new NullLogger(), new RedisConfig(host: $host, port: $port));
         $this->assertTrue($publisher->connect());
         $this->assertTrue($publisher->bindWrite($queue));
         $taskId = $publisher->putTask($body);
         $this->assertNotFalse($taskId);
         $publisher->disconnect();
 
-        $consumer = new Redis(new NullLogger(), $host, $port);
+        $consumer = new Redis(new NullLogger(), new RedisConfig(host: $host, port: $port));
         $this->assertTrue($consumer->connect());
         $this->assertTrue($consumer->bindRead($queue));
         $task = $consumer->pickTask(2);

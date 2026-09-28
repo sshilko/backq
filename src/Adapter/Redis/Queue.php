@@ -26,11 +26,18 @@ class Queue extends RedisQueue
      * been in processing for >=N seconds without being deleted (successful execution = delete())
      *
      * @see https://laravel.com/docs/5.7/queues#retrying-failed-jobs
+     *
+     * Redeclared deliberately. The illuminate parent declares both of these untyped and
+     * coerces in its constructor, and a typed redeclaration would be a signature this
+     * class cannot keep in step with on the next illuminate release. The docblock is the
+     * type here; psalm reads it, phpstan has the parent to go on.
      */
     protected $retryAfter = null;
 
     /**
      * The maximum number of seconds to block for a job.
+     *
+     * Redeclared for the reason given on $retryAfter.
      */
     protected $blockFor = null;
 

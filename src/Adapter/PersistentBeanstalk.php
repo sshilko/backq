@@ -11,16 +11,17 @@
 
 namespace BackQ\Adapter;
 
+use BackQ\Adapter\Beanstalk\Connection;
 use Override;
 
 /**
  * Beanstalk protocol adapter
- * @phpcs:disable
  *
  * @see https://raw.githubusercontent.com/kr/beanstalkd/master/doc/protocol.txt
  */
 class PersistentBeanstalk extends Beanstalk
 {
+
     protected bool $persistentConnection = false;
 
     public function __destruct()
@@ -28,21 +29,27 @@ class PersistentBeanstalk extends Beanstalk
         $this->disconnect();
     }
 
-    #[Override]
-    public function connect(string $host = '127.0.0.1', int $port = 11300, int $timeout = 1, bool $persistent = true, $logger = null): bool
-    {
-        $this->persistentConnection = $persistent;
-
-        return parent::connect($host, $port, $timeout, $persistent, ($logger ? $logger : $this));
-    }
-
+    /**
+     * A persistent connection belongs to the next worker, so closing it is a noop
+     */
     #[Override]
     public function disconnect(): bool
     {
         if ($this->persistentConnection) {
             return true;
-        } else {
-            return parent::disconnect();
         }
+
+        return parent::disconnect();
+    }
+
+    /**
+     * Whatever connection the caller asked for, this adapter makes it persistent
+     */
+    #[Override]
+    protected function connection(Connection $connection): Connection
+    {
+        $this->persistentConnection = true;
+
+        return $connection->asPersistent();
     }
 }

@@ -147,7 +147,8 @@ script; on the host, never.
   `phpmd-rulesets.xml`, `pdepend.xml`, `stubs/`, `check-classes.php`,
   `.pre-commit-config.yaml`) and the dockerized dev env
 - `example/` — runnable examples, not shipped. `plans/` — implementation plans; 1-6 are
-  implemented. They are historical records: plans 1-5 still describe the `Nsq` adapter, which
+  implemented, `plan-7` (`plan-7-adapter-architecture.md`) is **proposed and not started**. The
+  implemented ones are historical records: plans 1-5 still describe the `Nsq` adapter, which
   5.x removed (see `UPGRADING`), `plan-5` still says `AbstractAdapter::JOBTTR_DEFAULT` stayed,
   which it did not, and `plan-6` still counts 9 `error_log()` call sites in 4 files — 3 of them
   went with the `Amazon\SNS` workers, so 6 remained, all in `AProcess`. Read a plan's status
@@ -164,6 +165,42 @@ transport or storage failure is **returned** as a `Throwable`, never `false`; an
 argument still **throws**. `AbstractPublisher::publish()` is variadic and forwards named
 arguments (`publish($message, readyWait: 5)`). Per-adapter signatures and rationale:
 `UPGRADING`.
+
+### The one place a failure policy is written
+
+That return-vs-throw rule above is the contract; `AbstractAdapter` is the **only** place it is
+implemented, in the `attempt*` family. Do not hand-roll a try/catch that logs and returns
+`false` — call the helper that matches the operation:
+
+| Helper | For | On `Throwable` |
+|---|---|---|
+| `attempt($op, $body)` | `ping()`, `hasWorkers()`, `afterWork*()` | logs, returns `false` |
+| `attemptConnect($op, $body)` | `connect()` | logs, returns `false` |
+| `attemptReturning($op, $body)` | `putTask()` | logs, returns the `Throwable` |
+| `attemptRethrowing($op, $body)` | `pickTask()` | logs, then **rethrows** |
+
+`attemptRethrowing` is the pick because a worker reads a `false` pick as an idle cycle, so a
+transport failure must not look like one — it is logged and rethrown, and the worker decides
+what it means. `attemptReturning` returns the original `Throwable` so `putTask()` keeps the
+caller's type, message and previous chain; a **missing precondition** there also answers a
+`RuntimeException`, because that signature admits no other failure.
+
+Every one of them logs through `log()` at `error` with `['exception' => $e]` in the context,
+which is what carries the class, stack and previous chain to the handler — so a handler that
+matched on a message prefix the adapter used to write no longer works; match on `exception`.
+`isReady()` is the "is this adapter bound" precondition and `preconditionFailed()` its log;
+`attempt` and `attemptRethrowing` gate on it themselves, which is why `pickTask()` on an
+unbound adapter returns `false` rather than reaching an uninitialised property.
+`attemptConnect` does **not** gate, because connecting is the one operation with no
+precondition to check. `Redis::queue()` is the companion accessor: it throws
+`RuntimeException` when `$queue` is null, and that is an invariant break which must never
+escape uncaught, so a psalm `RedundantPropertyInitializationCheck` on `$this->queue` is a real
+report, not noise to suppress.
+
+`false` from an acknowledgement means *the backend did not confirm the job*, not *the call
+failed* — and `AbstractWorker` treats it as fatal
+(`Worker failed to acknowledge job result`, which ends the cycle). Do not make a call site
+swallow it.
 
 ## Traps
 
@@ -195,15 +232,33 @@ Each of these yields a wrong result rather than an error.
 - **The Beanstalk tests need no beanstalkd** (in-process fake,
   `tests/Support/FakeBeanstalkServer.php`) but assert the **array key order** of the config
   `$defaults` in `src/Adapter/Beanstalk/Client.php`: host, logger, persistent, port,
-  timeout. `Beanstalk.php` and `Client.php` carry `@phpcs:disable`, so phpcs skips them
-  entirely — check those two with `php -l` and the tests.
+  timeout. Never reorder or add to that array; read the new `context` key with `?? null`.
+  `src/Adapter/Beanstalk/Client.php` is the **only** file left in `src/Adapter/` carrying
+  `@phpcs:disable`, and it is there on purpose: its class docblock holds the nine-row table
+  documenting every override of the vendored `davidpersson/beanstalk` client, and
+  `ClientTest::testTheOverrideInventoryInTheDocblockMatchesTheCode()` asserts that table
+  against the code by reflection. So for that one file `php -l` plus the tests are the gate,
+  not phpcs — and the test is only worth anything if both sides are non-empty; a regex or a
+  reflection filter that silently returns nothing makes it pass on two empty lists, so
+  re-probe it with a deliberate mismatch before trusting a change to it. The other three
+  files that used to carry `@phpcs:disable` (`Beanstalk.php`, `PersistentBeanstalk.php`,
+  `IO/StreamIO.php`) are linted and gated normally — do not re-add the suppression to them.
 - **Do not re-enable the sniffs excluded in `build/phpcs-ruleset.xml`**:
   `AttributesOrder` needs `orderAlphabetically=true`, and `DisallowTrailingCommaInDeclaration`
   plus `DisallowNonCapturingCatch` conflict with their matching "Require" sniffs and send
   phpcbf into an infinite loop. `DisallowNullSafeObjectOperator` is excluded for the
   adapters' logging: they call `$this?->logger->error(...)` at the call site since
   `AbstractAdapter` dropped its `logInfo()` / `logDebug()` / `logError()` helpers, and the
-  logger is mandatory there.
+  logger is mandatory there. That call style is why psalm needs suppressions, and the count
+  is measured rather than assumed: **12** `@psalm-suppress` annotations in `src/Adapter/` —
+  `AbstractAdapter` 2, `Redis` 5, `MySql` 3, `Beanstalk` 1, `Beanstalk/Client` 1. Most are
+  the `?->logger` trio (`TypeDoesNotContainNull`, `PossiblyNullReference`); the
+  `PossiblyNullPropertyAssignment` ones are the *same* cause one step later — a preceding
+  `$this?->logger` line widens `$this` to nullable, so the assignment after it looks unsafe.
+  The count **rose** from 10 when the `attempt*` family landed, because `log()` and `report()`
+  are new methods with the same call style. So adding a method that logs through
+  `$this?->logger` needs its own suppression and removing a log line may let one go —
+  re-measure with `grep -rn 'psalm-suppress' src/Adapter/` rather than assuming a direction.
 - **Three `opis/closure` deprecations are expected** — `SerializableClosure implements
   Serializable` and the dynamic `ClosureStream::$context`. They print as `D` and do not fail
   the run.

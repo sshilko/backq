@@ -4,8 +4,10 @@ namespace BackQ\Tests\Adapter\MySql;
 
 use BackQ\Adapter\MySql\JobConfig;
 use Error;
+use mysqli;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use RuntimeException;
 
 class JobConfigTest extends TestCase
 {
@@ -49,6 +51,22 @@ class JobConfigTest extends TestCase
         $this->assertSame(0, $config->pickMissSleep);
         $this->assertSame(0, $config->pickSuccessSleep);
         $this->assertSame(0, $config->putTaskSleep);
+    }
+
+    public function testThereIsNoConnectionProviderByDefault(): void
+    {
+        $this->assertNull((new JobConfig())->connectionProvider);
+    }
+
+    public function testTheConnectionProviderIsTheCallersToBuild(): void
+    {
+        $provider = static function (): mysqli {
+            throw new RuntimeException('not called by this test');
+        };
+
+        $config = new JobConfig(connectionProvider: $provider);
+
+        $this->assertSame($provider, $config->connectionProvider);
     }
 
     public function testTheConfigIsFinal(): void

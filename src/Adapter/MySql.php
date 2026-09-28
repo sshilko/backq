@@ -25,7 +25,6 @@ use Psr\Log\LoggerInterface;
 use Stringable;
 use Throwable;
 use function count;
-use function date;
 use function json_encode;
 use function max;
 use function usleep;
@@ -63,10 +62,14 @@ use const MYSQLI_ASSOC;
  * be established before a job is published or picked. Query failures surface as
  * mysqli_sql_exception, the default error mode of the driver since PHP 8.1
  *
+ * The link is the caller's, so a dead one is not this adapter's to replace. A caller
+ * that wants the adapter to survive one hands it a connectionProvider on the JobConfig,
+ * and from then on the link the provider builds is the one every statement goes to.
+ *
  * Class MySql
  * @package ns\BackQ\Adapter
  */
-abstract class MySql extends AbstractAdapter
+class MySql extends AbstractAdapter
 {
     /**
      * @param mysqli $db an established connection, the adapter never closes it
@@ -103,8 +106,8 @@ abstract class MySql extends AbstractAdapter
                 $jobId = $data[0][$this->config->idColumn];
                 $sql = 'UPDATE ' . $this->config->table . ' ' .
                     'SET ' . JobColumn::State->value . ' = "' . JobState::Lock->value . '", ' .
-                    JobColumn::Time->value . ' = "' . date('Y-m-d H:i:s') . '" ' .
-                    'WHERE ' . $this->config->idColumn . ' = ' . $jobId;
+                    JobColumn::Time->value . ' = NOW(), ' .
+                    'WHERE ' . $this->config->idColumn . ' = "' . $this->escape((string) $jobId) . '"';
                 $this?->logger->debug($sql);
                 $this->write($sql);
                 $result = [$jobId, $data[0][$this->config->dataColumn]];
@@ -115,7 +118,7 @@ abstract class MySql extends AbstractAdapter
                 return $result;
             }
         } catch (\Throwable $e) {
-            $this?->logger->error($e->getMessage());
+            $this->log(__FUNCTION__, $e);
             $this->rollback();
         }
         usleep($this->config->pickMissSleep);
@@ -171,7 +174,7 @@ abstract class MySql extends AbstractAdapter
             if (1 === count($data)) {
                 $sql = 'UPDATE ' . $this->config->table . ' ' .
                     'SET ' . $this->config->dataColumn . ' = "' . $this->escape((string) $body) . '", ' .
-                    JobColumn::Time->value . ' = "' . date('Y-m-d H:i:s') . '", ' .
+                    JobColumn::Time->value . ' = NOW(), ' .
                     JobColumn::State->value . ' = "' . $state->value . '" ' .
                     'WHERE ' . $this->config->idColumn . ' = "' . $this->escape($jobId) . '"';
                 $this?->logger->debug($sql);
@@ -187,7 +190,7 @@ abstract class MySql extends AbstractAdapter
                 ' VALUES ' .
                 '(' . '"' . $this->escape($jobId) . '",' .
                 '"' . $this->escape((string) $body) . '",' .
-                '"' . date('Y-m-d H:i:s') . '",' .
+                'NOW(),' .
                 '"' . $state->value . '")';
             $this?->logger->debug($sql);
             $this->write($sql);
@@ -195,7 +198,7 @@ abstract class MySql extends AbstractAdapter
 
             return (string) $jobId;
         } catch (Throwable $e) {
-            $this?->logger->error($e->getMessage());
+            $this->log(__FUNCTION__, $e);
             $this->rollback();
 
             return $e;
@@ -238,23 +241,37 @@ abstract class MySql extends AbstractAdapter
     /**
      * A healthy link is all this adapter needs, the job table is the queue
      *
-     * The reconnect flag is ignored, the mysqli driver cannot reconnect:
-     * a dead link can only be replaced by a new mysqli built by the caller
+     * The mysqli driver cannot reconnect, so a dead link is replaced by a new one built
+     * by the caller's connectionProvider, and only when the caller asked for one. Without
+     * a provider the link stays the caller's to replace and this answers false, which is
+     * what a caller already handling its own links expects to see.
      */
     #[Override]
     public function ping(bool $reconnect = true): bool
     {
-        try {
-            return $this->db->ping();
-        } catch (mysqli_sql_exception) {
-            return false;
-        }
+        return $this->attempt(
+            __FUNCTION__,
+            function () use ($reconnect): bool {
+                if ($this->db->ping()) {
+                    return true;
+                }
+
+                return $reconnect && $this->replaceDeadLink();
+            }
+        );
     }
 
+    /**
+     * A table queue has no heartbeat column, so there is no cheap way to know whether a
+     * worker is idle on it. Answering "yes" would reach the user through
+     * AbstractPublisher::hasWorkers(), so the answer is "no" and the fact is recorded.
+     */
     #[Override]
     public function hasWorkers(string $queue): bool
     {
-        return true;
+        $this?->logger->debug(__FUNCTION__ . ' not supported, reporting no workers');
+
+        return false;
     }
 
     #[Override]
@@ -263,6 +280,7 @@ abstract class MySql extends AbstractAdapter
         /**
          * Idle timeouts are a worker concern, the queue is shared via the table
          */
+        $this?->logger->debug(__FUNCTION__ . ' is a worker concern, the queue is the table');
     }
 
     #[Override]
@@ -293,12 +311,74 @@ abstract class MySql extends AbstractAdapter
     }
 
     /**
+     * The link belongs to the caller, so a refused operation is about that and not
+     * about anything the adapter could do differently
+     */
+    #[Override]
+    protected function preconditionFailed(string $operation): void
+    {
+        $this?->logger->debug(static::class . ' adapter ' . $operation . ': the mysqli link is owned by the caller');
+    }
+
+    /**
+     * Trade a dead link for the one the caller's provider builds
+     *
+     * The provider is asked first and the dead link is closed only once a live one exists,
+     * so a provider that fails leaves the caller the link it already has. The link it
+     * returns is from then on the one every statement goes to, which is the whole point:
+     * without this the mysqli driver cannot recover and the worker is done.
+     *
+     * @psalm-suppress PossiblyNullPropertyAssignment the nullsafe logger line above widens
+     *                 $this, which it is not
+     */
+    private function replaceDeadLink(): bool
+    {
+        $provider = $this->config->connectionProvider;
+        if (null === $provider) {
+            $this?->logger->debug(
+                __FUNCTION__ . ': no connectionProvider configured, the dead link is the caller\'s to replace'
+            );
+
+            return false;
+        }
+
+        $this?->logger->debug(__FUNCTION__ . ': asking the connectionProvider for a new link');
+
+        $replacement = $provider();
+
+        $dead = $this->db;
+        $this->db = $replacement;
+        $this->closeLink($dead);
+
+        $this?->logger->debug(__FUNCTION__ . ': the new link is in place');
+
+        return true;
+    }
+
+    /**
+     * Give up on a link the adapter no longer uses
+     *
+     * A link that will not close is not worth a raise: the link it belonged to is already
+     * gone as far as this adapter is concerned, and a worker must not die on the way out.
+     */
+    private function closeLink(mysqli $link): void
+    {
+        try {
+            $link->close();
+        } catch (Throwable $e) {
+            $this?->logger->debug(__FUNCTION__ . ' the dead link could not be closed: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Move a job into the given state
      */
     private function updateState(JobState $state, ?string $workId): bool
     {
+        $operation = __FUNCTION__;
+
         if (null === $workId) {
-            $this?->logger->error(__FUNCTION__ . ' Missing job id');
+            $this?->logger->error($operation . ' Missing job id');
 
             return false;
         }
@@ -307,18 +387,23 @@ abstract class MySql extends AbstractAdapter
             'SET ' . JobColumn::State->value . ' = "' . $state->value . '" ' .
             'WHERE ' . $this->config->idColumn . ' = "' . $this->escape($workId) . '"';
 
-        $this?->logger->debug(__FUNCTION__ . ': ' . $sql);
+        $this?->logger->debug($operation . ': ' . $sql);
 
-        try {
-            return 0 <= $this->write($sql);
-        } catch (mysqli_sql_exception $e) {
-            /**
-             * An acknowledge must not throw, false tells the worker the job stays open
-             */
-            $this?->logger->error($e->getMessage());
+        /**
+         * The statement ran, and that is what this cell reports. The row count is not
+         * the answer: an UPDATE that writes the value a row already holds also reports 0,
+         * so reading it as success would fail a job that is already DONE and make a
+         * re-delivered id throw inside the worker. A count of 0 is worth knowing about,
+         * so it is logged rather than returned.
+         */
+        return $this->attempt($operation, function () use ($sql, $workId, $operation): bool {
+            $affected = $this->write($sql);
+            if (0 === $affected) {
+                $this?->logger->debug($operation . ': no row matched ' . $workId);
+            }
 
-            return false;
-        }
+            return true;
+        });
     }
 
     /**
@@ -342,7 +427,8 @@ abstract class MySql extends AbstractAdapter
     /**
      * Run a write statement
      *
-     * @return int the number of rows the statement matched, 0 if the statement is not a write
+     * @return int the number of rows the statement matched, 0 when the statement matched
+     *              no row or was not a write
      * @throws mysqli_sql_exception when the server rejects the statement
      */
     private function write(string $sql): int

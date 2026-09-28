@@ -10,6 +10,7 @@
  */
 
 use BackQ\Adapter\Redis;
+use BackQ\Adapter\Redis\RedisConfig;
 use BackQ\Message\Process;
 use BackQ\Publisher\Serialized;
 use Symfony\Component\Console\Logger\ConsoleLogger;
@@ -30,7 +31,11 @@ final class MyRedisSerializedPublisher extends Serialized
 }
 
 $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$adapter = new Redis($logger, getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
+$redisConfig = new RedisConfig(
+    host: getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1',
+    port: (int) (getenv('BACKQ_REDIS_PORT') ?: 6379),
+);
+$adapter = new Redis($logger, $redisConfig);
 
 /**
  * We will serialize and delay `process` message

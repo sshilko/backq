@@ -10,6 +10,7 @@
  */
 
 use BackQ\Adapter\Redis;
+use BackQ\Adapter\Redis\RedisConfig;
 use BackQ\Worker\AProcess;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
@@ -25,7 +26,11 @@ require_once __DIR__ . '/../../../vendor/autoload.php';
  * Optional logger, shared by the adapter and the worker
  */
 $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$adapter = new Redis($logger, getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
+$redisConfig = new RedisConfig(
+    host: getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1',
+    port: (int) (getenv('BACKQ_REDIS_PORT') ?: 6379),
+);
+$adapter = new Redis($logger, $redisConfig);
 
 /**
  * OPTIONAL

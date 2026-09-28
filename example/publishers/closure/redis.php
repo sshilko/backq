@@ -9,6 +9,7 @@
  * Redistributions of files must retain the above copyright notice.
  */
 use BackQ\Adapter\Redis;
+use BackQ\Adapter\Redis\RedisConfig;
 use BackQ\Publisher\Closure;
 use Opis\Closure\SerializableClosure;
 use Symfony\Component\Console\Logger\ConsoleLogger;
@@ -28,7 +29,11 @@ final class MyRedisClosurePublisher extends Closure
 }
 
 $logger  = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$adapter = new Redis($logger, getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1', (int) (getenv('BACKQ_REDIS_PORT') ?: 6379));
+$redisConfig = new RedisConfig(
+    host: getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1',
+    port: (int) (getenv('BACKQ_REDIS_PORT') ?: 6379),
+);
+$adapter = new Redis($logger, $redisConfig);
 
 $publisher = new MyRedisClosurePublisher($adapter);
 if (!$publisher->start()) {

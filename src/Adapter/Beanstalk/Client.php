@@ -29,6 +29,26 @@ use function strtok;
 use const PHP_INT_MAX;
 
 /**
+ * The beanstalkd client, with the delta from davidpersson/beanstalk made explicit
+ *
+ * This class extends \Beanstalk\Client and overrides nine methods. Each one is here because
+ * the vendored version cannot do what this library needs, and together they are the whole
+ * maintenance cost of the fork: a `composer update` of davidpersson/beanstalk is a diff
+ * against this list rather than a mystery. `tests/Adapter/Beanstalk/ClientTest.php` holds one
+ * case per row, so a change on either side of the override has to show up as a test.
+ *
+ * | Override      | What the parent does | What this one does, and why                                       |
+ * |---------------|----------------------|--------------------------------------------------------------------|
+ * | `__construct` | Merges its own defaults under the given config | Merges them in the order this class reads them, and never builds a connection. Behaviourally the same as the parent today; kept because the default set is what the adapter configures the client with, and it is asserted key for key. |
+ * | `__destruct`  | Always disconnects | Closes a non-persistent connection and leaves a persistent one open, which is the point of a persistent connection. |
+ * | `connect`     | `pfsockopen`/`fsockopen`, no read timeout | Opens the socket through `IO\StreamIO` with a read/write deadline, and passes a stream context through, which is what turns `tcp://` into `tls://`. |
+ * | `reserve`     | Sends the command and blocks with no deadline | Applies the timeout to the stream as well as to the command, restores the general deadline afterwards, and reports a `DEADLINE_SOON` differently from an expected `TIMED_OUT`. |
+ * | `disconnect`  | `quit`, then `fclose`, and reports `!connected` | Sends `quit` when connected, drops the stream, and reports the parent's own `connected` flag. |
+ * | `_write`      | `fwrite` on the resource | Writes through the stream, and refuses when there is no connection rather than writing into a dead handle. |
+ * | `_read`       | `stream_get_contents`, `rtrim`s the terminator, and cannot tell a short read from a full one | Rejects a short read instead of returning a truncated body, and strips only the two-byte terminator so a body ending in `\r` survives. |
+ * | `_statsRead`  | Decodes whatever arrived after any status | Refuses to decode a body that did not arrive behind an `OK`. |
+ * | `_decode`     | Reads `$value[0]` on every line | Skips empty lines, so a trailing newline in the YAML does not raise an uninitialized offset on PHP 8. |
+ *
  * @phpcs:disable
  */
 class Client extends \Beanstalk\Client
@@ -80,7 +100,7 @@ class Client extends \Beanstalk\Client
         }
 
         /**
-         * @var array{host: string, port: int, timeout: int, persistent: bool} $config
+         * @var array{host: string, port: int, timeout: int, persistent: bool, context?: mixed} $config
          */
         $config = $this->_config;
 
@@ -95,7 +115,12 @@ class Client extends \Beanstalk\Client
                 (int) $config['port'],
                 (float) $connectionTimeout,
                 self::IO_TIMEOUT,
-                null,
+                /**
+                 * A stream context is what turns the `tcp://` stream below into a `tls://`
+                 * one, and it is absent from the defaults on purpose: they are asserted
+                 * key for key, and a null context is the same as no context.
+                 */
+                $config['context'] ?? null,
                 true,
                 (bool) $config['persistent']
             );
@@ -212,7 +237,6 @@ class Client extends \Beanstalk\Client
         if ($this->connected) {
             try {
                 $this->_write('quit');
-                //$this->_io->close();
             } catch (Throwable $ex) {
                 $this->_error(__FUNCTION__ . " error: " . $ex->getMessage());
             }

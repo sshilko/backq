@@ -12,6 +12,7 @@
 namespace BackQ\Adapter;
 
 use BackQ\Adapter\Beanstalk\Client;
+use BackQ\Adapter\Beanstalk\Connection;
 use Override;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -21,7 +22,6 @@ use function is_array;
 
 /**
  * Beanstalk protocol adapter
- * @phpcs:disable
  *
  * Every message is reported through $this?->logger. Psalm reads the nullsafe operator as
  * widening $this to `Beanstalk|null` for the rest of the method, which is not what it
@@ -32,15 +32,18 @@ use function is_array;
  */
 class Beanstalk extends AbstractAdapter
 {
-    public const ADAPTER_NAME = 'beanstalk';
+    public const string ADAPTER_NAME = 'beanstalk';
 
-    public const PRIORITY_DEFAULT = 1024;
+    public const int PRIORITY_DEFAULT = 1024;
 
     public const int JOBTTR_DEFAULT = 60;
 
     private Client $client;
 
-    private $connected;
+    /**
+     * Whether the client is built and the socket is open
+     */
+    private bool $connected = false;
 
     /**
      * Timeout for reserve() command
@@ -59,36 +62,39 @@ class Beanstalk extends AbstractAdapter
     /**
      * Connects adapter
      *
+     * @param Connection $connection where to open the socket, and how
      */
     #[Override]
-    public function connect(string $host = '127.0.0.1', int $port = 11300, int $timeout = 1, bool $persistent = false, $logger = null): bool
+    public function connect(Connection $connection = new Connection()): bool
     {
         if (true === $this->connected) {
             return true;
         }
 
-        try {
-            $bconfig = [
-                'host' => $host,
-                'port' => $port,
-                'timeout' => $timeout,
-                'persistent' => $persistent,
-                'logger'  => ($logger ?: $this)
-            ];
+        $connection = $this->connection($connection);
 
-            //$this->client = new \Beanstalk\Client($bconfig);
-            $this->client = new Client($bconfig);
+        return $this->attemptConnect(__FUNCTION__, function () use ($connection): bool {
+            $this->client = new Client([
+                'host' => $connection->host,
+                'port' => $connection->port,
+                'timeout' => $connection->timeout,
+                'persistent' => $connection->persistent,
+                'context' => $connection->context,
+                /**
+                 * The vendored client reports through whatever answers error(string), which
+                 * any PSR-3 logger already does. This is that logger.
+                 */
+                'logger' => $this->logger,
+            ]);
 
             if ($this->client->connect()) {
                 $this->connected = true;
 
                 return true;
             }
-        } catch (Throwable $e) {
-            $this->error('Beanstalk adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
-        }
 
-        return false;
+            return false;
+        });
     }
 
     #[Override]
@@ -98,60 +104,42 @@ class Beanstalk extends AbstractAdapter
     }
 
     /**
-     * This overrides the original Beanstalkd logger
-     * @see \Beanstalk\Client._error()
-     * @param $msg
-     */
-    public function error(string $msg): void
-    {
-        $this?->logger->error($msg);
-    }
-
-    /**
      * Checks (if possible) if there are workers to work immediately
      *
      */
     #[Override]
     public function hasWorkers(string $queue = ''): bool
     {
-        if ($this->connected) {
-            try {
-                if ($queue) {
-                    # $definedtubes = $this->client->listTubes();
-                    # if (!empty($definedtubes) && in_array($queue, $definedtubes)) {
-                    # Because we already binded to a queue, it will be always shown in list
+        return $this->attempt(__FUNCTION__, function () use ($queue): bool {
+            if ($queue) {
+                /**
+                 * Workers watching queue
+                 *
+                 * rarely fails with NOT_FOUND even when we binded (use %tube) successfuly before
+                 * failure produces error-log entries
+                 */
+                /**
+                 * @var array<array-key, mixed>|false
+                 */
+                $result = $this->client->statsTube($queue);
 
-                    /**
-                     * Workers watching queue
-                     *
-                     * rarely fails with NOT_FOUND even when we binded (use %tube) successfuly before
-                     * failure produces error-log entries
-                     */
-                    /**
-                     * @var array<array-key, mixed>|false
-                     */
-                    $result = $this->client->statsTube($queue);
-                    if (is_array($result) && isset($result['current-watching'])) {
-                        return $result['current-watching'] > 0;
-                    }
-                } else {
-                    /**
-                     * Workers at all connected (not very usefull)
-                     */
-                    /**
-                     * @var array<array-key, mixed>|false
-                     */
-                    $result = $this->client->stats();
-                    if (is_array($result) && isset($result['current-workers'])) {
-                        return $result['current-workers'] > 0;
-                    }
-                }
-            } catch (RuntimeException $e) {
-                $this->error(__FUNCTION__ . ' ' . $e->getMessage());
+                return is_array($result) && isset($result['current-watching'])
+                    ? $result['current-watching'] > 0
+                    : false;
             }
-        }
 
-        return false;
+            /**
+             * Workers at all connected (not very usefull)
+             */
+            /**
+             * @var array<array-key, mixed>|false
+             */
+            $result = $this->client->stats();
+
+            return is_array($result) && isset($result['current-workers'])
+                ? $result['current-workers'] > 0
+                : false;
+        });
     }
 
     /**
@@ -160,7 +148,7 @@ class Beanstalk extends AbstractAdapter
     #[Override]
     public function ping(bool $reconnect = true): bool
     {
-        try {
+        return $this->attempt(__FUNCTION__, function () use ($reconnect): bool {
             /**
              * @todo Any other fast && reliable options to check if socket is alive?
              */
@@ -172,16 +160,12 @@ class Beanstalk extends AbstractAdapter
                 return true;
             }
 
-            if ($reconnect) {
-                if (true === $this->client->connect()) {
-                    return $this->ping(false);
-                }
+            if ($reconnect && true === $this->client->connect()) {
+                return false !== $this->client->stats();
             }
-        } catch (RuntimeException $e) {
-            $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
-        }
 
-        return false;
+            return false;
+        });
     }
 
     /**
@@ -191,17 +175,15 @@ class Beanstalk extends AbstractAdapter
     #[Override]
     public function bindRead(string $queue): bool
     {
-        if ($this->connected) {
-            try {
-                if ($this->client->watch($queue)) {
-                    return true;
-                }
-            } catch (Throwable $e) {
-                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+        /**
+         * watch() answers the number of tubes now watched, which is an int on success
+         */
+        return $this->attempt(
+            __FUNCTION__,
+            function () use ($queue): bool {
+                return (bool) $this->client->watch($queue);
             }
-        }
-
-        return false;
+        );
     }
 
     /**
@@ -211,17 +193,15 @@ class Beanstalk extends AbstractAdapter
     #[Override]
     public function bindWrite(string $queue): bool
     {
-        if ($this->connected) {
-            try {
-                if ($this->client->useTube($queue)) {
-                    return true;
-                }
-            } catch (Throwable $e) {
-                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+        /**
+         * useTube() answers the tube name, which is a string on success
+         */
+        return $this->attempt(
+            __FUNCTION__,
+            function () use ($queue): bool {
+                return (bool) $this->client->useTube($queue);
             }
-        }
-
-        return false;
+        );
     }
 
     /**
@@ -233,23 +213,20 @@ class Beanstalk extends AbstractAdapter
     #[Override]
     public function pickTask(?int $timeout = null): bool|array
     {
-        if ($this->connected) {
-            try {
-                $result = $this->client->reserve($timeout ?? $this->workTimeout);
-                /**
-                 * @var array{id: int, body: string|false}|false $result
-                 */
-                if (is_array($result)) {
-                    return [$result['id'], $result['body'], []];
-                }
-            } catch (Throwable $e) {
-                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
-
-                throw $e;
+        $result = $this->attemptRethrowing(__FUNCTION__, function () use ($timeout): bool|array {
+            $reserved = $this->client->reserve($timeout ?? $this->workTimeout);
+            /**
+             * @var array{id: int, body: string|false}|false $reserved
+             */
+            if (is_array($reserved)) {
+                return [$reserved['id'], $reserved['body'], []];
             }
-        }
 
-        return false;
+            return false;
+        });
+        \assert(\is_bool($result) || \is_array($result));
+
+        return $result;
     }
 
     /**
@@ -267,36 +244,26 @@ class Beanstalk extends AbstractAdapter
         string|Stringable $body,
         int $readyWait = 0,
         ?int $jobTtr = null,
-        ?int $priority = null
+        ?int $priority = null,
     ): string|Throwable {
-        if (!$this->connected) {
-            $error = new RuntimeException(self::class . ' adapter ' . __FUNCTION__ . ': not connected');
-            $this?->logger->error($error->getMessage());
-
-            return $error;
-        }
-
-        try {
+        return $this->attemptReturning(__FUNCTION__, function () use ($body, $readyWait, $jobTtr, $priority): string {
             $result = $this->client->put(
                 $priority ?? self::PRIORITY_DEFAULT,
                 $readyWait,
                 $jobTtr ?? self::JOBTTR_DEFAULT,
                 (string) $body
             );
-        } catch (Throwable $e) {
-            $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
 
-            return $e;
-        }
+            /**
+             * The policy helper names the class and the operation when it logs this, so the
+             * reason is all the message has to carry.
+             */
+            if (false === $result) {
+                throw new RuntimeException('beanstalkd rejected the job');
+            }
 
-        if (false === $result) {
-            $error = new RuntimeException(self::class . ' adapter ' . __FUNCTION__ . ': beanstalkd rejected the job');
-            $this?->logger->error($error->getMessage());
-
-            return $error;
-        }
-
-        return (string) $result;
+            return (string) $result;
+        });
     }
 
     /**
@@ -306,22 +273,17 @@ class Beanstalk extends AbstractAdapter
     #[Override]
     public function afterWorkFailed(?string $workId): bool
     {
-        if ($this->connected) {
-            try {
-                /**
-                 * Release task back to queue with default priority and 1 second ready-delay
-                 * The client documents an integer id, the acknowledge contract a string,
-                 * so the id changes hand on the way out
-                 */
-                if ($this->client->release((int) $workId, self::PRIORITY_DEFAULT, 1)) {
-                    return true;
-                }
-            } catch (Throwable $e) {
-                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+        /**
+         * Release task back to queue with default priority and 1 second ready-delay
+         * The client documents an integer id, the acknowledge contract a string,
+         * so the id changes hand on the way out
+         */
+        return $this->attempt(
+            __FUNCTION__,
+            function () use ($workId): bool {
+                return true === $this->client->release((int) $workId, self::PRIORITY_DEFAULT, 1);
             }
-        }
-
-        return false;
+        );
     }
 
     /**
@@ -331,17 +293,12 @@ class Beanstalk extends AbstractAdapter
     #[Override]
     public function afterWorkSuccess(?string $workId): bool
     {
-        if ($this->connected) {
-            try {
-                if ($this->client->delete((int) $workId)) {
-                    return true;
-                }
-            } catch (Throwable $e) {
-                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
+        return $this->attempt(
+            __FUNCTION__,
+            function () use ($workId): bool {
+                return true === $this->client->delete((int) $workId);
             }
-        }
-
-        return false;
+        );
     }
 
     /**
@@ -351,17 +308,33 @@ class Beanstalk extends AbstractAdapter
     #[Override]
     public function disconnect(): bool
     {
-        if (true === $this->connected) {
-            try {
-                $this->client->disconnect();
-                $this->connected = false;
+        return $this->attempt(__FUNCTION__, function (): bool {
+            $this->client->disconnect();
+            $this->connected = false;
 
-                return true;
-            } catch (Throwable $e) {
-                $this?->logger->error(self::class . ' adapter ' . __FUNCTION__ . ' exception: ' . $e->getMessage());
-            }
-        }
+            return true;
+        });
+    }
 
-        return false;
+    /**
+     * The beanstalkd client is only usable once connect() answered
+     */
+    #[Override]
+    protected function isReady(): bool
+    {
+        return true === $this->connected;
+    }
+
+    /**
+     * The connection the client is about to be built from
+     *
+     * PersistentBeanstalk answers a persistent one, which is the whole difference between
+     * the two adapters: everything else lives in this class.
+     *
+     * @param Connection $connection the connection the caller asked for
+     */
+    protected function connection(Connection $connection): Connection
+    {
+        return $connection;
     }
 }

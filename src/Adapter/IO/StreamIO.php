@@ -47,17 +47,14 @@ use const STREAM_CLIENT_CONNECT;
 use const STREAM_CLIENT_PERSISTENT;
 use const STREAM_SHUT_RDWR;
 
-/**
- * @phpcs:disable
- */
 class StreamIO extends AbstractIO
 {
-    public const FREAD_0_TRIES = 3;
-    public const WRITE_0_TRIES = 3;
+    public const int FREAD_0_TRIES = 3;
+    public const int WRITE_0_TRIES = 3;
 
-    public const READ_EOF_CODE  = 901;
-    public const READ_TIME_CODE = 902;
-    public const READ_ERR_CODE  = 900;
+    public const int READ_EOF_CODE  = 901;
+    public const int READ_TIME_CODE = 902;
+    public const int READ_ERR_CODE  = 900;
 
     /**
      * Attempt to connect N times before give up
@@ -70,7 +67,13 @@ class StreamIO extends AbstractIO
     public int $connRetryIntervalMs = 50;
 
     /**
+     * The open socket, or null once close() ran
+     *
      * @var resource|null
+     *
+     * A resource has no type declaration in PHP, so the docblock is the type and the
+     * property stays untyped. Everything that reads it checks for null first, which is
+     * the only question about a resource this class can answer.
      */
     private $sock = null;
 
@@ -90,7 +93,7 @@ class StreamIO extends AbstractIO
         int|null $read_write_timeout = null,
         $context = null,
         bool $blocking = false,
-        private string|bool $persistent = ''
+        private string|bool $persistent = '',
     ) {
         $errstr = $errno  = null;
         $this->sock       = null;
@@ -122,7 +125,13 @@ class StreamIO extends AbstractIO
                     $errstr,
                     $connection_timeout,
                     STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT
-                ) : @stream_socket_client($remote, $errno, $errstr, $connection_timeout, STREAM_CLIENT_CONNECT)) ?: null;
+                ) : @stream_socket_client(
+                    $remote,
+                    $errno,
+                    $errstr,
+                    $connection_timeout,
+                    STREAM_CLIENT_CONNECT
+                )) ?: null;
             }
             if (!$this->sock) {
                 $triesLeft--;

@@ -68,7 +68,10 @@ Read it as two halves that meet at the queue server:
    `afterWorkFailed()` tells the backend the outcome.
 
 `AbstractAdapter` is the contract that both halves implement, so a worker written
-against Beanstalkd runs unchanged on Redis, and vice versa.
+against Beanstalkd runs unchanged on Redis, and vice versa. It is also split into
+two roles — `QueueConsumer` for the consume side, `QueueProducer` for the publish
+side — so a component that only publishes depends on four methods instead of
+eleven (see [Building an adapter](#building-an-adapter)).
 - Queue backends are implemented independently
 
 ## Benefits
@@ -166,9 +169,56 @@ them from a clone of this repository. In your own project, depend on
 
 `*` — unsupported/partial:
 - `Redis::hasWorkers()` is a stub,
-- `MySql::hasWorkers()` always returns `true`,
+- `MySql::hasWorkers()` reports no workers without checking,
 - `MySql::setWorkTimeout()` is accepted but not applied — idle timeouts are a
   worker concern, and the MySQL queue is shared through the table.
+
+### Building an adapter
+
+Every adapter takes a PSR-3 `LoggerInterface` first and a value object second, and
+that is where its configuration lives:
+
+```php
+use BackQ\Adapter\Beanstalk\Connection;
+use BackQ\Adapter\MySql\JobConfig;
+use BackQ\Adapter\MySql as MySqlAdapter;
+use BackQ\Adapter\PersistentBeanstalk;
+use BackQ\Adapter\Redis;
+use BackQ\Adapter\Redis\RedisConfig;
+
+$beanstalk = new PersistentBeanstalk($logger);
+$beanstalk->connect(new Connection(host: 'beanstalkd', timeout: 5));
+
+$redis     = new Redis($logger, new RedisConfig(host: 'redis', prefix: 'app:'));
+$mysql     = new MySqlAdapter($db, new JobConfig(table: 'backq_jobs'), $logger);
+```
+
+`RedisConfig` and `Connection` validate their own fields and throw
+`InvalidArgumentException` naming the offending one, at construction rather than
+against the server. The MySQL adapter is handed an established `mysqli` and never
+opens or closes it — give `JobConfig` a `connectionProvider` closure if a worker
+should be able to replace a link that has dropped:
+
+```php
+$config = new JobConfig(
+    table: 'backq_jobs',
+    connectionProvider: static fn (): mysqli => new mysqli('127.0.0.1', 'backq', 'secret', 'backq_jobs'),
+);
+```
+
+`AbstractAdapter` splits into two roles — `QueueConsumer` for a worker and
+`QueueProducer` for a publisher — so a component that only ever publishes depends
+on four methods instead of eleven. `AbstractAdapter` implements both, so any
+existing subclass is both roles already. Narrowing `AbstractWorker` and
+`AbstractPublisher` to the role interfaces is deferred to 6.0.
+
+**Failure policy.** A transport or storage failure is *returned*, never thrown:
+`putTask()` hands back a `Throwable`, and `ping()` / `pickTask()` / the two
+`afterWork*()` methods report `false` and log one PSR-3 record carrying
+`['exception' => $e]`. An invalid *argument* still throws. `false` from an
+acknowledgement means the backend did not confirm the job — the worker treats
+that as `Worker failed to acknowledge job result` and ends the cycle, so a job
+lost to an expiry or a competing consumer is no longer acknowledged as handled.
 
 ### Worker controls
 

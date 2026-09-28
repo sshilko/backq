@@ -10,6 +10,7 @@
  */
 
 use BackQ\Adapter\Redis;
+use BackQ\Adapter\Redis\RedisConfig;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
@@ -26,7 +27,7 @@ $redisHost = getenv('BACKQ_REDIS_HOST') ?: '127.0.0.1';
 $redisPort = (int) (getenv('BACKQ_REDIS_PORT') ?: 6379);
 
 $logger   = new ConsoleLogger(new ConsoleOutput(ConsoleOutput::VERBOSITY_DEBUG));
-$redissub = new Redis($logger, $redisHost, $redisPort);
+$redissub = new Redis($logger, new RedisConfig(host: $redisHost, port: $redisPort));
 $logger->info('Starting');
 $redissub->setWorkTimeout(5);
 if (!$redissub->connect()) {
