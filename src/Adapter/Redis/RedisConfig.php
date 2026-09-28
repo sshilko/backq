@@ -23,7 +23,7 @@ use InvalidArgumentException;
  * style, so the mapping onto the illuminate/redis keys `read_timeout`, `persistent_id` and
  * `database` is only in Redis::ensureConnected().
  */
-final readonly class RedisConfig
+readonly class RedisConfig
 {
     public const int PORT_LOWER  = 1;
     public const int PORT_UPPER  = 65535;
@@ -43,6 +43,8 @@ final readonly class RedisConfig
      * @param ?string $authPassword password for AUTH
      *
      * @throws InvalidArgumentException when a setting is outside the range the server accepts
+     *
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList) the ten settings are the point of the object
      */
     public function __construct(
         public string $host = '127.0.0.1',

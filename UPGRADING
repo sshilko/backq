@@ -370,7 +370,7 @@
   $prefix, int $timeout, int $read_timeout, int $database_id, ?string
   $auth_password)`; it is now `__construct(LoggerInterface $logger,
   RedisConfig $config = new RedisConfig())`. `BackQ\Adapter\Redis\RedisConfig` is
-  a `final readonly` class carrying the same nine settings plus the queue name:
+  a `readonly` class carrying the same nine settings plus the queue name:
 
   | Was | Now | Default unchanged |
   |---|---|---|

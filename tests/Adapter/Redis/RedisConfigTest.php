@@ -91,11 +91,6 @@ class RedisConfigTest extends TestCase
         new RedisConfig(port: 0);
     }
 
-    public function testTheConfigIsFinal(): void
-    {
-        $this->assertTrue((new ReflectionClass(RedisConfig::class))->isFinal());
-    }
-
     public function testTheConfigIsReadOnly(): void
     {
         $this->assertTrue((new ReflectionClass(RedisConfig::class))->isReadOnly());
