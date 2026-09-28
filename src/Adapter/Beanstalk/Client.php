@@ -91,6 +91,10 @@ class Client extends \Beanstalk\Client
      * @see \Beanstalk\Client::$_connection
      * @see \Beanstalk\Client::reserve()
      * @return bool `true` if the connection was established, `false` otherwise.
+     *
+     * @suppress PhanPartialTypeMismatchArgument the stream context reaches a `resource|null`
+     * parameter, and the parent declares $_config as a bare `array`, so phan sees the value
+     * as mixed with nothing to narrow it. The @var in the body says what the key holds.
      */
     #[Override]
     public function connect(): bool
@@ -100,7 +104,12 @@ class Client extends \Beanstalk\Client
         }
 
         /**
-         * @var array{host: string, port: int, timeout: int, persistent: bool, context?: mixed} $config
+         * A stream context is a resource from stream_context_create(), and null is the
+         * same as none, so that is what the key holds. It is typed here rather than left
+         * mixed because the value goes to a `resource|null` parameter below, and a
+         * non-resource reaching it would fail there rather than name the offender.
+         *
+         * @var array{host: string, port: int, timeout: int, persistent: bool, context?: resource} $config
          */
         $config = $this->_config;
 

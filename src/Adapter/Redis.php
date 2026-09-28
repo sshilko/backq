@@ -541,9 +541,15 @@ class Redis extends AbstractAdapter
     {
         $this?->logger->debug(__FUNCTION__);
 
-        return $this->attemptConnect(__FUNCTION__, function (): bool {
+        /**
+         * Inside a closure __FUNCTION__ is the string `{closure}`, not this method's name,
+         * so the operation is carried in for the messages below to name.
+         */
+        $operation = __FUNCTION__;
+
+        return $this->attemptConnect($operation, function () use ($operation): bool {
             if (ConnectionState::Nothing !== $this->state) {
-                $this?->logger->debug(__FUNCTION__ . ' already connected, keeping the live connection');
+                $this?->logger->debug($operation . ' already connected, keeping the live connection');
 
                 return true;
             }
@@ -551,7 +557,7 @@ class Redis extends AbstractAdapter
             $this->ensureConnected();
 
             if (!$this->pingServer()) {
-                $this?->logger->error(__FUNCTION__ . ': the redis server did not answer');
+                $this?->logger->error($operation . ': the redis server did not answer');
 
                 return false;
             }

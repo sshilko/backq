@@ -128,6 +128,25 @@ class RedisAdapterCoreTest extends TestCase
         $this->assertCount(1, (new ReflectionProperty(Redis::class, 'reservedJobs'))->getValue($redis));
     }
 
+    /**
+     * The messages connect() writes from inside its closure must name connect()
+     *
+     * __FUNCTION__ is the string `{closure}` inside a closure, not the method name, so
+     * this pins the name being carried in rather than read from the wrong scope. It fails
+     * on the literal `{closure}` reaching the log.
+     */
+    public function testTheConnectMessagesNameTheMethodAndNotTheClosure(): void
+    {
+        $logger  = new RecordingLogger();
+        $redis   = new Redis($logger);
+        $this->setState($redis, ConnectionState::BindRead);
+
+        $this->assertTrue($redis->connect());
+
+        $this->assertLogged($logger, 'connect already connected, keeping the live connection', 'debug');
+        $this->assertNotLogged($logger, '{closure}');
+    }
+
     public function testBindReadRequiresConnectedClient(): void
     {
         $redis = new Redis(new NullLogger());
