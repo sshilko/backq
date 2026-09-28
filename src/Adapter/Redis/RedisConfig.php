@@ -17,9 +17,10 @@ use InvalidArgumentException;
  * How the adapter reaches the Redis server
  *
  * These are the nine settings the adapter used to take as named arguments, plus the queue
- * name connect() needs before there is a binding, kept as one object so they are validated
- * once, at the call site, instead of deeper down where a connector reports "Connection
- * refused" for a port that never existed. The property names follow this repository's
+ * name connect() needs before there is a binding and the worker lease length hasWorkers()
+ * reads the registry by, kept as one object so they are validated once, at the call site,
+ * instead of deeper down where a connector reports "Connection refused" for a port that
+ * never existed. The property names follow this repository's
  * style, so the mapping onto the illuminate/redis keys `read_timeout`, `persistent_id` and
  * `database` is only in Redis::ensureConnected().
  */
@@ -29,6 +30,7 @@ readonly class RedisConfig
     public const int PORT_UPPER  = 65535;
     public const int TIMEOUT_MIN = 1;
     public const int DATABASE_MIN = 0;
+    public const int WORKER_TTL_MIN = 5;
 
     /**
      * @param string $host server the adapter connects to
@@ -41,10 +43,16 @@ readonly class RedisConfig
      * @param int $databaseId logical database number
      * @param string $queueName queue the adapter is bound to until bindRead()/bindWrite() says otherwise
      * @param ?string $authPassword password for AUTH
+     * @param int $workerTtl seconds a worker lease in the hasWorkers() registry is valid for.
+     *                         It must exceed the longest job, because a lease that expires
+     *                         while its worker is busy reports that worker as absent, and it
+     *                         must exceed readTimeout, because a worker blocked in a pop
+     *                         renews before it blocks and is then covered for readTimeout
+     *                         seconds.
      *
      * @throws InvalidArgumentException when a setting is outside the range the server accepts
      *
-     * @SuppressWarnings(PHPMD.ExcessiveParameterList) the ten settings are the point of the object
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList) the eleven settings are the point of the object
      */
     public function __construct(
         public string $host = '127.0.0.1',
@@ -57,6 +65,7 @@ readonly class RedisConfig
         public int $databaseId = 0,
         public ?string $authPassword = null,
         public string $queueName = 'default',
+        public int $workerTtl = 300,
     ) {
         if ($port < self::PORT_LOWER || $port > self::PORT_UPPER) {
             throw new InvalidArgumentException(
@@ -76,6 +85,16 @@ readonly class RedisConfig
         if ($databaseId < self::DATABASE_MIN) {
             throw new InvalidArgumentException(
                 'databaseId must be at least ' . self::DATABASE_MIN . ', got ' . $databaseId
+            );
+        }
+
+        /**
+         * A lease of 0 would make every worker look absent and a lease of 1 would make the
+         * registry flap on every pick cycle. Both are silent, and a support ticket.
+         */
+        if ($workerTtl < self::WORKER_TTL_MIN) {
+            throw new InvalidArgumentException(
+                'workerTtl must be at least ' . self::WORKER_TTL_MIN . ' seconds, got ' . $workerTtl
             );
         }
     }

@@ -57,10 +57,20 @@
   on the transitive copy.
 - `BackQ\Adapter\AbstractAdapter::hasWorkers($queue)` is narrowed to `bool`
   (was `bool|int|null`). Concrete adapters return real values where the backend
-  supports the check and `false` elsewhere: `Redis`
-  reports "no workers" (a documented stub contract), `Beanstalk` implements the
-  check against real tube stats, and `MySql` reports `true`. Subclasses
-  overriding `hasWorkers()` must declare a `bool` return type.
+  supports the check and `false` elsewhere: `Redis` answers from a per-queue
+  lease registry the workers write (see below), `Beanstalk` implements the check
+  against real tube stats, and `MySql` reports "no workers" (a table queue has no
+  heartbeat, so there is nothing cheap to check). Subclasses overriding
+  `hasWorkers()` must declare a `bool` return type.
+
+  **`Redis::hasWorkers()` is no longer the stub it was in 4.x.** It performs Redis
+  I/O, so it can now log an `error` where it was previously silent, and it answers
+  "was a worker seen on this queue within `workerTtl` seconds" rather than a
+  constant `false`. Code that branched on the constant still gets a `false` it can
+  publish on, and no signature changed: the answer moves from always-false to a
+  real answer, not from one answer to another. `RedisConfig` gained an eleventh
+  field, `workerTtl` (default `300`, minimum `5`), appended last, so every existing
+  construction — positional or named — keeps working.
 - **The process worker no longer writes to the PHP error log.** `BackQ\Worker\AProcess`
   reports unsupported payloads, child-launch failures, fork-cleanup failures,
   timeouts, signals and outer-loop failures through the PSR-3 logger set with

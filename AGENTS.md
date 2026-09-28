@@ -146,13 +146,18 @@ script; on the host, never.
 - `build/` — quality config (`phpcs-ruleset.xml`, `phpstan.neon`, `psalm.xml`, `phan.php`,
   `phpmd-rulesets.xml`, `pdepend.xml`, `stubs/`, `check-classes.php`,
   `.pre-commit-config.yaml`) and the dockerized dev env
-- `example/` — runnable examples, not shipped. `plans/` — implementation plans; 1-6 are
-  implemented, `plan-7` (`plan-7-adapter-architecture.md`) is **proposed and not started**. The
-  implemented ones are historical records: plans 1-5 still describe the `Nsq` adapter, which
-  5.x removed (see `UPGRADING`), `plan-5` still says `AbstractAdapter::JOBTTR_DEFAULT` stayed,
-  which it did not, and `plan-6` still counts 9 `error_log()` call sites in 4 files — 3 of them
-  went with the `Amazon\SNS` workers, so 6 remained, all in `AProcess`. Read a plan's status
-  block before trusting its body.
+- `example/` — runnable examples, not shipped. `plans/` — implementation plans. As implemented:
+  1-7 and 9 are done, 8 (`plan-8-redis-has-workers-local-registry.md`) is **proposed and not
+  started** — it is the *alternative* to the implemented plan 9, not a step after it. The
+  implemented ones are historical records, and a historical record can be wrong about its own
+  present: plans 1-5 still describe the `Nsq` adapter, which 5.x removed (see `UPGRADING`),
+  `plan-5` still says `AbstractAdapter::JOBTTR_DEFAULT` stayed, which it did not, `plan-6` still
+  counts 9 `error_log()` call sites in 4 files — 3 of them went with the `Amazon\SNS` workers, so
+  6 remained, all in `AProcess`, and `plan-7`'s own status block now contradicts the
+  "proposed and not started" line this list used to carry. Read a plan's status block before
+  trusting its body, and expect a shipped plan's sketches to be right about the design and wrong
+  about the plumbing: plan 9 ends with a "Corrections this plan needed" section because four of
+  its code sketches did not survive contact with the container.
 - `.github/workflows/ci.yml` builds the same php83 image and runs the same check-classes
   and PHPUnit steps on every PR, so a green local sweep matches CI
 
@@ -196,6 +201,19 @@ precondition to check. `Redis::queue()` is the companion accessor: it throws
 `RuntimeException` when `$queue` is null, and that is an invariant break which must never
 escape uncaught, so a psalm `RedundantPropertyInitializationCheck` on `$this->queue` is a real
 report, not noise to suppress.
+
+  `Queue::getRedis()` is the other one, and it costs more: it is **declared**
+  `Illuminate\Contracts\Redis\Factory` and **answers a `BackQ\Adapter\Redis\Manager`**, whose
+  `__call` forwards to the client. So any value from it carries a native `\Redis` type as a
+  **runtime check**, not as documentation — a return type or a parameter type narrower than the
+  union is a `TypeError` at call time, and `php -l`, `check-classes.php` and psalm all pass it.
+  Worse, `RedisAdapterCoreTest` wires a `createMock(\Redis::class)`, so **the whole offline suite
+  stays green while the feature is broken in production**: only `RedisAdapterTest` reaches a real
+  `Manager`. Declare the union (`Factory|\Redis`, or `Redis\Manager` if you want the narrow
+  reading) and narrow with `assert($x instanceof \Redis)` where the command is issued, exactly as
+  `pingServer()` does. Note `Manager` is not a free name in `src/Adapter/Redis.php` —
+  `Illuminate\Queue\Capsule\Manager` is imported there, so the file spells the other one
+  `Redis\Manager`.
 
 `false` from an acknowledgement means *the backend did not confirm the job*, not *the call
 failed* — and `AbstractWorker` treats it as fatal
@@ -250,15 +268,20 @@ Each of these yields a wrong result rather than an error.
   adapters' logging: they call `$this?->logger->error(...)` at the call site since
   `AbstractAdapter` dropped its `logInfo()` / `logDebug()` / `logError()` helpers, and the
   logger is mandatory there. That call style is why psalm needs suppressions, and the count
-  is measured rather than assumed: **12** `@psalm-suppress` annotations in `src/Adapter/` —
-  `AbstractAdapter` 2, `Redis` 5, `MySql` 3, `Beanstalk` 1, `Beanstalk/Client` 1. Most are
+  is measured rather than assumed: **14** `@psalm-suppress` annotations in `src/Adapter/` —
+  `AbstractAdapter` 2, `Redis` 7, `MySql` 3, `Beanstalk` 1, `Beanstalk/Client` 1. Most are
   the `?->logger` trio (`TypeDoesNotContainNull`, `PossiblyNullReference`); the
   `PossiblyNullPropertyAssignment` ones are the *same* cause one step later — a preceding
   `$this?->logger` line widens `$this` to nullable, so the assignment after it looks unsafe.
   The count **rose** from 10 when the `attempt*` family landed, because `log()` and `report()`
-  are new methods with the same call style. So adding a method that logs through
-  `$this?->logger` needs its own suppression and removing a log line may let one go —
-  re-measure with `grep -rn 'psalm-suppress' src/Adapter/` rather than assuming a direction.
+  are new methods with the same call style, and again from 12 to 14 when
+  `Redis::hasWorkers()` gained its lease registry, whose two `is_int()` shape checks on `ZADD`
+  and `ZCARD` need `@psalm-suppress TypeDoesNotContainType` — psalm reads both commands as
+  always answering `int`, while phpredis declares `Redis|int|false`. So adding a method that
+  logs through `$this?->logger` needs its own suppression, removing a log line may let one go,
+  and a runtime guard on a value psalm has already narrowed to one type needs its own
+  `TypeDoesNotContainType` — re-measure with `grep -rn 'psalm-suppress' src/Adapter/` rather
+  than assuming a direction.
 - **Three `opis/closure` deprecations are expected** — `SerializableClosure implements
   Serializable` and the dynamic `ClosureStream::$context`. They print as `D` and do not fail
   the run.

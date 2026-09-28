@@ -164,14 +164,29 @@ them from a clone of this repository. In your own project, depend on
 | Adapter / Feature | `ping` | `hasWorkers` | `setWorkTimeout` |
 |---|---|---|---|
 | [Beanstalkd](https://beanstalkd.github.io/) — stable | ✓ | ✓ | ✓ |
-| [Redis](https://redis.io) — stable | ✓ | * | ✓ |
+| [Redis](https://redis.io) — stable | ✓ | ✓ | ✓ |
 | [MySQL](https://www.mysql.com) — stable | ✓ | * | * |
 
 `*` — unsupported/partial:
-- `Redis::hasWorkers()` is a stub,
 - `MySql::hasWorkers()` reports no workers without checking,
 - `MySql::setWorkTimeout()` is accepted but not applied — idle timeouts are a
   worker concern, and the MySQL queue is shared through the table.
+
+On Redis, `hasWorkers()` is answered from a per-queue lease registry in Redis, so
+it spans processes and hosts: a worker announces itself when it binds read, renews
+while it works, and gives the lease back when it disconnects. A worker that is
+killed leaves a lease behind, and the lease expires on its own.
+
+What it measures is *a worker was seen on this queue within the last `workerTtl`
+seconds*, where `workerTtl` is a `RedisConfig` field defaulting to `300`. Set it
+above your longest job: a worker running a job longer than `workerTtl` is not
+reported, and the answer is `false` (publish anyway) rather than a wrong `true`. A
+lease that cannot be written — a Redis ACL that permits the queue commands and not
+`ZADD` — is logged and ignored, and the worker keeps working.
+
+The registry lives in `backq:workers:{queue}`, under the configured key prefix if
+you set one. `Illuminate\Queue\RedisQueue::clear()` does not remove it, and a
+`KEYS` dump will show it; an entry there means a lease, not a job.
 
 ### Building an adapter
 

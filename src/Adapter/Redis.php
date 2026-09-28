@@ -18,6 +18,7 @@ use Closure;
 use DateInterval;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Redis\Factory;
 use Illuminate\Queue\Capsule\Manager;
 use Illuminate\Queue\Jobs\RedisJob;
 use InvalidArgumentException;
@@ -70,6 +71,25 @@ class Redis extends AbstractAdapter
     private const string REDIS_DRIVER     = 'phpredis';
     private const string REDIS_DRIVER_OWN = 'redis-backq';
 
+    /**
+     * Where the worker leases live, before phpredis applies the configured prefix
+     *
+     * The prefix is applied by the connection, not here: a plain ZADD/ZCARD on this name
+     * lands as {prefix}backq:workers:{queue}. An already-prefixed name lands twice, and
+     * then hasWorkers() reads a key nobody ever writes and answers false forever, which is
+     * why this is a constant and never a concatenation with $this->config->prefix.
+     */
+    private const string WORKERS_KEY = 'backq:workers:';
+
+    /**
+     * Renew the lease this often, as a fraction of its length
+     *
+     * A worker that is late once is still covered twice over, and a worker that dies is
+     * reaped within workerTtl. It is a constant and not a second setting because a second
+     * number the user can set wrongly is a second thing to document.
+     */
+    private const int WORKER_RENEW_DIVISOR = 3;
+
     private Container $app;
 
     /**
@@ -100,6 +120,29 @@ class Redis extends AbstractAdapter
      *
      */
     private ?int $blockFor = null;
+
+    /**
+     * This adapter's lease token in the worker registry, generated once on first use
+     *
+     * It names the adapter instance, so two workers in one process do not overwrite each
+     * other's lease. Null until a worker announces, which is also what tells release() that
+     * there is nothing to give back — a publisher binds write, never takes a lease, and is
+     * the normal case here.
+     *
+     * Never serialized: a publisher serialized through a queue drops its adapter
+     * (AbstractPublisher::__sleep) and a publisher never announces anyway.
+     */
+    private ?string $workerToken = null;
+
+    /**
+     * When this adapter last renewed its lease, in this process's own seconds
+     *
+     * Null until the first renewal, so the first pick cycle after bindRead() writes one and
+     * a freshly started worker is visible one cycle after it bound. This is a duration
+     * between two events in one process and nothing else compares it, so PHP's clock is the
+     * right one; the *score* the lease carries is the server's clock, which is serverNow().
+     */
+    private ?int $leasedAt = null;
 
     /**
      * This option specifies how many
@@ -255,6 +298,15 @@ class Redis extends AbstractAdapter
     public function disconnect(): bool
     {
         $this?->logger->debug('Disconnecting');
+
+        /**
+         * Give the lease back before anything below can raise, so a publisher does not wait
+         * out the TTL on an adapter that is gone. Best effort, and the answer is discarded:
+         * the lease expires on its own, and disconnect() answers about this adapter's own
+         * socket, not about a registry it could not write to.
+         */
+        $this->release($this->queueName);
+
         if (ConnectionState::Nothing !== $this->state) {
             $this?->logger->debug('Disconnecting, previously connected');
 
@@ -367,15 +419,57 @@ class Redis extends AbstractAdapter
     /**
      * Checks (if possible) if there are workers to work immediately
      *
-     * Redis has no concept of "worker availability" for a queue when using the
-     * underlying list-based jobs, so this always reports "no workers".
+     * The answer comes from the per-queue lease registry the workers write, so it spans
+     * processes and hosts: this is the one method where a publisher sees workers it did not
+     * start, which is the case a web request asking is.
+     *
+     * What it measures is "a worker was seen on this queue within the last workerTtl
+     * seconds". It does not measure "idle right now" — a lease cannot tell busy from idle,
+     * and a worker running a job longer than workerTtl is not reported. Both are false
+     * rather than a wrong true, so the answer is always safe to publish on.
      */
     #[Override]
     public function hasWorkers(string $queue): bool
     {
-        $this?->logger->debug(self::class . '.' . __FUNCTION__ . ' not supported, reporting no workers');
+        $this?->logger->debug(__FUNCTION__);
 
-        return false;
+        /**
+         * Inside a closure __FUNCTION__ is the string `{closure}`, not this method's name,
+         * so the operation is carried in for the message below to name, as connect() does.
+         */
+        $operation = __FUNCTION__;
+
+        return $this->attempt($operation, function () use ($queue, $operation): bool {
+            $redis = $this->redis();
+            assert($redis instanceof \Redis);
+            $now = $this->serverNow($redis);
+
+            /**
+             * Prune first, count second: a worker killed with SIGKILL leaves its lease
+             * behind, and only the prune is what makes the count mean "alive right now".
+             * Three commands where a Lua script would be one — see the plan this came from
+             * for why the script is not worth the caveat it comes with, phpredis applying
+             * OPT_PREFIX to EVAL key arguments being version-dependent.
+             */
+            $key = self::WORKERS_KEY . $queue;
+            $redis->zremrangebyscore($key, '-inf', (string) $now);
+
+            $workers = $redis->zcard($key);
+
+            /**
+             * @psalm-suppress TypeDoesNotContainType psalm reads ZCARD as always answering
+             * int, so this looks dead. It is not, for the reason the ZADD check above gives:
+             * phpredis declares Redis|int|false, and a false here is the same silent "no
+             * worker has ever existed" the throw exists to prevent.
+             */
+            if (!is_int($workers)) {
+                throw new RuntimeException('redis ZCARD did not answer with a member count');
+            }
+
+            $this?->logger->debug($operation . ': ' . $workers . ' worker(s) with a live lease on ' . $queue);
+
+            return 0 < $workers;
+        });
     }
 
     /**
@@ -408,6 +502,15 @@ class Redis extends AbstractAdapter
             $this?->logger->debug(
                 $operation . ' blocking for ' . (int) $this->blockFor . ' seconds until get a job'
             );
+
+            /**
+             * Renew before the pop, not after: the pop blocks for up to readTimeout seconds,
+             * and a lease that expires while the worker is waiting is a worker reported
+             * absent while it waits for exactly the job being published. The answer is
+             * discarded — a worker that cannot renew still works.
+             */
+            $this->renew();
+
             $redisJob = $redisQueue->pop($this->queueName);
 
             /** @var RedisJob $redisJob */
@@ -598,6 +701,16 @@ class Redis extends AbstractAdapter
         $this->ensureConnected();
         $this->state = $role;
 
+        /**
+         * A read-bound adapter is a worker, and this is the only method that makes an adapter
+         * one. A publisher binds write, is not a worker, and must not be able to find itself
+         * in the registry hasWorkers() reads. The lease goes after the state is stored,
+         * because attempt() gates on the role.
+         */
+        if (ConnectionState::BindRead === $role) {
+            $this->lease($queue);
+        }
+
         return true;
     }
 
@@ -622,6 +735,154 @@ class Redis extends AbstractAdapter
         }
 
         return false;
+    }
+
+    /**
+     * The connection, as the command surface every registry word in this class goes through
+     *
+     * The union is what the value really is, measured and not assumed: getRedis() is declared
+     * Factory, and at runtime it answers a BackQ\Adapter\Redis\Manager, which is one. A
+     * narrower native type here is not a stricter check but a TypeError on the first lease a
+     * real deployment takes — with assert() compiled out (build/php.ini sets
+     * zend.assertions=-1) that is the only narrowing left, and the wrong one.
+     *
+     * A caller narrows it with one assert, exactly as pingServer() does: the assert is what
+     * the static analysers read, and the Manager's __call is what actually runs. Do not turn
+     * it into a real check, and do not add a second narrowing style next to pingServer()'s.
+     */
+    private function redis(): Factory|\Redis
+    {
+        $redisQueue = $this->queue()->getConnection(self::CONNECTION_NAME);
+        assert($redisQueue instanceof Queue);
+
+        return $redisQueue->getRedis();
+    }
+
+    /**
+     * The server's clock, in seconds
+     *
+     * The lease is an absolute expiry compared against the server's own clock on both
+     * sides, so a publisher in one container and a worker in another cannot make a dead
+     * worker look alive because their clocks disagree. phpredis answers TIME as two
+     * strings — seconds and microseconds — so the first index is load-bearing: a score of
+     * 0 expires every lease immediately.
+     *
+     * An answer with no first element is a protocol break rather than a slow server, and it
+     * is raised so that the attempt() helper of the caller logs it and that operation
+     * answers false. The one isset covers it: a TIME that is a Redis object rather than an
+     * array is not ArrayAccess, so the offset is missing there too.
+     *
+     * The connection is a parameter, not another redis() call, because every caller already
+     * has one in hand for the command that comes next. It is the same union redis() returns,
+     * and it needs its own assert for the same reason — a *parameter* type is a runtime check
+     * too, so a \Redis here passes a unit test that mocks \Redis and fails every real
+     * deployment.
+     */
+    private function serverNow(Factory|\Redis $redis): int
+    {
+        assert($redis instanceof \Redis);
+        $time = $redis->time();
+        if (!isset($time[0])) {
+            throw new RuntimeException('redis TIME did not answer with a timestamp');
+        }
+
+        return (int) $time[0];
+    }
+
+    /**
+     * Take or renew this adapter's lease on the queue, and answer whether Redis took it
+     *
+     * The answer is not used by the work cycle. A worker that cannot write the registry must
+     * still work: a Redis ACL that permits the queue commands and not ZADD takes down every
+     * worker in a deployment, and a registry that can fail a worker is worse than no
+     * registry at all. A failure is logged by attempt() and otherwise ignored, so
+     * hasWorkers() degrades to "no workers" and nothing else changes.
+     *
+     * attempt() gates on isReady(), which is true here: only a bound adapter gets this far,
+     * and the state is stored before bind() calls in.
+     */
+    private function lease(string $queue): bool
+    {
+        /**
+         * The random half is what makes the token unique; the pid is there so an operator
+         * reading a ZRANGE can tell which process a lease belongs to. getmypid() answers
+         * false where it cannot, and a token without its pid is still a token.
+         */
+        $pid = getmypid();
+        $this->workerToken ??= (is_int($pid) ? $pid : 0) . '-' . bin2hex(random_bytes(8));
+        $token = $this->workerToken;
+
+        return $this->attempt('lease', function () use ($queue, $token): bool {
+            $redis = $this->redis();
+            assert($redis instanceof \Redis);
+            $added = $redis->zadd(
+                self::WORKERS_KEY . $queue,
+                $this->serverNow($redis) + $this->config->workerTtl,
+                $token
+            );
+
+            /**
+             * @psalm-suppress TypeDoesNotContainType psalm reads ZADD as always answering
+             * int, so this looks dead. It is not: phpredis declares Redis|int|false, and a
+             * false here would turn hasWorkers() into "no worker has ever existed" with
+             * nothing logged and no failing test.
+             */
+            if (!is_int($added)) {
+                throw new RuntimeException('redis ZADD did not answer with a member count');
+            }
+
+            /**
+             * zadd answers how many members were *new*: 1 on the first announce, 0 on every
+             * renewal, and 0 again if the key was flushed in between. Both are success, so
+             * testing for 1 === $added would log a failure on every heartbeat after the
+             * first, and a lease that never renews is a worker that disappears from the
+             * registry while it is working.
+             */
+            return 0 === $added || 1 === $added;
+        });
+    }
+
+    /**
+     * Give the lease back, and do not care whether Redis took it
+     *
+     * An adapter that never announced has no token and nothing to release, which is the
+     * normal case for a publisher: it binds write, so it never took a lease.
+     */
+    private function release(string $queue): void
+    {
+        $token = $this->workerToken;
+        if (null === $token) {
+            return;
+        }
+
+        $this->attempt('release', function () use ($queue, $token): bool {
+            $redis = $this->redis();
+            assert($redis instanceof \Redis);
+            $redis->zrem(self::WORKERS_KEY . $queue, $token);
+
+            return true;
+        });
+    }
+
+    /**
+     * Renew the lease if it is due, and write nothing if it is not
+     *
+     * Every pick cycle runs this, so it is rate-limited here rather than in the caller. It
+     * is cheap because pickTask() is itself rate-limited by the blocking pop; the only case
+     * this guards is a polling worker with blockFor = null, where an extra command per
+     * cycle would roughly double the round trips of an idle loop.
+     */
+    private function renew(): void
+    {
+        $interval = max(1, intdiv($this->config->workerTtl, self::WORKER_RENEW_DIVISOR));
+        $now = time();
+        if (null !== $this->leasedAt && ($now - $this->leasedAt) < $interval) {
+            return;
+        }
+
+        if ($this->lease($this->queueName)) {
+            $this->leasedAt = $now;
+        }
     }
 
     /**

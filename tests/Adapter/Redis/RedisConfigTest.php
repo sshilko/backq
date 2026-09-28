@@ -25,11 +25,12 @@ class RedisConfigTest extends TestCase
         $this->assertSame(0, $config->databaseId);
         $this->assertNull($config->authPassword);
         $this->assertSame('default', $config->queueName);
+        $this->assertSame(300, $config->workerTtl);
     }
 
     public function testEveryValueCanBeOverridden(): void
     {
-        $config = new RedisConfig('redis.example', 6380, true, 'backq', 'queue:', 3, 30, 2, 'secret', 'the-queue');
+        $config = new RedisConfig('redis.example', 6380, true, 'backq', 'queue:', 3, 30, 2, 'secret', 'the-queue', 900);
 
         $this->assertSame('redis.example', $config->host);
         $this->assertSame(6380, $config->port);
@@ -41,6 +42,7 @@ class RedisConfigTest extends TestCase
         $this->assertSame(2, $config->databaseId);
         $this->assertSame('secret', $config->authPassword);
         $this->assertSame('the-queue', $config->queueName);
+        $this->assertSame(900, $config->workerTtl);
     }
 
     public function testTheValuesAreNamedAfterTheSettingsNotAfterTheIlluminateKeys(): void
@@ -91,6 +93,24 @@ class RedisConfigTest extends TestCase
         new RedisConfig(port: 0);
     }
 
+    /**
+     * A worker lease of 0 makes every worker look absent and a lease of 1 makes the registry
+     * flap on every pick cycle. Both are silent, so they are rejected at construction.
+     */
+    #[DataProvider('workerTtlProvider')]
+    public function testAWorkerTtlTooShortToBeUsefulIsRejected(int $workerTtl): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('workerTtl');
+
+        new RedisConfig(workerTtl: $workerTtl);
+    }
+
+    public function testTheShortestWorkerTtlIsAccepted(): void
+    {
+        $this->assertSame(5, (new RedisConfig(workerTtl: 5))->workerTtl);
+    }
+
     public function testTheConfigIsReadOnly(): void
     {
         $this->assertTrue((new ReflectionClass(RedisConfig::class))->isReadOnly());
@@ -128,6 +148,19 @@ class RedisConfigTest extends TestCase
             'readTimeout zero' => ['readTimeout', 0],
             'timeout negative' => ['timeout', -1],
             'timeout zero' => ['timeout', 0],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: int}>
+     */
+    public static function workerTtlProvider(): array
+    {
+        return [
+            'negative' => [-1],
+            'one below the minimum' => [4],
+            'one too short to survive a pick cycle' => [1],
+            'zero' => [0],
         ];
     }
 }

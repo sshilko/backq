@@ -31,6 +31,11 @@ class RedisAdapterCoreTest extends TestCase
 
     use LogAssertions;
 
+    /**
+     * @var list<array<int, mixed>> the worker-registry words the spy Redis was sent
+     */
+    private array $redisCalls = [];
+
     public function testConstructAppliesConfig(): void
     {
         $redis = new Redis(new NullLogger(), new RedisConfig(host: 'redis.example', port: 6380));
@@ -199,11 +204,187 @@ class RedisAdapterCoreTest extends TestCase
         $this->assertFalse($redis->afterWorkFailed('job-1'));
     }
 
-    public function testHasWorkersReportsNotSupported(): void
+    /**
+     * A worker announces itself when it takes the read role, which is the only thing that
+     * makes an adapter a worker, so this is the only place an announcement can come from
+     */
+    public function testBindReadAnnouncesALease(): void
     {
         $redis = new Redis(new NullLogger());
+        $this->wireManager($redis, $this->spyRedis());
+        $this->assertTrue($redis->connect());
 
-        $this->assertFalse($redis->hasWorkers('queue'));
+        $this->assertTrue($redis->bindRead('the-queue'));
+
+        $this->assertCount(1, $this->redisCalls);
+        $this->assertSame('zadd', $this->redisCalls[0][0]);
+        $this->assertSame('backq:workers:the-queue', $this->redisCalls[0][1]);
+
+        /**
+         * The score is an absolute expiry on the server's clock, not a duration, so two hosts
+         * with skewed clocks cannot make a dead worker look alive. It arrives as a float
+         * because that is what phpredis' own zadd signature declares.
+         */
+        $this->assertSame(1000300.0, $this->redisCalls[0][2]);
+        $this->assertMatchesRegularExpression('/^\d+-[0-9a-f]{16}$/', $this->redisCalls[0][3][0]);
+    }
+
+    /**
+     * A publisher is not a worker, and hasWorkers() must not be able to find itself
+     */
+    public function testBindWriteDoesNotAnnounceALease(): void
+    {
+        $redis = new Redis(new NullLogger());
+        $this->wireManager($redis, $this->spyRedis());
+        $this->assertTrue($redis->connect());
+
+        $this->assertTrue($redis->bindWrite('the-queue'));
+
+        $this->assertSame([], $this->redisCalls);
+    }
+
+    /**
+     * Give the lease back on the way out, so a publisher does not wait out the TTL on an
+     * adapter that is gone
+     */
+    public function testDisconnectReleasesTheLease(): void
+    {
+        $redis = new Redis(new NullLogger());
+        $this->wireManager($redis, $this->spyRedis());
+        $this->assertTrue($redis->connect());
+        $this->assertTrue($redis->bindRead('the-queue'));
+
+        $this->assertTrue($redis->disconnect());
+
+        $this->assertCount(2, $this->redisCalls);
+        $this->assertSame('zrem', $this->redisCalls[1][0]);
+        $this->assertSame('backq:workers:the-queue', $this->redisCalls[1][1]);
+        $this->assertSame($this->redisCalls[0][3][0], $this->redisCalls[1][2]);
+    }
+
+    /**
+     * A worker that cannot write the registry must still work: a Redis ACL that permits the
+     * queue commands and not ZADD must not take down every worker in the deployment
+     */
+    public function testTheLeaseIsNeverLoadBearingForAWorkCycle(): void
+    {
+        $logger = new RecordingLogger();
+        $redis  = new Redis($logger);
+
+        $redisClient = $this->createMock(\Redis::class);
+        $redisClient->method('ping')->willReturn('+PONG');
+        $redisClient->method('time')->willThrowException(
+            new \RedisException('NOPERM this user has no permissions to run zadd')
+        );
+        $this->wireManager($redis, $this->queueAnswering($redisClient));
+
+        $this->assertTrue($redis->connect());
+
+        /**
+         * The whole point: the lease failed, the bind did not. attempt() logged it and the
+         * work cycle never saw it.
+         */
+        $this->assertTrue($redis->bindRead('the-queue'));
+        $this->assertLogged($logger, 'adapter lease exception: NOPERM', 'error');
+    }
+
+    /**
+     * Every pick cycle runs the renew, so it is rate-limited rather than written per cycle.
+     * The mock answers 0 to every ZADD after the first, which is what Redis answers to a
+     * member that is already there, so this also pins that a renewal which added nothing is
+     * still a renewal that happened: a lease() reading that 0 as a failure would leave
+     * $leasedAt null and write a third time.
+     */
+    public function testPickTaskRenewsTheLeaseAtMostEveryTtlOverThree(): void
+    {
+        $redis = new Redis(new NullLogger());
+        $this->setState($redis, ConnectionState::BindRead);
+        $this->setQueueName($redis, 'the-queue');
+
+        $queue = $this->createMock(Queue::class);
+        $queue->method('pop')->willReturn(null);
+        $this->wireManager($redis, $this->spyRedis(1000000, 0, $queue));
+
+        $this->assertFalse($redis->pickTask());
+        $this->assertCount(1, $this->redisCalls, 'the first pick cycle renews, $leasedAt starts null');
+
+        $this->assertFalse($redis->pickTask());
+        $this->assertCount(1, $this->redisCalls, 'the second cycle is inside the interval and writes nothing');
+    }
+
+    /**
+     * The answer comes from a registry, not from this process, so the leases counted are ones
+     * this adapter never wrote
+     */
+    public function testHasWorkersCountsTheLeasesItDidNotWrite(): void
+    {
+        $redis = new Redis(new NullLogger());
+        $this->setState($redis, ConnectionState::BindWrite);
+        $this->wireManager($redis, $this->spyRedis(1000000, 2));
+
+        $this->assertTrue($redis->hasWorkers('the-queue'));
+    }
+
+    /**
+     * The queue nobody is consuming, and the case that must not answer true: a backlog is not
+     * a worker
+     */
+    public function testHasWorkersIsFalseWhenNoWorkerHasALease(): void
+    {
+        $redis = new Redis(new NullLogger());
+        $this->setState($redis, ConnectionState::BindWrite);
+        $this->wireManager($redis, $this->spyRedis(1000000, 0));
+
+        $this->assertFalse($redis->hasWorkers('the-queue'));
+    }
+
+    /**
+     * A worker killed with SIGKILL leaves its lease behind, and only the prune is what makes
+     * the count mean "alive right now"
+     */
+    public function testHasWorkersPrunesExpiredLeasesBeforeCounting(): void
+    {
+        $redis = new Redis(new NullLogger());
+        $this->setState($redis, ConnectionState::BindWrite);
+        $this->wireManager($redis, $this->spyRedis(1000000, 0));
+
+        $redis->hasWorkers('the-queue');
+
+        $this->assertSame(['zremrangebyscore', 'zcard'], array_column($this->redisCalls, 0));
+        $this->assertSame('backq:workers:the-queue', $this->redisCalls[0][1]);
+        $this->assertSame(['-inf', '1000000'], [$this->redisCalls[0][2], $this->redisCalls[0][3]]);
+    }
+
+    /**
+     * The operation is refused before any I/O, and the record names hasWorkers() rather than
+     * the closure it is written from
+     */
+    public function testHasWorkersIsFalseOnAnUnboundAdapter(): void
+    {
+        $logger = new RecordingLogger();
+        $redis  = new Redis($logger);
+
+        $this->assertFalse($redis->hasWorkers('the-queue'));
+        $this->assertLogged($logger, 'adapter hasWorkers: not connected or not bound', 'debug');
+        $this->assertNotLogged($logger, '{closure}');
+    }
+
+    /**
+     * A protocol break must not read as "no worker has ever existed", so it is logged as the
+     * failure it is and the operation answers false
+     */
+    public function testHasWorkersIsFalseWhenRedisDoesNotAnswer(): void
+    {
+        $logger = new RecordingLogger();
+        $redis  = new Redis($logger);
+        $this->setState($redis, ConnectionState::BindWrite);
+
+        $redisClient = $this->createMock(\Redis::class);
+        $redisClient->method('time')->willThrowException(new \RedisException('Lost connection'));
+        $this->wireManager($redis, $this->queueAnswering($redisClient));
+
+        $this->assertFalse($redis->hasWorkers('the-queue'));
+        $this->assertLogged($logger, 'adapter hasWorkers exception: Lost connection', 'error');
     }
 
     public function testSetWorkTimeoutStoresSubReadTimeoutValue(): void
@@ -545,6 +726,68 @@ class RedisAdapterCoreTest extends TestCase
         $redisClient->method('ping')->willReturn('+PONG');
 
         return $this->queueAnswering($redisClient);
+    }
+
+    /**
+     * A \Redis that records the worker-registry words the adapter sends it
+     *
+     * Every word is recorded as [command, key, ...arguments] in the order it arrived, which
+     * is what the ordering and the token assertions read. ZADD answers 1 for the first member
+     * and 0 for every one after it, which is what Redis answers to a member that is already
+     * in the set: a renewal adds nothing and is not a failure.
+     *
+     * Every word is recorded in $this->redisCalls, which this method clears on the way in.
+     *
+     * @param int    $serverNow   the seconds the server's TIME reports
+     * @param int    $workerCount the leases ZCARD finds, the answer a publisher gets
+     * @param ?Queue $queue       a queue to wire instead, for a caller that stubs pop()
+     */
+    private function spyRedis(int $serverNow = 1000000, int $workerCount = 0, ?Queue $queue = null): Queue
+    {
+        $added = 0;
+        $this->redisCalls = [];
+
+        $redisClient = $this->createMock(\Redis::class);
+        $redisClient->method('ping')->willReturn('+PONG');
+        $redisClient->method('isConnected')->willReturn(false);
+        $redisClient->method('time')->willReturn([(string) $serverNow, '0']);
+        $redisClient->method('zadd')->willReturnCallback(
+            function (string $key, mixed $score, mixed ...$members) use (&$added): int {
+                $this->redisCalls[] = ['zadd', $key, $score, $members];
+                $added++;
+
+                return 1 === $added ? 1 : 0;
+            }
+        );
+        $redisClient->method('zrem')->willReturnCallback(
+            function (mixed $key, mixed $member): int {
+                $this->redisCalls[] = ['zrem', $key, $member];
+
+                return 1;
+            }
+        );
+        $redisClient->method('zremrangebyscore')->willReturnCallback(
+            function (string $key, string $start, string $end): int {
+                $this->redisCalls[] = ['zremrangebyscore', $key, $start, $end];
+
+                return 0;
+            }
+        );
+        $redisClient->method('zcard')->willReturnCallback(
+            function (string $key) use ($workerCount): int {
+                $this->redisCalls[] = ['zcard', $key, $workerCount];
+
+                return $workerCount;
+            }
+        );
+
+        if (null === $queue) {
+            return $this->queueAnswering($redisClient);
+        }
+
+        $queue->method('getRedis')->willReturn($redisClient);
+
+        return $queue;
     }
 
     private function queueAnswering(\Redis $redisClient): Queue
