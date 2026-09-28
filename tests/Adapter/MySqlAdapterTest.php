@@ -22,18 +22,37 @@ use stdClass;
 use Throwable;
 use TypeError;
 use function array_column;
+use function array_filter;
 use function array_is_list;
 use function array_shift;
+use function array_values;
+use function count;
 use function get_debug_type;
+use function hexdec;
 use function implode;
 use function is_array;
+use function microtime;
+use function preg_match;
 use function str_replace;
+use function str_starts_with;
+use function substr;
 use function var_export;
 
 class MySqlAdapterTest extends TestCase
 {
 
     use LogAssertions;
+
+    /**
+     * The token, as a pattern, in the three places a statement names it
+     *
+     * A version 7 UUID is 32 hex characters, and the pattern pins the two fields that
+     * make it one rather than 16 random bytes: the version nibble at offset 12 is a 7, and
+     * the variant at offset 16 is 8, 9, a or b. The other 30 positions are unconstrained
+     * on purpose - the timestamp and the random tail are not this layer's claim, and
+     * testTheTokenEncodesTheMomentItWasMinted() is.
+     */
+    private const string TOKEN = '[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}';
 
     /**
      * The statements the adapter sent, in order
@@ -50,6 +69,52 @@ class MySqlAdapterTest extends TestCase
     private array $answers = [];
 
     private ?Throwable $defaultFailure = null;
+
+    /**
+     * The one claim about the token that is not "it is 16 random bytes", and the reason it
+     * is worth building by hand rather than calling bin2hex(random_bytes(16)).
+     *
+     * A UUIDv7 carries 48 bits of big-endian milliseconds in its first six bytes, so the
+     * first twelve hex characters are the timestamp and the rest is the version, the
+     * variant and the random tail. Decoding that here, against PHP's own clock, is what
+     * makes "time-based" a checked property rather than a comment - and a wrong layout
+     * would still satisfy a pattern that only looked for a 7 somewhere.
+     *
+     * The window is a second in each direction because the only clock involved is this
+     * one, and a test that asserted the same millisecond would be asserting the scheduler.
+     */
+    public function testTheTokenEncodesTheMomentItWasMinted(): void
+    {
+        $before = (int) (microtime(true) * 1000);
+        $this->assertTrue($this->adapter($this->db())->bindRead('news'));
+        $after = (int) (microtime(true) * 1000);
+
+        $token  = $this->tokenIn($this->statements[0]);
+        $minted = $this->millisIn($token);
+
+        $this->assertGreaterThanOrEqual($before - 1000, $minted, 'not before the call');
+        $this->assertLessThanOrEqual($after + 1000, $minted, 'and not after it');
+    }
+
+    /**
+     * The same claim from the other side: two tokens minted in separate adapters are
+     * different, which is what the UNIQUE key relies on. The pid used to make that
+     * obvious to a human reading the table; the timestamp alone does not, so this is the
+     * test that has to stand in for that reassurance.
+     */
+    public function testTwoAdaptersNeverShareAToken(): void
+    {
+        $this->assertTrue($this->adapter($this->db())->bindRead('news'));
+        $first = $this->tokenIn($this->statements[0]);
+
+        $this->assertTrue($this->adapter($this->db())->bindRead('news'));
+
+        $this->assertNotSame(
+            $first,
+            $this->tokenIn($this->statements[0]),
+            'two adapters in one process, so the only thing that could differ is the token'
+        );
+    }
 
     public function testConnectOnlyPingsTheLink(): void
     {
@@ -211,29 +276,344 @@ class MySqlAdapterTest extends TestCase
         $this->assertTrue($closed);
     }
 
+    /**
+     * The queue name does not reach the job table: one table holds every queue's jobs, which
+     * is why the worker registry of the hasWorkers() feature needed a queue column of its
+     * own. What bindRead() does with the name is write the registry, and nothing it writes
+     * names backq_jobs.
+     */
     public function testTheQueueNameIsIrrelevantTheTableIsTheQueue(): void
     {
-        $db = $this->db();
-        $db->expects($this->never())->method('query');
+        $db      = $this->db();
         $adapter = $this->adapter($db);
 
-        $this->assertTrue($adapter->bindRead('whatever'));
-        $this->assertTrue($adapter->bindWrite('whatever'));
+        $this->assertTrue($adapter->bindRead('news'));
+        $this->assertTrue($adapter->bindWrite('news'));
+        $this->assertNotSame([], $this->statements);
+        foreach ($this->statements as $sql) {
+            $this->assertStringNotContainsString('backq_jobs', $sql);
+        }
     }
 
     /**
-     * A table queue has no heartbeat column, so there is no cheap way to know whether a
-     * worker is idle on it. Answering "yes" reaches the user through
-     * AbstractPublisher::hasWorkers(), so the honest answer is no.
+     * The registry table and the lease length live on JobConfig, and a caller that never
+     * touches them gets a table it has to create. Both are asserted literally rather than
+     * read from the config, so a change to the default has to fail a test rather than be
+     * followed by one.
      */
-    public function testHasWorkersReportsNoWorkersRatherThanClaimingSome(): void
+    public function testBindReadWritesALeaseForTheQueue(): void
+    {
+        $db      = $this->db();
+        $adapter = $this->adapter($db);
+
+        $this->assertTrue($adapter->bindRead('news'));
+        $this->assertMatchesRegularExpression(
+            '#^INSERT INTO backq_workers \(queue, token, seen\) VALUES \("news", UNHEX\("'
+            . self::TOKEN . '"\), NOW\(\)\) '
+            . 'ON DUPLICATE KEY UPDATE queue = "news", seen = NOW\(\)$#',
+            $this->statements[0]
+        );
+    }
+
+    /**
+     * The token is minted once per adapter, so a second bindRead() writes the same row
+     * rather than a second one. Offline this is the whole of the claim: the table's UNIQUE
+     * key is on the token, so "one row" reduces to "one token". MySqlLiveTest asserts the
+     * row count against a real server.
+     */
+    public function testBindReadTakesTheLeaseOnlyOnce(): void
+    {
+        $db      = $this->db();
+        $adapter = $this->adapter($db);
+
+        $adapter->bindRead('news');
+        $adapter->bindRead('news');
+
+        $leases = $this->insertsInto('backq_workers');
+        $this->assertCount(2, $leases, 'both binds write, the second is an update of the same row');
+        $this->assertSame($this->tokenIn($leases[0]), $this->tokenIn($leases[1]));
+    }
+
+    /**
+     * The structural reason a publisher cannot find itself: nothing it does produces a lease,
+     * so hasWorkers() counting leases is not a question about this adapter at all
+     */
+    public function testBindWriteTakesNoLease(): void
+    {
+        $db = $this->db();
+
+        $this->assertTrue($this->adapter($db)->bindWrite('news'));
+        $this->assertSame([], $this->statements);
+    }
+
+    public function testBindReadReapsRowsOlderThanThreeLeases(): void
+    {
+        $db = $this->db();
+
+        $this->assertTrue($this->adapter($db, $this->registryConfig())->bindRead('news'));
+        $this->assertSame(
+            'DELETE FROM backq_workers WHERE seen <= NOW() - INTERVAL 900 SECOND ORDER BY seen ASC LIMIT 1000',
+            $this->statements[1],
+            'bounded and oldest-first: this now runs on a schedule, not once per deployment'
+        );
+    }
+
+    /**
+     * The gap this closes. bindRead() is called once per process, before the worker's
+     * while(true) loop, so a startup-only reap leaks one row per crash forever in exactly
+     * the deployments - a stable long-lived fleet - where nobody is restarting anything to
+     * notice. renew() is inside the loop, so reaping there is what makes the table bounded.
+     */
+    public function testAPickCycleReapsAsWellAsRenews(): void
+    {
+        $db      = $this->db([[], []]);
+        $adapter = $this->adapter($db, $this->registryConfig());
+        $adapter->bindRead('news');
+        $this->assertCount(1, $this->reaps(), 'the startup reap');
+
+        $this->assertFalse($adapter->pickTask());
+
+        $this->assertCount(2, $this->reaps(), 'and one per renew, which is per interval not per cycle');
+        $this->assertCount(2, $this->insertsInto('backq_workers'));
+    }
+
+    /**
+     * The two are not one statement and the order is the contract: the lease is written
+     * before the reap, so a reap that takes a moment cannot expire the worker's own row
+     * out from under it, and the renew happens before begin_transaction() so it holds no
+     * row lock while the pick runs.
+     */
+    public function testTheLeaseIsWrittenBeforeTheReapInTheSameCycle(): void
+    {
+        $db = $this->db([[]]);
+        $adapter = $this->adapter($db, $this->registryConfig());
+        $adapter->bindRead('news');
+
+        $this->assertFalse($adapter->pickTask());
+
+        $this->assertStringStartsWith('INSERT INTO backq_workers', $this->statements[2]);
+        $this->assertStringStartsWith('DELETE FROM backq_workers', $this->statements[3]);
+        $this->assertStringContainsString('FROM backq_jobs', $this->statements[4], 'and the pick ran last');
+    }
+
+    /**
+     * A lease that cannot be written must not also cost the table its reap, and a reap
+     * that fails must not cost the worker its lease. Two attempts, not one: a single
+     * attempt() around both would make the first failure skip the second. This is the case
+     * a database user without DELETE lands in, which is silent apart from the log line -
+     * the leases keep working and the table grows forever.
+     */
+    public function testAFailedReapDoesNotCostTheWorkerItsLease(): void
     {
         $logger  = new RecordingLogger();
-        $db      = $this->db();
+        $denied  = new mysqli_sql_exception('You are not allowed to delete', 1142);
+        $db      = $this->db([[], $denied, [], $denied, []], $denied);
+        $adapter = $this->adapter($db, $this->registryConfig(), $logger);
+
+        $adapter->bindRead('news');
+        $this->assertCount(1, $this->insertsInto('backq_workers'), 'the announce leased');
+        $this->assertCount(1, $this->reaps(), 'and the reap was attempted rather than skipped');
+
+        $this->assertFalse($adapter->pickTask());
+        $this->assertCount(
+            2,
+            $this->insertsInto('backq_workers'),
+            'and so did the renew, so a full lease of visibility'
+        );
+        $this->assertCount(2, $this->reaps());
+        $this->assertLogged($logger, 'not allowed to delete', 'error');
+    }
+
+    /**
+     * The registry is never load-bearing. A deployment that granted SELECT, INSERT and
+     * UPDATE but not DELETE, or that has not run the DDL at all, must not stop every worker
+     * in it, so bindRead() answers true whatever the registry said.
+     */
+    public function testBindReadStillReturnsTrueWhenTheStatementThrows(): void
+    {
+        $logger  = new RecordingLogger();
+        $db      = $this->db([], new mysqli_sql_exception("Table 'mydb.backq_workers' doesn't exist"));
         $adapter = $this->adapter($db, null, $logger);
 
-        $this->assertFalse($adapter->hasWorkers('whatever'));
-        $this->assertLogged($logger, 'hasWorkers', 'debug');
+        $this->assertTrue($adapter->bindRead('news'));
+        $this->assertLogged($logger, "Table 'mydb.backq_workers' doesn't exist", 'error');
+    }
+
+    public function testHasWorkersIsTrueWhenALeaseIsLive(): void
+    {
+        $db = $this->db([['workers' => '1']]);
+
+        $this->assertTrue($this->adapter($db)->hasWorkers('news'));
+        $this->assertSame(
+            'SELECT COUNT(*) AS workers FROM backq_workers WHERE queue = "news" '
+            . 'AND seen > NOW() - INTERVAL 300 SECOND',
+            $this->statements[0]
+        );
+    }
+
+    /**
+     * The only guard against an "always true" bug. The stub this replaces answered false for
+     * every queue at every time, and a read that cannot see its own WHERE clause looks
+     * exactly like that from the outside.
+     */
+    public function testHasWorkersIsFalseWhenNoLeaseIsLive(): void
+    {
+        $db = $this->db([['workers' => '0']]);
+
+        $this->assertFalse($this->adapter($db)->hasWorkers('news'));
+    }
+
+    public function testHasWorkersIsFalseWhenTheCountQueryFindsNoRowAtAll(): void
+    {
+        $db = $this->db([[]]);
+
+        $this->assertFalse($this->adapter($db)->hasWorkers('news'));
+    }
+
+    /**
+     * One table holds every queue's jobs, so the shared job table cannot answer "is a worker
+     * on *this* queue" and the registry carries a queue column of its own. Without the
+     * predicate a worker on any queue would answer for all of them.
+     */
+    public function testHasWorkersCountsOnlyTheGivenQueue(): void
+    {
+        $db      = $this->db([[], []]);
+        $adapter = $this->adapter($db);
+
+        $adapter->hasWorkers('news');
+        $adapter->hasWorkers('mail');
+
+        $this->assertStringContainsString('WHERE queue = "news"', $this->statements[0]);
+        $this->assertStringContainsString('WHERE queue = "mail"', $this->statements[1]);
+    }
+
+    public function testHasWorkersIsFalseWhenTheStatementThrows(): void
+    {
+        $logger = new RecordingLogger();
+        $db     = $this->db([], new mysqli_sql_exception('Server has gone away'));
+
+        $this->assertFalse($this->adapter($db, null, $logger)->hasWorkers('news'));
+        $this->assertLogged($logger, 'Server has gone away', 'error');
+    }
+
+    /**
+     * The user has to run the DDL, and a deployment that has not must degrade to false rather
+     * than raise - but it must not do it silently, and it must not do it once per call. This
+     * is the one asymmetry in the feature: the library cannot tell "you forgot the CREATE
+     * TABLE" from "the server went away", and a page of error logs per web request is worse
+     * than one debug line.
+     */
+    public function testHasWorkersLogsAMissingRegistryTableOnceAtDebug(): void
+    {
+        $logger = new RecordingLogger();
+        $db     = $this->db([new mysqli_sql_exception("Table 'mydb.backq_workers' doesn't exist", 1146)]);
+        $adapter = $this->adapter($db, null, $logger);
+
+        $this->assertFalse($adapter->hasWorkers('news'));
+        $this->assertCount(1, $this->statements);
+
+        $this->assertFalse($adapter->hasWorkers('news'));
+        $this->assertCount(1, $this->statements, 'the second call issues no statement at all');
+        $this->assertLogged($logger, 'backq_workers', 'debug');
+        $this->assertNotLogged($logger, "doesn't exist", 'error');
+    }
+
+    /**
+     * Only 1146 is the forgotten DDL. Everything else is the server, and a server that is
+     * unhappy about something else still gets an error on every call - a false negative
+     * dressed as a de-duplicated debug line is the failure this guards against. 1205 is the
+     * lock wait timeout, measured rather than quoted: the plan this test came from names
+     * 1144, which is a missing storage engine.
+     */
+    public function testAnUnrelatedStatementFailureStillLogsAtErrorEveryTime(): void
+    {
+        $logger = new RecordingLogger();
+        $db     = $this->db([], new mysqli_sql_exception('Lock wait timeout exceeded', 1205));
+        $adapter = $this->adapter($db, null, $logger);
+
+        $this->assertFalse($adapter->hasWorkers('news'));
+        $this->assertFalse($adapter->hasWorkers('news'));
+
+        $this->assertCount(2, $this->statements, 'no de-duplication outside 1146');
+        $this->assertSame(2, $this->levelsAt($logger, 'error'));
+    }
+
+    /**
+     * A release is keyed by the token the adapter took, so a worker that could not write its
+     * release must still not believe in a lease it no longer has
+     */
+    public function testDisconnectDeletesTheLeaseItWrote(): void
+    {
+        $db      = $this->db();
+        $adapter = $this->adapter($db);
+        $adapter->bindRead('news');
+
+        $this->assertTrue($adapter->disconnect());
+        $this->assertMatchesRegularExpression(
+            '#^DELETE FROM backq_workers WHERE token = UNHEX\("(' . self::TOKEN . ')"\)$#',
+            $this->statements[2],
+        );
+        $this->assertSame($this->tokenIn($this->statements[0]), $this->tokenIn($this->statements[2]));
+    }
+
+    public function testDisconnectTouchesNothingWhenBindReadNeverRan(): void
+    {
+        $db = $this->db();
+
+        $this->assertTrue($this->adapter($db)->disconnect());
+        $this->assertSame([], $this->statements);
+    }
+
+    /**
+     * Every pick cycle runs the renew, so it is rate-limited rather than written per cycle.
+     * With the default 300 second lease the interval is 100 seconds and three cycles take
+     * microseconds, so "one write" here is a real measurement and not a timing coincidence.
+     * The other half - that a renew happens again once the interval has passed - needs the
+     * wall clock to move, and it is asserted in MySqlLiveTest with a 5 second lease rather
+     * than by sleeping 100 seconds.
+     */
+    public function testPickTaskRenewsAtMostOncePerThirdOfTheLease(): void
+    {
+        $db = $this->db([[], [], []]);
+        $adapter = $this->adapter($db, $this->registryConfig());
+        $adapter->bindRead('news');
+        $this->assertCount(1, $this->insertsInto('backq_workers'), 'bindRead announced the worker');
+
+        $this->assertFalse($adapter->pickTask());
+        $this->assertCount(
+            2,
+            $this->insertsInto('backq_workers'),
+            'the first pick cycle renews, $renewedAt starts null'
+        );
+        $this->assertCount(2, $this->reaps(), 'and reaps, on the same throttle');
+
+        $this->assertFalse($adapter->pickTask());
+        $this->assertFalse($adapter->pickTask());
+        $this->assertCount(2, $this->insertsInto('backq_workers'), 'the next two are inside the interval');
+        $this->assertCount(2, $this->reaps(), 'so they reap nothing either, which is the point of a throttle');
+    }
+
+    /**
+     * A renew that fails is a failed lease, and a worker whose lease is failing is a worker
+     * whose pick must keep working. The throttle must not advance on the failed write either,
+     * or a transient error would cost a third of the lease length of visibility.
+     */
+    public function testPickTaskSurvivesAFailedRenewAndRetriesIt(): void
+    {
+        $logger   = new RecordingLogger();
+        $failure  = new mysqli_sql_exception('Lock wait timeout exceeded', 1205);
+        $db       = $this->db([null, null, $failure, null, null, null]);
+        $adapter  = $this->adapter($db, $this->registryConfig(), $logger);
+        $adapter->bindRead('news');
+
+        $this->assertFalse($adapter->pickTask());
+        $this->assertCount(5, $this->statements, 'the renew failed, the reap still ran, and the pick still ran');
+        $this->assertStringStartsWith('DELETE FROM backq_workers', $this->statements[3]);
+        $this->assertStringContainsString('FROM backq_jobs', $this->statements[4]);
+        $this->assertLogged($logger, 'Lock wait timeout exceeded', 'error');
+
+        $this->assertFalse($adapter->pickTask());
+        $this->assertCount(3, $this->insertsInto('backq_workers'), 'the throttle did not skip the retry');
     }
 
     public function testSetWorkTimeoutIsIgnored(): void
@@ -634,6 +1014,96 @@ class MySqlAdapterTest extends TestCase
     private function config(?Closure $provider = null): JobConfig
     {
         return new JobConfig('id', 'payload', 'backq_jobs', 0, 0, 0, $provider);
+    }
+
+    /**
+     * The same, with the worker registry the hasWorkers() tests read
+     *
+     * Built with named arguments so the registry fields are named where they are read, and
+     * the positional seven above are left to prove the fields were appended rather than
+     * inserted.
+     */
+    private function registryConfig(int $workerTtl = 300): JobConfig
+    {
+        return new JobConfig(
+            idColumn: 'id',
+            dataColumn: 'payload',
+            table: 'backq_jobs',
+            pickMissSleep: 0,
+            pickSuccessSleep: 0,
+            putTaskSleep: 0,
+            workerTable: 'backq_workers',
+            workerTtl: $workerTtl,
+        );
+    }
+
+    /**
+     * The recorded INSERTs naming one table
+     *
+     * @return list<string>
+     */
+    private function insertsInto(string $table): array
+    {
+        return array_values(array_filter(
+            $this->statements,
+            static function (string $sql) use ($table): bool {
+                return str_starts_with($sql, 'INSERT INTO ' . $table . ' ');
+            }
+        ));
+    }
+
+    /**
+     * The recorded reaps, which is the count that says whether the table stays bounded
+     *
+     * @return list<string>
+     */
+    private function reaps(): array
+    {
+        return array_values(array_filter(
+            $this->statements,
+            static function (string $sql): bool {
+                return str_starts_with($sql, 'DELETE FROM backq_workers ');
+            }
+        ));
+    }
+
+    /**
+     * The token out of a lease or a release, so two statements can be compared as being
+     * about the same worker without the assertion repeating the token's shape
+     */
+    private function tokenIn(string $sql): string
+    {
+        $matched = preg_match('#UNHEX\("(' . self::TOKEN . ')"\)#', $sql, $found);
+        $this->assertSame(1, $matched, 'the statement names a token: ' . $sql);
+
+        return $found[1];
+    }
+
+    /**
+     * The 48 bits of milliseconds out of the front of a version 7 token
+     *
+     * The first six bytes are the timestamp big-endian, so the first twelve hex
+     * characters are the whole of it and hexdec() handles the rest. This is the decoder
+     * the adapter's layout is written against, so a layout that changed would have to
+     * change this too - which is why the test above asserts the decoded value rather than
+     * the first twelve characters.
+     */
+    private function millisIn(string $token): int
+    {
+        return (int) hexdec(substr($token, 0, 12));
+    }
+
+    /**
+     * @return int how many records the logger captured at one level
+     */
+    private function levelsAt(RecordingLogger $logger, string $level): int
+    {
+        return count(array_filter(
+            $logger->records,
+            static function (array $record) use ($level): bool {
+                return $record[0] === $level;
+            }
+        ));
     }
 
     private function messages(RecordingLogger $logger): string

@@ -41,9 +41,92 @@ x-app: &app
     COMPOSER_DISABLE_XDEBUG_WARN: "1"
     BACKQ_REDIS_HOST: "redis"
     BACKQ_REDIS_PORT: "6379"
+    # The MySQL adapter's live tests read these; a host-side run overrides the port with
+    # the published one, the same way BACKQ_REDIS_PORT is overridden.
+    BACKQ_MYSQL_HOST: "mysql80"
+    BACKQ_MYSQL_PORT: "3306"
+    BACKQ_MYSQL_DB: "mydb"
+    BACKQ_MYSQL_USER: "test"
+    BACKQ_MYSQL_PASSWORD: "pass"
   extra_hosts:
     - "host.docker.internal:host-gateway"
   restart: on-failure:2
+
+#@see https://hub.docker.com/_/mysql
+x-mysql: &mysql
+  platform: linux/amd64
+  tty: true
+  stdin_open: true
+  dns: 1.1.1.1
+  dns_opt:
+    - use-vc
+  image: library/mysql:8.0.46-debian
+  pull_policy: if_not_present
+  stop_grace_period: 20s
+  cpus: 0.95
+  cpu_percent: 95
+  mem_limit: "600M"
+  pids_limit: 100
+  command:
+    - --innodb-flush-log-at-trx-commit=2
+    - --innodb-flush-neighbors=0
+    - --innodb-lock-wait-timeout=10
+    - --skip-innodb-adaptive-hash-index
+    - --innodb-compression-level=0
+    - --innodb-fast-shutdown=1
+    - --innodb-file-per-table=ON
+    - --innodb-buffer-pool-size=268435456
+    - --innodb-log-buffer-size=16777216
+    - --innodb-max-dirty-pages-pct=60
+    - --skip-innodb-buffer-pool-dump-at-shutdown
+    - --innodb-stats-auto-recalc=OFF
+    - --group-concat-max-len=9223372036854775807
+    - --default-authentication-plugin=mysql_native_password
+    - --skip-character-set-client-handshake
+    - --character-set-server=utf8mb4
+    - --collation-server=utf8mb4_general_ci
+    - --character-set-filesystem=binary
+    - --disable-log-bin
+    - --binlog-format=ROW
+    - --lock-wait-timeout=20
+    - --sync-binlog=0
+    - --max_allowed_packet=10485760
+    - --max-connections=1000
+    - --sql-mode=TRADITIONAL
+    - --skip-performance-schema
+    - --skip-name-resolve
+    - --tls-version=TLSv1.2
+  healthcheck:
+    test: ["CMD", "mysqladmin", "-utest", "-ppass", "ping"]
+    timeout: 2s
+    interval: 5s
+    retries: 10
+    start_period: 30s
+  logging:
+    options:
+      max-size: "4m"
+      max-file: "2"
+  environment:
+    MYSQL_DATABASE: mydb
+    MYSQL_USER: test
+    MYSQL_PASSWORD: pass
+    MYSQL_ROOT_PASSWORD: root
+    #MYSQL_INITDB_SKIP_TZINFO: 0
+  sysctls:
+    net.core.somaxconn: 1024
+  # tmpfs:
+  #   - /var/lib/mysql/
+  #  volumes:
+  #    - ./../test/fixtures/mysql/:/docker-entrypoint-initdb.d:ro,cached
+  #    - /tmp/dbdata:/var/lib/mysql/
+  ulimits:
+    nproc: 65535
+    nofile:
+      soft: 262140
+      hard: 262140
+  restart: on-failure:5
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
 
 services:
   app-php83:
@@ -56,6 +139,11 @@ services:
     depends_on:
       redis:
         condition: service_started
+      # service_healthy, not service_started: the MySQL entrypoint takes tens of seconds to
+      # initialise, and a live test that loses the race fails as a connection error rather
+      # than as a skipped test.
+      mysql80:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "php", "-v"]
       interval: 10s
@@ -75,6 +163,19 @@ services:
       - /data
     ports:
       - "127.0.0.1:16379:6379"
+
+  #@see https://hub.docker.com/_/mysql
+  mysql80:
+    <<: *mysql
+    image: library/mysql:8.0.46-debian
+    container_name: backq-mysql
+    # 3306 is what mysqld listens on inside; 4306 is the published host port, so a
+    # host-side run reaches it as 127.0.0.1:4306 and the container reaches it as
+    # mysql80:3306. The two are not the same number on purpose. The original `expose:
+    # 4306` is gone: mysqld does not listen there, and an `expose` of a port nothing
+    # serves is a lie other tooling will believe.
+    ports:
+      - "127.0.0.1:4306:3306"
 
 volumes:
   composer-cache:

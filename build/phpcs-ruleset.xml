@@ -35,7 +35,7 @@
          "svnblame", "gitblame", "hgblame" or "notifysend" -->
     <arg name="report" value="full,csv,source,summary"/>
     <arg name="tab-width" value="4"/>
-    <arg name="parallel" value="1" />
+    <!-- <arg name="parallel" value="2" /> -->
 
     <ini name="memory_limit" value="-1" />
 

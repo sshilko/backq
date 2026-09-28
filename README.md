@@ -165,10 +165,9 @@ them from a clone of this repository. In your own project, depend on
 |---|---|---|---|
 | [Beanstalkd](https://beanstalkd.github.io/) — stable | ✓ | ✓ | ✓ |
 | [Redis](https://redis.io) — stable | ✓ | ✓ | ✓ |
-| [MySQL](https://www.mysql.com) — stable | ✓ | * | * |
+| [MySQL](https://www.mysql.com) — stable | ✓ | ✓ | * |
 
 `*` — unsupported/partial:
-- `MySql::hasWorkers()` reports no workers without checking,
 - `MySql::setWorkTimeout()` is accepted but not applied — idle timeouts are a
   worker concern, and the MySQL queue is shared through the table.
 
@@ -187,6 +186,71 @@ lease that cannot be written — a Redis ACL that permits the queue commands and
 The registry lives in `backq:workers:{queue}`, under the configured key prefix if
 you set one. `Illuminate\Queue\RedisQueue::clear()` does not remove it, and a
 `KEYS` dump will show it; an entry there means a lease, not a job.
+
+#### `MySql::hasWorkers()` needs one table
+
+`MySql::hasWorkers()` is answered the same way, from a companion table rather than
+a key, and **this is the one feature in BackQ that needs DDL**. Create it once, as
+the user of the queue:
+
+```sql
+CREATE TABLE `backq_workers` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `queue` varchar(64) NOT NULL,
+  `token` varbinary(16) NOT NULL,
+  `seen` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `backq_workers_token` (`token`),
+  KEY `backq_workers_queue_seen` (`queue`, `seen`),
+  KEY `backq_workers_seen` (`seen`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+The table name and the lease length are `JobConfig::$workerTable` and
+`JobConfig::$workerTtl`, both optional and defaulting to `backq_workers` and `300`.
+A worker announces itself on `bindRead()`, renews from `pickTask()` once every
+`workerTtl / 3` seconds, and deletes its row on `disconnect()`. A publisher only
+reads, and a publisher never appears in the count.
+
+MySQL shares one job table between every queue, so the registry carries a `queue`
+column of its own — that is the only way "is a worker on *this* queue" can be asked
+at all.
+
+Both the value and the expiry are written by the server (`NOW()`), so no PHP clock
+can disagree with the answer. `datetime` rather than `timestamp` is deliberate: a
+`TIMESTAMP` in that position would silently take `ON UPDATE CURRENT_TIMESTAMP` and
+be rewritten by any update.
+
+The same `workerTtl > longest job` rule applies, for the same reason: a worker
+mid-job is not renewing, so a job longer than the lease is a job during which the
+worker is invisible. An expired lease is not counted, whether or not the row has
+been deleted, so a killed worker stops being reported on its own — but its row
+stays in the table until a worker reaps it, and a worker reaps on the same
+`workerTtl / 3` schedule it renews on and not only at startup. A worker that binds
+once and runs for months never starts again, so a reap that lived only in
+`bindRead()` would leave one row per crash behind forever. The reap deletes what
+is three lease lengths past expiry, oldest first, 1000 rows at a time, and a lease
+that cannot be written does not stop it running.
+
+Both secondary indexes in that DDL are load-bearing and neither duplicates the
+other: the count filters on a queue *and* a time, so it needs `(queue, seen)`,
+while the reap filters on the time alone — it is the one statement in the feature
+that is not scoped to a queue — so it needs `(seen)`.
+
+`token` is `varbinary(16)` and holds a version 7 UUID, and the type is not a size
+preference: the adapter sends it as `UNHEX()`, and a `utf8mb4` `varchar` refuses
+16 raw bytes outright (error 1366). It is also worth knowing the id is
+time-based, so `SELECT HEX(token)` tells you when a lease was minted without
+joining anything. It is *not* monotonic — two tokens minted in the same
+millisecond are ordered by their random bits — and the width is the part that
+pays, 16 bytes in the unique key rather than a declared 256.
+
+A table you did not create degrades to `false` and logs one `debug` line, never an
+exception, and the registry is never load-bearing: a user who may read and write the
+queue but not the registry loses the answer, not the queue. The line is logged once per
+adapter, which for a long-running worker is once for the life of the process; under
+PHP-FPM it is once per request, so keep `debug` out of your production log level. What
+bounds the noise is the level, not the library.
 
 ### Building an adapter
 

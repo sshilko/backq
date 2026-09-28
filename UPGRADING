@@ -59,9 +59,9 @@
   (was `bool|int|null`). Concrete adapters return real values where the backend
   supports the check and `false` elsewhere: `Redis` answers from a per-queue
   lease registry the workers write (see below), `Beanstalk` implements the check
-  against real tube stats, and `MySql` reports "no workers" (a table queue has no
-  heartbeat, so there is nothing cheap to check). Subclasses overriding
-  `hasWorkers()` must declare a `bool` return type.
+  against real tube stats, and `MySql` answers from a companion worker table (also
+  see below). Subclasses overriding `hasWorkers()` must declare a `bool` return
+  type.
 
   **`Redis::hasWorkers()` is no longer the stub it was in 4.x.** It performs Redis
   I/O, so it can now log an `error` where it was previously silent, and it answers
@@ -71,6 +71,67 @@
   real answer, not from one answer to another. `RedisConfig` gained an eleventh
   field, `workerTtl` (default `300`, minimum `5`), appended last, so every existing
   construction — positional or named — keeps working.
+
+  **`MySql::hasWorkers()` is no longer the stub it was in 4.x either.** It counts
+  the rows of a companion `backq_workers` table, one per bound worker, answering
+  the same sentence Redis does. MySQL shares one job table between every queue, so
+  the registry carries a `queue` column of its own; that is the only way "is a
+  worker on *this* queue" can be asked at all.
+
+  ```sql
+  CREATE TABLE `backq_workers` (
+    `id` int unsigned NOT NULL AUTO_INCREMENT,
+    `queue` varchar(64) NOT NULL,
+    `token` varbinary(16) NOT NULL,
+    `seen` datetime NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `backq_workers_token` (`token`),
+    KEY `backq_workers_queue_seen` (`queue`, `seen`),
+    KEY `backq_workers_seen` (`seen`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  ```
+
+  Both secondary indexes are load-bearing and neither duplicates the other. The
+  count filters on a queue *and* a time, so it needs `(queue, seen)`. The reap
+  filters on the time alone — it is the one statement in the feature that is not
+  scoped to a queue — so it needs `(seen)`; drop that index and the same `DELETE`
+  becomes a full scan *and* a `Using filesort` on every renew interval, measured
+  on 8.0.46. If you are creating the table from an older copy of this file, add
+  the second key.
+
+  **`token` is `varbinary(16)`, and that is not only a size.** It holds a version
+  7 UUID, the adapter sends it as `UNHEX()` of the 32 hex characters, and a
+  `utf8mb4` `varchar` rejects 16 raw bytes with error 1366 — measured — so a
+  table created from an older copy of this DDL does not merely carry a wider
+  index, it rejects the statement. `ALTER TABLE … MODIFY token varbinary(16)`
+  does not convert the old rows, so a table that is already in use has to be
+  emptied and re-leased; the leases are disposable, they expire on their own. The
+  id is time-based, so `SELECT HEX(token)` says when a lease was minted, and it is
+  not monotonic: within one millisecond the order is decided by the random bits.
+
+  **This is the one feature in the library that needs DDL.** The adapter never
+  runs it: a deployment that has not created the table answers "no workers" and
+  logs one `debug` line and never raises — once per adapter, so once for the life of a
+  long-running worker, and once per request under PHP-FPM, where keeping `debug` out of
+  production is what bounds the noise. `JobConfig` gained two
+  optional trailing arguments, `string $workerTable` and `int $workerTtl`
+  (default `300`, minimum `JobConfig::WORKER_TTL_MIN`, 5, below which the
+  constructor now throws an `InvalidArgumentException` as `RedisConfig` already
+  did), so `workerTtl` means one thing across the library. They are appended last
+  because `JobConfig` is `final readonly` and existing code constructs it
+  positionally.
+
+  Set `workerTtl` above your longest job, for the same reason as on Redis and with
+  the same consequence: a worker mid-job is not renewing, so the answer is `false`
+  — publish anyway — rather than a wrong `true`. A worker that was `kill -9`'d
+  stops being counted when its lease expires; its row stays until a worker reaps
+  it, which is the operational difference from the Redis registry. The reap runs
+  on the renew's `workerTtl / 3` schedule and not only when a worker starts: a
+  worker that binds once and then runs for months never starts again, so a reap
+  that lived only in `bindRead()` would leave one row per crash behind forever.
+  It deletes what is three lease lengths past expiry, oldest first, 1000 rows at a
+  time, and a lease that cannot be written does not stop it running. A publisher
+  only reads, and a publisher never appears in the count.
 - **The process worker no longer writes to the PHP error log.** `BackQ\Worker\AProcess`
   reports unsupported payloads, child-launch failures, fork-cleanup failures,
   timeouts, signals and outer-loop failures through the PSR-3 logger set with
@@ -458,11 +519,6 @@
   third-party adapter in the wild exists for that reason. `new MySql($db, new
   JobConfig(), $logger)` is now the supported construction. The test double
   `BackQ\Tests\Support\TestMySqlAdapter` is deleted.
-- **`BackQ\Adapter\MySql::hasWorkers()` returns `false`, not `true`.** It
-  always reported `true` without checking anything; the query it would need is
-  the same query that already knows the answer, so it reports "no workers" the
-  way `Redis` does, at `debug` level, and the `README.md` feature table now says
-  so. `MySql::setWorkTimeout()` keeps its empty body and the same `debug` line.
 - **The MySQL queue's timestamps come from the database.** `pickTask()`,
   `putTask()` and the state update wrote `date('Y-m-d H:i:s')` interpolated into
   the SQL, so the job clock was the web server's clock and a second host could

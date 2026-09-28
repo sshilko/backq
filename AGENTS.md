@@ -79,6 +79,16 @@ wide pass is what proves you did not break a neighbour.
 9. `git status --short`, then `git diff` anything unexpected it names.
 10. `grep` the symbol you added or removed and expect the right answer in each direction.
 
+### The suite needs two services, not one
+
+`tests/Adapter/MySqlLiveTest.php` is the first test in this repository that executes a MySQL
+statement, and `phpunit.xml` sets `failOnSkipped="true"`, so its reachability guard turning
+into a skip is a **failed run**. `build/docker-compose.yaml` therefore carries `mysql80`
+alongside `redis`, and `app-php83` waits for it with `condition: service_healthy` — a
+host-side `composer app-tests` now needs both services, not just Redis. That is the honest
+consequence of the live tests, not a regression; if you are on the host, export
+`BACKQ_MYSQL_PORT=4306` (the published port) alongside the existing `BACKQ_REDIS_PORT`.
+
 ### Commands
 
 | Command (in the container) | Pass signal |
@@ -147,17 +157,29 @@ script; on the host, never.
   `phpmd-rulesets.xml`, `pdepend.xml`, `stubs/`, `check-classes.php`,
   `.pre-commit-config.yaml`) and the dockerized dev env
 - `example/` — runnable examples, not shipped. `plans/` — implementation plans. As implemented:
-  1-7 and 9 are done, 8 (`plan-8-redis-has-workers-local-registry.md`) is **proposed and not
-  started** — it is the *alternative* to the implemented plan 9, not a step after it. The
-  implemented ones are historical records, and a historical record can be wrong about its own
-  present: plans 1-5 still describe the `Nsq` adapter, which 5.x removed (see `UPGRADING`),
-  `plan-5` still says `AbstractAdapter::JOBTTR_DEFAULT` stayed, which it did not, `plan-6` still
-  counts 9 `error_log()` call sites in 4 files — 3 of them went with the `Amazon\SNS` workers, so
-  6 remained, all in `AProcess`, and `plan-7`'s own status block now contradicts the
-  "proposed and not started" line this list used to carry. Read a plan's status block before
-  trusting its body, and expect a shipped plan's sketches to be right about the design and wrong
-  about the plumbing: plan 9 ends with a "Corrections this plan needed" section because four of
-  its code sketches did not survive contact with the container.
+  1-7, 9 and 11 are done. 8 (`plan-8-redis-has-workers-local-registry.md`) is **proposed and not
+  started** — it is the *alternative* to the implemented plan 9, not a step after it. Plan 10
+  (`plan-10-mysql-has-workers-named-lock.md`) is the same shape for `MySql::hasWorkers()` and is
+  **also proposed and not started**, also the alternative to plan 11 rather than a step after it.
+  Its problem statement is *historical*: `hasWorkers()` was a stub when plan 10 was written and is
+  now answered from a table, so plan 10 is no longer the fix for anything — what survives of it is
+  the decision "the `CREATE TABLE` is unacceptable in my deployment". All three proposed plans
+  shared a prerequisite their predecessors did not, and plan 11 removed it: **there was no MySQL
+  service in `build/docker-compose.yaml`, so this repository had never executed one MySQL
+  statement**, and every test in `tests/Adapter/MySqlAdapterTest.php` asserted a string against a
+  `createMock(mysqli)` rather than a result. There is a `mysql80` service and a
+  `tests/Adapter/MySqlLiveTest.php` now — so the container is required for a green suite, not just
+  Redis (see "The suite needs two services, not one"). The implemented ones are historical records,
+  and a historical record can be wrong about its own present: plans 1-5 still describe the `Nsq`
+  adapter, which 5.x removed (see `UPGRADING`), `plan-5` still says
+  `AbstractAdapter::JOBTTR_DEFAULT` stayed, which it did not, `plan-6` still counts 9
+  `error_log()` call sites in 4 files — 3 of them went with the `Amazon\SNS` workers, so 6
+  remained, all in `AProcess`, and `plan-7`'s own status block now contradicts the "proposed and
+  not started" line this list used to carry. Read a plan's status block before trusting its body,
+  and expect a shipped plan's sketches to be right about the design and wrong about the plumbing:
+  plan 9 ends with a "Corrections this plan needed" section because four of its code sketches did
+  not survive contact with the container, and plan 11's has **fourteen**, seven of which a mocked
+  suite cannot catch.
 - `.github/workflows/ci.yml` builds the same php83 image and runs the same check-classes
   and PHPUnit steps on every PR, so a green local sweep matches CI
 
@@ -201,6 +223,86 @@ precondition to check. `Redis::queue()` is the companion accessor: it throws
 `RuntimeException` when `$queue` is null, and that is an invariant break which must never
 escape uncaught, so a psalm `RedundantPropertyInitializationCheck` on `$this->queue` is a real
 report, not noise to suppress.
+
+  **`MySql::hasWorkers()` is a `SELECT`, and `write()` answers `0` for anything that produced
+  a result set** (`src/Adapter/MySql.php` `write()`). It frees the result and returns
+  `max(0, affected_rows)`, so a `hasWorkers()` built on it reports "no workers" on every
+  call, forever, with `MySqlAdapterTest` fully green behind it — the mock answers every
+  statement with a `mysqli_result`, so `write()`'s `0` is exactly what the mock returns.
+  Only `MySqlLiveTest` reaches a real server. This is the MySQL twin of the `getRedis()`
+  trap, and the rule is the same: **the offline layer asserts the string, and a string being
+  right is not the statement being run.** `select()` and its `instanceof mysqli_result`
+  narrowing are what stand between a result set and a wrong answer; do not "simplify" it.
+  `mysqli::query()` has **no declared return type** (measured by reflection), so that
+  narrowing is the only thing psalm has to go on.
+
+  Two more from the same adapter, both measured against MySQL 8.0.46 rather than quoted:
+  **`VALUES(col)` in `ON DUPLICATE KEY UPDATE` raises `Warning 1287`** on 8.0.20+, and the
+  8.0.19+ row-alias spelling that replaced it would put a version floor on the adapter. The
+  lease therefore names the queue literally in the `UPDATE` clause, which needs neither and
+  raises nothing. And **`ER_NO_SUCH_TABLE` is 1146, not 1144** — 1144 is a missing storage
+  engine, and 1205 is the lock-wait timeout. `hasWorkers()` de-duplicates on 1146 alone, so
+  getting that number wrong turns every unrelated failure into one `debug` line per process.
+
+  **`backq_workers.token` is `varbinary(16)`, and that is a constraint on the value, not a size
+  setting.** The adapter sends the token as `UNHEX()` of its 32 hex characters, and a `utf8mb4`
+  `varchar` refuses the result outright — `ERROR 1366 (HY000): Incorrect string value` for column
+  `token`, measured. So a table created from an older copy of the DDL does not merely carry a
+  wider index: **it rejects every lease write**, inside `attempt()`, as one logged `error` per
+  interval per worker and a table that never fills. Three rules come with it, all measured:
+  - **Never interpolate the 16 raw bytes.** A random byte is `0x00` half the time and `0x22` half
+    the time, so the raw form ends the literal early — the *first* token raised
+    `syntax error … near '??ua?|", NOW())' at line 1`. Only the hex goes in the statement.
+  - **No dashes inside `UNHEX()`.** It is not a parser: it answers `NULL` for anything that is not
+    pairs of hex digits, and `NULL` into a `NOT NULL` column is a second, quieter failure. The
+    dashed spelling is the log line's problem, not the statement's.
+  - **The token is a UUIDv7 and it is *not* monotonic.** 20,000 minted back to back came out
+    strictly ascending 50.1% of the time — within one millisecond the order is the random bits,
+    as RFC 9562 specifies. That would buy insert locality only for a *clustered* key, and the
+    clustered key here is the auto-increment `id`; `token` is a secondary UNIQUE key read by
+    equality. The width (256 bytes per key down to 16) and a legible `SELECT HEX(token)` are what
+    it buys — **82 KB on 10,000 rows by `ANALYZE TABLE`, not a factor of sixteen**, because the
+    old tokens were 20–32 characters rather than 64. Do not claim locality for this table.
+  The token's embedded milliseconds are **PHP's** clock and `seen` is the **server's**; nothing
+  compares them, so a host with a wrong clock writes a wrong time in the token and a right expiry.
+  It is a diagnostic, never a source of truth.
+
+  **The registry's reap is on a schedule, so the index on `seen` alone is not a copy of the
+  one on `(queue, seen)`.** The reap is the only statement in the feature that is not
+  queue-scoped, so it filters on `seen` by itself, and it is the only one the
+  `(queue, seen)` index cannot serve. Measured on 8.0.46 with `EXPLAIN`: with
+  `backq_workers_seen` the `DELETE` is `type=range` on that key, and without it the same
+  statement is `type=ALL`, `key=NULL`, **`Using filesort`** — a scan *and* a sort, because
+  `ORDER BY seen` then has nothing to read in order. The count is unaffected by that drop
+  (`type=index`, `key=backq_workers_queue_seen`, `Using index`), which is what makes the two
+  keys distinct rather than one duplicated. The DDL is in four places — the `MySql` class
+  docblock, `README.md`, `UPGRADING` and `tests/Adapter/MySql/Schema.php` — and a fifth copy
+  arrives in any deployment that copied it from an older README, so read the key list rather
+  than assuming. `MySqlLiveTest` asserts the plan with `EXPLAIN`, which is the only assertion
+  in the file that needs a populated table to mean anything: `type` and `key` are the server's
+  choice, `rows` is a guess against a table the fixture just emptied.
+
+  **A reap nested inside the lease's `attempt()` is a silent leak, and the mock cannot see
+  it.** `announce()` runs the lease and the reap as two separate `attempt()` calls, and
+  `bindRead()` and `renew()` both go through it. One `attempt()` around both would make the
+  first failure skip the second, which is exactly the deployment the plan's own text worried
+  about: a user granted `SELECT`/`INSERT`/`UPDATE` but not `DELETE`. The leases keep working,
+  the picks keep working, `hasWorkers()` keeps answering correctly, and the table grows
+  forever with one `error` line per interval per worker. `attempt()` logs every `Throwable` at
+  `error` unconditionally, so "it is only in the log" is the whole of the symptom.
+
+  **`bindRead()` runs once per process, before the worker's `while (true)`** (`src/Worker/AbstractWorker.php`
+  `:193`, the loop is at `:263`). That is why the reap lives in `renew()` as well as in
+  `bindRead()`: a worker that binds once and then runs for months never starts again, so a
+  startup-only reap leaks one row per crash in exactly the deployments — a stable long-lived
+  fleet — where nobody is restarting anything to notice. Measured before the fix: 7035 pick
+  cycles over three seconds left a 4000-second-old row untouched at a 15-second threshold.
+  It read `hasWorkers() === false` throughout, so the answer was never wrong — the table just
+  never shrank. The regression test is
+  `MySqlLiveTest::testARunningWorkerReapsADeadPeerWithoutRestarting`, and its ordering is the
+  test: a reap on the *first* pick would pass against the old code and prove nothing, so the
+  dead peer is seeded after the startup reap and the assertion waits for a pick that is past
+  the interval.
 
   `Queue::getRedis()` is the other one, and it costs more: it is **declared**
   `Illuminate\Contracts\Redis\Factory` and **answers a `BackQ\Adapter\Redis\Manager`**, whose
@@ -261,6 +363,12 @@ Each of these yields a wrong result rather than an error.
   re-probe it with a deliberate mismatch before trusting a change to it. The other three
   files that used to carry `@phpcs:disable` (`Beanstalk.php`, `PersistentBeanstalk.php`,
   `IO/StreamIO.php`) are linted and gated normally — do not re-add the suppression to them.
+- **Prove every `@psalm-suppress` is load-bearing by deleting it and re-running.** Psalm will
+  not report an annotation as unused, so a predicted count is a guess wearing a number's
+  clothes. Plan 11 predicted `MySql.php` 3 → 7 and `src/Adapter/` 14 → 18 for the six
+  methods it added; all four were written, and psalm reported nothing without any of them, so
+  the measured count is **3** and **14** — unchanged. Four unused annotations are four lines
+  of noise, and worse, they teach the next reader a rule that is not true.
 - **Do not re-enable the sniffs excluded in `build/phpcs-ruleset.xml`**:
   `AttributesOrder` needs `orderAlphabetically=true`, and `DisallowTrailingCommaInDeclaration`
   plus `DisallowNonCapturingCatch` conflict with their matching "Require" sniffs and send
@@ -277,8 +385,14 @@ Each of these yields a wrong result rather than an error.
   are new methods with the same call style, and again from 12 to 14 when
   `Redis::hasWorkers()` gained its lease registry, whose two `is_int()` shape checks on `ZADD`
   and `ZCARD` need `@psalm-suppress TypeDoesNotContainType` — psalm reads both commands as
-  always answering `int`, while phpredis declares `Redis|int|false`. So adding a method that
-  logs through `$this?->logger` needs its own suppression, removing a log line may let one go,
+  always answering `int`, while phpredis declares `Redis|int|false`. **The MySQL worker
+  registry did not move the count at all**, which is the exception worth knowing: `Redis`'s
+  logger is a nullable property and `MySql`'s is a mandatory constructor parameter whose
+  widening the class docblock's two annotations already cover, so `MySql::hasWorkers()`,
+  `bindRead()`, `disconnect()`, `lease()`, `renew()` and `reap()` all log through
+  `$this?->logger` and need none. So adding a method that
+  logs through `$this?->logger` needs its own suppression *when the logger is a nullable
+  property*, removing a log line may let one go,
   and a runtime guard on a value psalm has already narrowed to one type needs its own
   `TypeDoesNotContainType` — re-measure with `grep -rn 'psalm-suppress' src/Adapter/` rather
   than assuming a direction.
@@ -307,4 +421,12 @@ Each of these yields a wrong result rather than an error.
 - Prefer typed properties and parameters. No comments unless they add real value
 - Never commit `vendor/` or secrets; `composer.lock` **is** tracked
 - New public API needs an `UPGRADING` entry
-- **`trigger_error()` MUST NEVER be used** — not in `src/`, `tests/` or `example/`
+- **`trigger_error()` MUST NEVER be used in new code** — not in `src/`, `tests/` or `example/`.
+  The rule is currently violated in 3 pre-existing call sites, all untouched by this work and all
+  predating it: `Publisher/AbstractPublisher.php:54` (a deprecation notice), and
+  `Worker/AProcess.php:248` and `Worker/GuzzleForwarder.php:127` (both at `E_USER_WARNING`, which
+  is the one that matters — it goes to stderr, not to a PSR-3 handler, so a host that redirects
+  stderr loses the message and a host that has `display_errors=Off` shows the user nothing).
+  Migrating them is its own change, not a drive-by. A rule stated as absolute and broken in three
+  places is worse than no rule, so the count is stated here rather than left for the next reader
+  to discover with `grep`.
