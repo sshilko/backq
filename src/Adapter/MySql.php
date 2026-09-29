@@ -415,9 +415,8 @@ class MySql extends AbstractAdapter
                 }
 
                 $this->registryMissing = true;
-                /** @phan-suppress-next-line PhanSuspiciousMagicConstant */
                 $this?->logger->debug(
-                    __FUNCTION__ . ': no ' . $this->config->workerTable . ' table, reporting no workers. '
+                    'hasWorkers: no ' . $this->config->workerTable . ' table, reporting no workers. '
                         . 'Create it, see the README for the DDL'
                 );
 
