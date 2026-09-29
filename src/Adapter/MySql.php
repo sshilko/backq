@@ -415,6 +415,7 @@ class MySql extends AbstractAdapter
                 }
 
                 $this->registryMissing = true;
+                /** @phan-suppress-next-line PhanSuspiciousMagicConstant */
                 $this?->logger->debug(
                     __FUNCTION__ . ': no ' . $this->config->workerTable . ' table, reporting no workers. '
                         . 'Create it, see the README for the DDL'
@@ -800,6 +801,7 @@ class MySql extends AbstractAdapter
         $bytes[6] = chr((ord($bytes[6]) & 0x0F) | 0x70);
         $bytes[8] = chr((ord($bytes[8]) & 0x3F) | 0x80);
 
+        /** @phan-suppress-next-line PhanTypeMismatchArgumentInternal */
         return bin2hex($bytes);
     }
 
